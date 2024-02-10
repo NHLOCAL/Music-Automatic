@@ -1,7 +1,8 @@
 import os
 
-from jibrish_to_hebrew import jibrish_to_hebrew
+from jibrish_to_hebrew import fix_jibrish, check_jibrish
 import eyed3
+from mutagen import File
 
 
 class FileManager:
@@ -18,7 +19,20 @@ class FileManager:
     def build_folder_structure(self, func):
         """יצירת רשימת קבצים ותיקיות"""
         pass
-    
+
+
+    def summary_message(self, files_list, description):
+        """הדפסת הודעת סיכום בסיום הפעלת פונקציה"""
+        
+        self.counting = len(files_list)
+        
+        if self.counting < 1:
+            print('No matching files or folders found, no changes made!')
+        
+        else:    
+            print(f'Num. of {description}: {counting}')
+        
+        
 
     def delete_empty_folders(self):
     
@@ -34,48 +48,74 @@ class FileManager:
                     os.rmdir(folder_path)
                     delete_folders.append(folder_path)
 
-        print(f'Num. of empty folders deleted: {len(delete_folders)}')
-
-
+        self.summary_message(delete_folders, 'empty folders deleted')
 
 
     def fix_jibrish_files(self):
-    
         '''המרת קבצים עם קידוד פגום לעברית תקינה'''
+        
+        files_with_changes = []
         
         for root, dirs, files in os.walk(self.root_dir):
             for file in files:
                 if file.lower().endswith((".mp3", ".wav", ".wma")):
                     file_path = os.path.join(root, file)
-
-                    try:
-                        # Load the MP3 file
-                        audiofile = eyed3.load(file_path)
-
-                        # Apply custom function to album name and title
-                        if audiofile.tag.album:
-                            new_album_name = jibrish_to_hebrew(audiofile.tag.album)
-                            audiofile.tag.album = new_album_name
-
-                        if audiofile.tag.title:
-                            new_title = jibrish_to_hebrew(audiofile.tag.title)
-                            audiofile.tag.title = new_title
-
-                        # Save changes to the MP3 file
-                        audiofile.tag.save()
-
+                    
+                    # Load the MP3 file
+                    audiofile = eyed3.load(file_path)
+                    
+                    # Flag to track changes in the file
+                    changed = False
+                    
+                    # Apply custom function to album name and title
+                    if audiofile.tag.album and check_jibrish(audiofile.tag.album): 
+                        new_album_name = fix_jibrish(audiofile.tag.album)
+                        audiofile.tag.album = new_album_name
                         print(f"Updated Album: {new_album_name}")
+                        changed = True
+                    
+                    if audiofile.tag.title and check_jibrish(audiofile.tag.title):
+                        new_title = fix_jibrish(audiofile.tag.title)
+                        audiofile.tag.title = new_title
                         print(f"Updated Title: {new_title}")
+                        changed = True
+                    
+                    # Save changes to the MP3 file if changes were made
+                    if changed:
+                        audiofile.tag.save()
+                        files_with_changes.append(file_path)
+                        
+        self.summary_message(files_with_changes, 'Damaged files repaired')
 
-                    except Exception as e:
-                        print(f"Error processing {file}: {e}")
 
+    def check_albumart(self):
+    
+        albumart_generator = 
+        
+        for root, dirs, files in os.walk(self.root_dir):
+        for file in files:
+            if file.lower().endswith((".mp3", ".wav", ".wma")):
+                file_path = os.path.join(root, file)
+    
+        audio = File( filepath )
+        for k in audio.keys():
+            if u'covr' in k or u'APIC' in k:
+                return True
 
 
 
 if __name__ == "__main__":
-    root_directory = input('Add path folder\n>>>')
+    while True:
+        root_directory = input('Add path folder\n>>> ')
+        
+        # Check if the entered path exists
+        if os.path.exists(root_directory):
+            break
+        else:
+            print("The entered path does not exist. Please enter a valid path.")
+
+
     file_manager = FileManager(root_directory)
 
-    action = input('Choose action ([1] delete_empty_folders, [2] etc.)\n>>>')
+    action = input('Choose action ([1] delete_empty_folders, [2] fix_jibrish_files)\n>>>')
     file_manager.perform_action(int(action))
