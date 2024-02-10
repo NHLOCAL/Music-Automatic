@@ -14,6 +14,8 @@ class FileManager:
             self.delete_empty_folders()
         elif action == 2:
             self.fix_jibrish_files()
+        elif action == 3:
+            self.check_albumart()
 
 
     def build_folder_structure(self):
@@ -129,5 +131,19 @@ if __name__ == "__main__":
 
     file_manager = FileManager(root_directory)
 
-    action = input('Choose action ([1] delete_empty_folders, [2] fix_jibrish_files)\n>>>')
+    while True: 
+        action = input('''
+Choose action:
+
+    [1] delete_empty_folders = Deleting empty folders from the folder tree
+    [2] fix_jibrish_files = Fix wrong encoding in the music files
+    [3] check_albumart = Checking files that do not contain album art
+
+>>>''')
+    
+        if action.isdigit():
+            break
+        else:
+            print('Please enter a valid number to continue!')
+
     file_manager.perform_action(int(action))
