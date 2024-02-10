@@ -16,9 +16,14 @@ class FileManager:
             self.fix_jibrish_files()
 
 
-    def build_folder_structure(self, func):
+    def build_folder_structure(self):
         """יצירת רשימת קבצים ותיקיות"""
-        pass
+        for root, dirs, files in os.walk(self.root_dir):
+            for file in files:
+                if file.lower().endswith((".mp3", ".wav", ".wma")):
+                    file_path = os.path.join(root, file)
+                    
+                    yield file_path
 
 
     def summary_message(self, files_list, description):
@@ -54,53 +59,51 @@ class FileManager:
     def fix_jibrish_files(self):
         '''המרת קבצים עם קידוד פגום לעברית תקינה'''
         
+        list_generator = build_folder_structure()
         files_with_changes = []
         
-        for root, dirs, files in os.walk(self.root_dir):
-            for file in files:
-                if file.lower().endswith((".mp3", ".wav", ".wma")):
-                    file_path = os.path.join(root, file)
+        for file_path in list_generator:
                     
-                    # Load the MP3 file
-                    audiofile = eyed3.load(file_path)
-                    
-                    # Flag to track changes in the file
-                    changed = False
-                    
-                    # Apply custom function to album name and title
-                    if audiofile.tag.album and check_jibrish(audiofile.tag.album): 
-                        new_album_name = fix_jibrish(audiofile.tag.album)
-                        audiofile.tag.album = new_album_name
-                        print(f"Updated Album: {new_album_name}")
-                        changed = True
-                    
-                    if audiofile.tag.title and check_jibrish(audiofile.tag.title):
-                        new_title = fix_jibrish(audiofile.tag.title)
-                        audiofile.tag.title = new_title
-                        print(f"Updated Title: {new_title}")
-                        changed = True
-                    
-                    # Save changes to the MP3 file if changes were made
-                    if changed:
-                        audiofile.tag.save()
-                        files_with_changes.append(file_path)
+            # Load the MP3 file
+            audiofile = eyed3.load(file_path)
+            
+            # Flag to track changes in the file
+            changed = False
+            
+            # Apply custom function to album name and title
+            if audiofile.tag.album and check_jibrish(audiofile.tag.album): 
+                new_album_name = fix_jibrish(audiofile.tag.album)
+                audiofile.tag.album = new_album_name
+                print(f"Updated Album: {new_album_name}")
+                changed = True
+            
+            if audiofile.tag.title and check_jibrish(audiofile.tag.title):
+                new_title = fix_jibrish(audiofile.tag.title)
+                audiofile.tag.title = new_title
+                print(f"Updated Title: {new_title}")
+                changed = True
+            
+            # Save changes to the MP3 file if changes were made
+            if changed:
+                audiofile.tag.save()
+                files_with_changes.append(file_path)
                         
         self.summary_message(files_with_changes, 'Damaged files repaired')
 
 
     def check_albumart(self):
-    
-        albumart_generator = 
+        '''בדיקה אם שירים מכילים תמונת אלבום'''
         
-        for root, dirs, files in os.walk(self.root_dir):
-        for file in files:
-            if file.lower().endswith((".mp3", ".wav", ".wma")):
-                file_path = os.path.join(root, file)
-    
-        audio = File( filepath )
-        for k in audio.keys():
-            if u'covr' in k or u'APIC' in k:
-                return True
+        list_generator = build_folder_structure()
+        files_with_changes = []
+        
+        for file_path in list_generator:
+            meta_file = File(file_path)
+            
+            for k in meta_file.keys():
+                if u'covr' in k or u'APIC' in k:
+                    files_with_changes.append(file_path)
+            
 
 
 
