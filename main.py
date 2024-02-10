@@ -22,7 +22,6 @@ class FileManager:
             for file in files:
                 if file.lower().endswith((".mp3", ".wav", ".wma")):
                     file_path = os.path.join(root, file)
-                    
                     yield file_path
 
 
@@ -35,7 +34,7 @@ class FileManager:
             print('No matching files or folders found, no changes made!')
         
         else:    
-            print(f'Num. of {description}: {counting}')
+            print(f'Num. of {description}: {self.counting}')
         
         
 
@@ -59,7 +58,7 @@ class FileManager:
     def fix_jibrish_files(self):
         '''המרת קבצים עם קידוד פגום לעברית תקינה'''
         
-        list_generator = build_folder_structure()
+        list_generator = self.build_folder_structure()
         files_with_changes = []
         
         for file_path in list_generator:
@@ -94,16 +93,26 @@ class FileManager:
     def check_albumart(self):
         '''בדיקה אם שירים מכילים תמונת אלבום'''
         
-        list_generator = build_folder_structure()
-        files_with_changes = []
+        list_generator = self.build_folder_structure()
+        files_found = set()
         
         for file_path in list_generator:
+            
+            result = False
             meta_file = File(file_path)
             
             for k in meta_file.keys():
-                if u'covr' in k or u'APIC' in k:
-                    files_with_changes.append(file_path)
+                if not u'covr' in k and not u'APIC' in k:
+                    result = False
+                else:
+                    result = True
+                    break
             
+            if result is False:
+                files_found.add(file_path)
+        
+        self.summary_message(files_found, 'Files without album art found')
+        print(files_found)
 
 
 
