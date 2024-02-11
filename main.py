@@ -38,7 +38,8 @@ class FileManager:
         else:    
             print(f'Num. of {description}: {self.counting}')
         
-        
+
+class MusicManger(FileManager):
 
     def delete_empty_folders(self):
     
