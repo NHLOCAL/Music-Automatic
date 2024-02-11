@@ -5,6 +5,7 @@ import eyed3
 from mutagen import File
 
 
+# הפעלה ראשונית ופעולות בסיס
 class FileManager:
     def __init__(self, root_dir):
         self.root_dir = root_dir
@@ -39,6 +40,7 @@ class FileManager:
             print(f'Num. of {description}: {self.counting}')
         
 
+# פעולות על מוזיקה ותיקיות
 class MusicManger(FileManager):
 
     def delete_empty_folders(self):
