@@ -17,6 +17,8 @@ class FileManager:
             self.fix_jibrish_files()
         elif action == 3:
             self.check_albumart()
+        elif action == 4:
+            self.fix_track_names()
 
 
     def build_folder_structure(self):
@@ -89,7 +91,7 @@ class MusicManger(FileManager):
             
             # Save changes to the MP3 file if changes were made
             if changed:
-                audiofile.tag.save()
+                audiofile.tag.save(encoding='utf-8')
                 files_with_changes.append(file_path)
                         
         self.summary_message(files_with_changes, 'Damaged files repaired')
@@ -119,6 +121,55 @@ class MusicManger(FileManager):
         self.summary_message(files_found, 'Files without album art found')
         print(files_found)
 
+
+# תיקון ושינוי שמות קבצים במגוון שיטות
+class FixNames(FileManager):
+    
+    def fix_track_names(self):
+        '''Replace "track" with "רצועה" in file names and titles'''
+        
+        list_generator = self.build_folder_structure()
+        files_with_changes = []
+        
+        for file_path in list_generator:
+            file_name = os.path.basename(file_path)
+            file_name, file_extension = os.path.splitext(file_name)
+            
+            # Check if "track" exists in the file name
+            if "track" in file_name.lower():
+                # Replace "track" with "רצועה" in the file name
+                new_file_name = file_name.lower().replace("track", "רצועה") + file_extension
+                new_file_path = os.path.join(os.path.dirname(file_path), new_file_name)
+                os.rename(file_path, new_file_path)
+                print(f"Updated File Name: {new_file_path}")
+                files_with_changes.append(new_file_path)
+            
+            
+            # Load the MP3 file
+            audiofile = eyed3.load(file_path)
+            
+            # Flag to track changes in the file
+            changed = False
+            
+            # Check if "track" exists in the title
+            if audiofile.tag.title and "track" in audiofile.tag.title.lower():
+                # Replace "track" with "רצועה" in the title
+                try:
+                    new_title = audiofile.tag.title.lower().replace("track", "רצועה")
+                    audiofile.tag.title = new_title
+                    print(f"Updated Title: {new_title}")
+                    changed = True
+
+                except :
+                    pass
+            
+            # Save changes to the MP3 file if changes were made
+            if changed:
+                audiofile.tag.save(encoding='utf-8')
+                files_with_changes.append(file_path)
+            
+                        
+        self.summary_message(files_with_changes, 'Track names fixed')
 
 
 if __name__ == "__main__":
