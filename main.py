@@ -62,41 +62,6 @@ class MusicManger(FileManager):
         self.summary_message(delete_folders, 'empty folders deleted')
 
 
-    def fix_jibrish_files(self):
-        '''המרת קבצים עם קידוד פגום לעברית תקינה'''
-        
-        list_generator = self.build_folder_structure()
-        files_with_changes = []
-        
-        for file_path in list_generator:
-                    
-            # Load the MP3 file
-            audiofile = eyed3.load(file_path)
-            
-            # Flag to track changes in the file
-            changed = False
-            
-            # Apply custom function to album name and title
-            if audiofile.tag.album and check_jibrish(audiofile.tag.album): 
-                new_album_name = fix_jibrish(audiofile.tag.album)
-                audiofile.tag.album = new_album_name
-                print(f"Updated Album: {new_album_name}")
-                changed = True
-            
-            if audiofile.tag.title and check_jibrish(audiofile.tag.title):
-                new_title = fix_jibrish(audiofile.tag.title)
-                audiofile.tag.title = new_title
-                print(f"Updated Title: {new_title}")
-                changed = True
-            
-            # Save changes to the MP3 file if changes were made
-            if changed:
-                audiofile.tag.save(encoding='utf-8')
-                files_with_changes.append(file_path)
-                        
-        self.summary_message(files_with_changes, 'Damaged files repaired')
-
-
     def check_albumart(self):
         '''בדיקה אם שירים מכילים תמונת אלבום'''
         
@@ -170,6 +135,43 @@ class FixNames(FileManager):
             
                         
         self.summary_message(files_with_changes, 'Track names fixed')
+
+
+
+    def fix_jibrish_files(self):
+        '''המרת קבצים עם קידוד פגום לעברית תקינה'''
+        
+        list_generator = self.build_folder_structure()
+        files_with_changes = []
+        
+        for file_path in list_generator:
+                    
+            # Load the MP3 file
+            audiofile = eyed3.load(file_path)
+            
+            # Flag to track changes in the file
+            changed = False
+            
+            # Apply custom function to album name and title
+            if audiofile.tag.album and check_jibrish(audiofile.tag.album): 
+                new_album_name = fix_jibrish(audiofile.tag.album)
+                audiofile.tag.album = new_album_name
+                print(f"Updated Album: {new_album_name}")
+                changed = True
+            
+            if audiofile.tag.title and check_jibrish(audiofile.tag.title):
+                new_title = fix_jibrish(audiofile.tag.title)
+                audiofile.tag.title = new_title
+                print(f"Updated Title: {new_title}")
+                changed = True
+            
+            # Save changes to the MP3 file if changes were made
+            if changed:
+                audiofile.tag.save(encoding='utf-8')
+                files_with_changes.append(file_path)
+                        
+        self.summary_message(files_with_changes, 'Damaged files repaired')
+
 
 
 if __name__ == "__main__":
