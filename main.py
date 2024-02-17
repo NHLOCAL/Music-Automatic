@@ -4,6 +4,7 @@ from jibrish_to_hebrew import fix_jibrish, check_jibrish
 import eyed3
 from mutagen import File
 
+from mutagen.easyid3 import EasyID3
 
 # הפעלה ראשונית ופעולות בסיס
 class FileManager:
@@ -145,32 +146,29 @@ class FixNames(FileManager):
         files_with_changes = []
         
         for file_path in list_generator:
-                    
             # Load the MP3 file
-            audiofile = eyed3.load(file_path)
+            audiofile = EasyID3(file_path)
             
             # Flag to track changes in the file
             changed = False
             
-            # Apply custom function to album name and title
-            if audiofile.tag.album and check_jibrish(audiofile.tag.album): 
-                new_album_name = fix_jibrish(audiofile.tag.album)
-                audiofile.tag.album = new_album_name
-                print(f"Updated Album: {new_album_name}")
-                changed = True
+            # Define the fields to check and update
+            fields_to_check = ['album', 'title', 'artist', 'albumartist', 'genre']
             
-            if audiofile.tag.title and check_jibrish(audiofile.tag.title):
-                new_title = fix_jibrish(audiofile.tag.title)
-                audiofile.tag.title = new_title
-                print(f"Updated Title: {new_title}")
-                changed = True
-            
+            for field in fields_to_check:
+                if field in audiofile and check_jibrish(audiofile[field][0]):
+                    new_value = fix_jibrish(audiofile[field][0])
+                    audiofile[field] = new_value
+                    print(f"Updated {field.capitalize()}: {new_value}")
+                    changed = True
+                
             # Save changes to the MP3 file if changes were made
             if changed:
-                audiofile.tag.save(encoding='utf-8')
+                audiofile.save()
                 files_with_changes.append(file_path)
                         
         self.summary_message(files_with_changes, 'Damaged files repaired')
+
 
 
 
