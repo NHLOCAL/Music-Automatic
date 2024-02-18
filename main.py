@@ -1,5 +1,4 @@
 import os
-
 from jibrish_to_hebrew import fix_jibrish, check_jibrish
 from mutagen import File
 from mutagen.easyid3 import EasyID3
