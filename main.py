@@ -99,7 +99,6 @@ class FixNames(FileManager):
             file_name = os.path.basename(file_path)
             file_name, file_extension = os.path.splitext(file_name)
 
-
             # Load the MP3 file
             audiofile = EasyID3(file_path)
 
@@ -117,8 +116,7 @@ class FixNames(FileManager):
                     audiofile.save()
                 except:
                     pass
-
-            
+ 
             # Check if "track" exists in the file name
             if "track" in file_name.lower():
                 # Replace "track" with "רצועה" in the file name
@@ -127,7 +125,6 @@ class FixNames(FileManager):
                 os.rename(file_path, new_file_path)
                 print(f"Updated File Name: {new_file_path}")
                 changed = True
-
 
             # Save changes to the MP3 file if changes were made
             if changed:
