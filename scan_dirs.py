@@ -9,7 +9,7 @@ class FileManager:
         
     def build_folder_structure(self):
         """יצירת רשימת קבצים ותיקיות"""
-        for root, dirs, files in os.walk(self.root_dir):
+        for root, dirs, _ in os.walk(self.root_dir):
             for _dir in dirs:
                 dir_path = os.path.join(root, _dir)
                 files_in_dir =  [i for i in os.listdir(dir_path) if i.lower().endswith((".mp3", ".wav", ".wma"))]
