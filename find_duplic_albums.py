@@ -2,11 +2,11 @@ import os
 from collections import defaultdict
 from difflib import SequenceMatcher
 from mutagen.easyid3 import EasyID3
-
+import re
 
 def build_folder_structure(root_dir):
     """יצירת רשימת קבצים ותיקיות"""
-    for root, dirs, files in os.walk(root_dir):
+    for root, dirs, _ in os.walk(root_dir):
         for _dir in dirs:
             dir_path = os.path.join(root, _dir)
             files_in_dir =  [i for i in os.listdir(dir_path) if i.lower().endswith((".mp3", ".flac"))]
@@ -14,9 +14,13 @@ def build_folder_structure(root_dir):
             if files_in_dir == []:
                 continue
             
+            # בדיקה אם שמות השירים זהים, לאחר הסרת המספרים מהם
+            if len(set([re.sub(r'\d', '', i) for i in files_in_dir])) == 1:
+                continue
+
             if any(True for i in files_in_dir if "רצועה" in i or "track" in i.lower() or "audiotrack" in i.lower()):
                 continue
-                
+               
             yield dir_path, files_in_dir
 
 
