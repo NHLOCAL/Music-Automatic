@@ -65,31 +65,38 @@ class FolderComparer:
     def find_similar_folders(self, folder_files):
         """
         Find similar folders based on the information of file lists.
+        Return weighted score for all files in each folder for each parameter,
+        normalized by the number of files in the folder.
         """
-        similar_folders = defaultdict(list)
+        # Define weights for each parameter
+        weights = {'file': 5.0, 'album': 1.0, 'title': 3.0, 'artist': 1.0}
+
+        similar_folders = defaultdict(dict)
         processed_pairs = set()
         for folder_path, files in folder_files.items():
             for other_folder_path, other_files in folder_files.items():
-                if folder_path != other_folder_path and (other_folder_path, folder_path) not in processed_pairs:
-                    similarity_scores = []
-                    for file_info in files:
-                        for other_file_info in other_files:
-                            file_similarity = 0
-                            if file_info['album'] and other_file_info['album']:
-                                file_similarity += self.similar(file_info['album'], other_file_info['album'])
-                            if file_info['artist'] and other_file_info['artist']:
-                                file_similarity += self.similar(file_info['artist'], other_file_info['artist'])
-                            if file_info['file'] == other_file_info['file']:
-                                file_similarity += 1
-                            similarity_scores.append(file_similarity)
-                    if similarity_scores:
-                        avg_similarity = sum(similarity_scores) / len(similarity_scores)
-                        if avg_similarity > 2:  # Adjust threshold as needed
-                            similar_folders[folder_path].append(other_folder_path)
-                            processed_pairs.add((folder_path, other_folder_path))
+                if folder_path != other_folder_path and (other_folder_path, folder_path) not in processed_pairs and len(files) == len(other_files):
+                    folder_similarity = {}
+                    total_files = len(files)
+                    
+                    # Calculate similarity scores for each parameter
+                    for parameter in ['file', 'album', 'artist', 'title']:
+                        param_similarity = sum(self.similar(file_info[parameter], other_file_info[parameter]) if file_info[parameter] and other_file_info[parameter] else 0 for file_info, other_file_info in zip(files, other_files))
+                        folder_similarity[parameter] = param_similarity / total_files
+
+                    # Apply weights to individual scores
+                    weighted_score = sum(folder_similarity[param] * weights[param] for param in folder_similarity)
+                    folder_similarity['weighted_score'] = weighted_score
+
+                    if folder_similarity:
+                        similar_folders[(folder_path, other_folder_path)] = folder_similarity
+                        processed_pairs.add((folder_path, other_folder_path))
 
         return similar_folders
-    
+
+
+
+
 
     def similar(self, a, b):
         """
@@ -103,13 +110,18 @@ class FolderComparer:
         """
         folder_files = self.get_file_lists()
         similar_folders = self.find_similar_folders(folder_files)
-        for folder_path, similar_paths in similar_folders.items():
+        for folder_pair, similarities in similar_folders.items():
+            folder_path, other_folder_path = folder_pair
             print(f"Folder: {folder_path}")
-            print("Similar folders:")
-            for similar_path in similar_paths:
-                print(f"- {similar_path}")
+            print(f"Similar folder: {other_folder_path}")
+            print("Similarity scores:")
+            for parameter, score in similarities.items():
+                print(f"- {parameter.capitalize()}: {score}")
+            print()
+
+
 
 if __name__ == "__main__":
-    folder_paths = ["path/to/folder1", "path/to/folder2"]
+    folder_paths = [r"C:\Users\משתמש\Documents\space_automatic"]
     comparer = FolderComparer(folder_paths)
     comparer.main()
