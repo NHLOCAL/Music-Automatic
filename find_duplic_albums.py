@@ -69,7 +69,7 @@ class FolderComparer:
         normalized by the number of files in the folder.
         """
         # Define weights for each parameter
-        weights = {'file': 5.0, 'album': 1.0, 'title': 3.0, 'artist': 1.0}
+        weights = {'file': 5.0, 'album': 1.0, 'title': 3.5, 'artist': 0.5}
 
         similar_folders = defaultdict(dict)
         processed_pairs = set()
@@ -101,8 +101,13 @@ class FolderComparer:
     def similar(self, a, b):
         """
         Calculate similarity ratio between two strings.
+        If similarity level is less than 0.5, the result will be 0.
         """
-        return SequenceMatcher(None, a, b).ratio()
+        _ratio = SequenceMatcher(None, a, b).ratio()
+        if _ratio < 0.5:
+            return 0.0
+        return _ratio
+
 
     def main(self):
         """
@@ -110,7 +115,11 @@ class FolderComparer:
         """
         folder_files = self.get_file_lists()
         similar_folders = self.find_similar_folders(folder_files)
-        for folder_pair, similarities in similar_folders.items():
+        
+        # Sort similar folders by weighted score in descending order
+        sorted_similar_folders = sorted(similar_folders.items(), key=lambda x: x[1]['weighted_score'], reverse=True)
+        
+        for folder_pair, similarities in sorted_similar_folders:
             folder_path, other_folder_path = folder_pair
             print(f"Folder: {folder_path}")
             print(f"Similar folder: {other_folder_path}")
@@ -121,7 +130,8 @@ class FolderComparer:
 
 
 
+
 if __name__ == "__main__":
-    folder_paths = [r"C:\Users\משתמש\Documents\space_automatic"]
+    folder_paths = [r"D:\דברים שמתחדשים\חדשים כסליו\בעלזא"]
     comparer = FolderComparer(folder_paths)
     comparer.main()
