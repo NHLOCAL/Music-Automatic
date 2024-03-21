@@ -83,6 +83,7 @@ class FolderComparer:
 
         return self.folder_files
 
+
     def find_similar_folders(self, folder_files):
         """
         Find similar folders based on the information of file lists.
@@ -90,7 +91,7 @@ class FolderComparer:
         normalized by the number of files in the folder.
         """
         # Define weights for each parameter
-        weights = {'file': 5.0, 'album': 1.0, 'title': 3.5, 'artist': 0.5}
+        weights = {'file': 4.5, 'album': 1.0, 'title': 3.0, 'artist': 0.5, 'folder_name': 1.0}
 
         similar_folders = defaultdict(dict)
         processed_pairs = set()
@@ -100,6 +101,10 @@ class FolderComparer:
                     folder_similarity = {}
                     total_files = len(files)
                     
+                    # Calculate folder name similarity
+                    folder_name_similarity = self.similar(os.path.basename(folder_path), os.path.basename(other_folder_path))
+                    folder_similarity['folder_name'] = folder_name_similarity
+
                     for parameter in ['file', 'title', 'album', 'artist']:
                         total_similarity = 0
                         for file_info, other_file_info in zip(files, other_files):
@@ -117,6 +122,8 @@ class FolderComparer:
                         processed_pairs.add((folder_path, other_folder_path))
 
         return similar_folders
+
+
 
 
     # בדיקה אם רשימת קבצים בתיקיה הם בעלי שמות דומים מידי
