@@ -21,12 +21,6 @@ class FolderComparer:
                 if files_in_dir == []:
                     continue
 
-                if len(set([re.sub(r'\d', '', i) for i in files_in_dir])) == 1:
-                    continue
-
-                if any(True for i in files_in_dir if "רצועה" in i or "track" in i.lower() or "audiotrack" in i.lower()):
-                    continue
-
                 yield dir_path, files_in_dir
 
     def gather_file_info(self, folder_path, files_in_dir):
@@ -34,6 +28,9 @@ class FolderComparer:
         Collect information about files within a folder.
         """
         file_info = defaultdict(list)
+
+        generic_names = self.check_generic_names(files_in_dir)
+
         for file in files_in_dir:
             file_path = os.path.join(folder_path, file)
             try:
@@ -41,16 +38,28 @@ class FolderComparer:
                 artist = audio['artist'][0] if 'artist' in audio else None
                 album = audio['album'][0] if 'album' in audio else None
                 title = audio['title'][0] if 'title' in audio else None
-                file_info[folder_path].append({
-                    'file': file,
-                    'artist': artist,
-                    'album': album,
-                    'title': title,
-                })
+
+                # Check if generic_names is True, skip adding 'file' entry
+                if not generic_names:
+                    file_info[folder_path].append({
+                        'file': file,
+                        'artist': artist,
+                        'album': album,
+                        'title': title,
+                    })
+                else:
+                    # Only add artist, album, and title
+                    file_info[folder_path].append({
+                        'file': None,
+                        'artist': artist,
+                        'album': album,
+                        'title': title,
+                    })
             except Exception as e:
                 print(f"Error processing {file}: {e}")
 
         return file_info
+
 
     def get_file_lists(self):
         """
@@ -79,10 +88,13 @@ class FolderComparer:
                     folder_similarity = {}
                     total_files = len(files)
                     
-                    # Calculate similarity scores for each parameter
-                    for parameter in ['file', 'album', 'artist', 'title']:
-                        param_similarity = sum(self.similar(file_info[parameter], other_file_info[parameter]) if file_info[parameter] and other_file_info[parameter] else 0 for file_info, other_file_info in zip(files, other_files))
-                        folder_similarity[parameter] = param_similarity / total_files
+                    for parameter in ['file', 'title', 'album', 'artist']:
+                        total_similarity = 0
+                        for file_info, other_file_info in zip(files, other_files):
+                            if file_info[parameter] and other_file_info[parameter]:
+                                similarity_score = self.similar(file_info[parameter], other_file_info[parameter])
+                                total_similarity += similarity_score
+                        folder_similarity[parameter] = total_similarity / total_files
 
                     # Apply weights to individual scores
                     weighted_score = sum(folder_similarity[param] * weights[param] for param in folder_similarity)
@@ -95,6 +107,25 @@ class FolderComparer:
         return similar_folders
 
 
+    # בדיקה אם רשימת קבצים בתיקיה הם בעלי שמות דומים מידי
+    def check_generic_names(self, files_list):
+        n = len(files_list)
+        total_similarity = 0.0
+        total_pairs = 0
+        files_list_cleaned = [file.split('.')[0] for file in files_list]
+        files_list_cleaned = [re.sub(r'\d', '', i) for i in files_list_cleaned]
+        
+        for i in range(n):
+            for j in range(i+1, n):
+                similarity_score = SequenceMatcher(None, files_list_cleaned[i], files_list_cleaned[j]).ratio()
+                total_similarity += similarity_score
+                total_pairs += 1
+        
+        if total_pairs == 0:
+            return False
+        
+        average_similarity = total_similarity / total_pairs
+        return average_similarity >= 0.7
 
 
 
@@ -107,23 +138,6 @@ class FolderComparer:
         if _ratio < 0.5:
             return 0.0
         return _ratio
-    
-
-    def calculate_similarity_score(strings):
-        n = len(strings)
-        total_similarity = 0.0
-        total_pairs = 0
-        
-        for i in range(n):
-            for j in range(i+1, n):
-                similarity_score = SequenceMatcher(None, strings[i], strings[j]).ratio()
-                total_similarity += similarity_score
-                total_pairs += 1
-        
-        if total_pairs == 0:
-            return 0.0
-        
-        return total_similarity / total_pairs
 
 
 
@@ -150,6 +164,6 @@ class FolderComparer:
 
 
 if __name__ == "__main__":
-    folder_paths = [r"D:\דברים שמתחדשים\חדשים כסליו\בעלזא"]
+    folder_paths = [r"D:\דברים שמתחדשים\חדשים כסליו\אוסף אייזנטל\להקות"]
     comparer = FolderComparer(folder_paths)
     comparer.main()

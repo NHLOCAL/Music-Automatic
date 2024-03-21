@@ -1,5 +1,5 @@
 import os
-
+import re
 
 
 class FileManager:
@@ -17,7 +17,11 @@ class FileManager:
                 if files_in_dir == []:
                     continue
                 
-                if any(True for i in files_in_dir if "רצועה" in i or "track" in i.lower()):
+
+                if len(set([re.sub(r'\d', '', i) for i in files_in_dir])) == 1:
+                    continue
+
+                if any(True for i in files_in_dir if "רצועה" in i or "track" in i.lower() or "audiotrack" in i.lower()):
                     continue
                     
                 yield dir_path, files_in_dir,  _dir
