@@ -107,6 +107,24 @@ class FolderComparer:
         if _ratio < 0.5:
             return 0.0
         return _ratio
+    
+
+    def calculate_similarity_score(strings):
+        n = len(strings)
+        total_similarity = 0.0
+        total_pairs = 0
+        
+        for i in range(n):
+            for j in range(i+1, n):
+                similarity_score = SequenceMatcher(None, strings[i], strings[j]).ratio()
+                total_similarity += similarity_score
+                total_pairs += 1
+        
+        if total_pairs == 0:
+            return 0.0
+        
+        return total_similarity / total_pairs
+
 
 
     def main(self):
