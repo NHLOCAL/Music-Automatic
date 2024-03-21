@@ -3,6 +3,7 @@
 
 **Plans to carry out**:
 - Automatic conversion of corrupted metadata✅
+- Search and identify duplicate music folders and clean them
 - Removing duplicate songs with smart detection
 (in double singles - removal of the lower quality copy)
 - Adding a name by title and vice versa, with a priority check
