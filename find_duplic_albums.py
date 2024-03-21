@@ -18,7 +18,7 @@ class FolderComparer:
                 dir_path = os.path.join(root, _dir)
                 files_in_dir = [i for i in os.listdir(dir_path) if i.lower().endswith((".mp3", ".flac"))]
 
-                if files_in_dir == []:
+                if len(files_in_dir) <= 2:
                     continue
 
                 yield dir_path, files_in_dir
@@ -29,6 +29,20 @@ class FolderComparer:
         """
         file_info = defaultdict(list)
 
+        # Extract titles from the files
+        titles = []
+        for file in files_in_dir:
+            file_path = os.path.join(folder_path, file)
+            try:
+                audio = EasyID3(file_path)
+                title = audio['title'][0] if 'title' in audio else None
+                if title:
+                    titles.append(title)
+            except Exception as e:
+                print(f"Error processing {file}: {e}")
+
+        # Check generic names for the titles
+        generic_titles = self.check_generic_names(titles) if titles else None
         generic_names = self.check_generic_names(files_in_dir)
 
         for file in files_in_dir:
@@ -39,26 +53,24 @@ class FolderComparer:
                 album = audio['album'][0] if 'album' in audio else None
                 title = audio['title'][0] if 'title' in audio else None
 
-                # Check if generic_names is True, skip adding 'file' entry
-                if not generic_names:
-                    file_info[folder_path].append({
-                        'file': file,
-                        'artist': artist,
-                        'album': album,
-                        'title': title,
-                    })
-                else:
-                    # Only add artist, album, and title
-                    file_info[folder_path].append({
-                        'file': None,
-                        'artist': artist,
-                        'album': album,
-                        'title': title,
-                    })
+                # Determine 'file' value based on generic names
+                file_value = None if generic_names else file
+
+                # Determine 'title' value based on generic names
+                title_value = None if generic_titles else title
+
+                file_info[folder_path].append({
+                    'file': file_value,
+                    'artist': artist,
+                    'album': album,
+                    'title': title_value,
+                })
             except Exception as e:
                 print(f"Error processing {file}: {e}")
 
         return file_info
+
+
 
 
     def get_file_lists(self):
@@ -164,6 +176,6 @@ class FolderComparer:
 
 
 if __name__ == "__main__":
-    folder_paths = [r"D:\דברים שמתחדשים\חדשים כסליו\אוסף אייזנטל\להקות"]
+    folder_paths = [r"C:\Users\משתמש\Documents\space_automatic"]
     comparer = FolderComparer(folder_paths)
     comparer.main()
