@@ -151,10 +151,10 @@ class FolderComparer:
     def similar(self, a, b):
         """
         Calculate similarity ratio between two strings.
-        If similarity level is less than 0.5, the result will be 0.
+        If similarity level is less than 0.7, the result will be 0.
         """
         _ratio = SequenceMatcher(None, a, b).ratio()
-        if _ratio < 0.5:
+        if _ratio < 0.75:
             return 0.0
         return _ratio
 
