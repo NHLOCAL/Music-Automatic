@@ -3,6 +3,7 @@ from collections import defaultdict
 from difflib import SequenceMatcher
 from mutagen.easyid3 import EasyID3
 import re
+from main import MusicManger
 
 class FolderComparer:
     def __init__(self, folder_paths):
@@ -164,13 +165,13 @@ class FolderComparer:
         """
         Main function to execute file comparison and find similar folders.
         """
-        folder_files = self.get_file_lists()
-        similar_folders = self.find_similar_folders(folder_files)
+        self.folder_files = self.get_file_lists()
+        self.similar_folders = self.find_similar_folders(self.folder_files)
         
         # Sort similar folders by weighted score in descending order
-        sorted_similar_folders = sorted(similar_folders.items(), key=lambda x: x[1]['weighted_score'], reverse=True)
+        self.sorted_similar_folders = sorted(self.similar_folders.items(), key=lambda x: x[1]['weighted_score'], reverse=True)
         
-        for folder_pair, similarities in sorted_similar_folders:
+        for folder_pair, similarities in self.sorted_similar_folders:
             folder_path, other_folder_path = folder_pair
             print(f"Folder: {folder_path}")
             print(f"Similar folder: {other_folder_path}")
@@ -178,6 +179,24 @@ class FolderComparer:
             for parameter, score in similarities.items():
                 print(f"- {parameter.capitalize()}: {score}")
             print()
+
+
+
+class SelectAndThrow:
+    def __init__(self, sorted_similar_folders):
+        self.similar_folders = sorted_similar_folders
+
+    # סיווג התיקיות הדומות לפי איכות
+    def quality_sort(self):
+        # בדיקה אם השירים מכילים תמונת אלבום
+        # MusicManger.check_albumart()
+
+        # בדיקה אם שמות הקבצים זהים מידי
+
+        # בדיקה אם שמות הקבצים באנגלית?
+
+        # 
+        pass
 
 
 
