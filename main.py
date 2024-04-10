@@ -34,15 +34,55 @@ class FileManager:
         self.counting = len(files_list)
         
         if self.counting < 1:
-            print('No matching files or folders found, no changes made!')
+            return 'No matching files or folders found, no changes made!'
         
         else:    
-            print(f'Num. of {description}: {self.counting}')
-        
+            return (f'Num. of {description}: {self.counting}')
+
+    def run_func(self, func_name):
+        '''רצף פעולות קבוע שמפעיל פונקציה רצויה על מערכת הקבצים'''
+
+        self.list_generator = self.build_folder_structure()
+        self.files_procces = set()
+
+        # Check if the function exists as an instance method
+        if hasattr(self, func_name) and callable(getattr(self, func_name)):
+            # Get the function object
+            func = getattr(self, func_name)
+            # Call the function
+            return_func = func()
+            message = self.summary_message(*return_func)
+            print(message)
+        else:
+            print(f"Instance method '{func_name}' not found or is not callable.")
+
+
+
 
 # פעולות על מוזיקה ותיקיות
 class MusicManger(FileManager):
 
+    def check_albumart(self):
+        '''בדיקה אם שירים מכילים תמונת אלבום'''
+        
+        for file_path in self.list_generator:
+            
+            result = False
+            meta_file = File(file_path)
+            
+            for k in meta_file.keys():
+                if not u'covr' in k and not u'APIC' in k:
+                    result = False
+                else:
+                    result = True
+                    break
+            
+            if result is False:
+                self.files_procces.add(file_path)
+        
+        return self.files_procces, 'Files without album art found'
+
+    
     def delete_empty_folders(self):
     
         '''מחיקת תיקיות ריקות'''
@@ -60,41 +100,13 @@ class MusicManger(FileManager):
         self.summary_message(delete_folders, 'empty folders deleted')
 
 
-    def check_albumart(self):
-        '''בדיקה אם שירים מכילים תמונת אלבום'''
-        
-        list_generator = self.build_folder_structure()
-        files_found = set()
-        
-        for file_path in list_generator:
-            
-            result = False
-            meta_file = File(file_path)
-            
-            for k in meta_file.keys():
-                if not u'covr' in k and not u'APIC' in k:
-                    result = False
-                else:
-                    result = True
-                    break
-            
-            if result is False:
-                files_found.add(file_path)
-        
-        self.summary_message(files_found, 'Files without album art found')
-        print(files_found)
-
-
 # תיקון ושינוי שמות קבצים במגוון שיטות
 class FixNames(FileManager):
     
     def fix_track_names(self):
         '''Replace "track" with "רצועה" in file names and titles'''
         
-        list_generator = self.build_folder_structure()
-        files_with_changes = set()
-        
-        for file_path in list_generator:
+        for file_path in self.list_generator:
             file_name = os.path.basename(file_path)
             file_name, file_extension = os.path.splitext(file_name)
 
@@ -127,19 +139,16 @@ class FixNames(FileManager):
 
             # Save changes to the MP3 file if changes were made
             if changed:
-                files_with_changes.add(file_path)
+                self.files_procces.add(file_path)
 
-        self.summary_message(files_with_changes, 'Track names fixed')
+        return self.files_procces, 'Track names fixed'
 
 
 
     def fix_jibrish_files(self):
         '''המרת קבצים עם קידוד פגום לעברית תקינה'''
         
-        list_generator = self.build_folder_structure()
-        files_with_changes = set()
-        
-        for file_path in list_generator:
+        for file_path in self.list_generator:
             # Load the MP3 file
             audiofile = EasyID3(file_path)
             
@@ -150,18 +159,21 @@ class FixNames(FileManager):
             fields_to_check = ['album', 'title', 'artist', 'albumartist', 'genre']
             
             for field in fields_to_check:
-                if field in audiofile and check_jibrish(audiofile[field][0]):
-                    new_value = fix_jibrish(audiofile[field][0])
-                    audiofile[field] = new_value
-                    print(f"Updated {field.capitalize()}: {new_value}")
-                    changed = True
+                try:
+                    if field in audiofile and check_jibrish(audiofile[field][0]):
+                        new_value = fix_jibrish(audiofile[field][0])
+                        audiofile[field] = new_value
+                        print(f"Updated {field.capitalize()}: {new_value}")
+                        changed = True
+                except:
+                    pass
                 
             # Save changes to the MP3 file if changes were made
             if changed:
                 audiofile.save()
-                files_with_changes.add(file_path)
+                self.files_procces.add(file_path)
                         
-        self.summary_message(files_with_changes, 'Damaged files repaired')
+        return self.files_procces, 'Damaged files repaired'
 
 
 
