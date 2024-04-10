@@ -182,21 +182,75 @@ class FolderComparer:
 
 
 
+import shutil
+
 class SelectAndThrow:
     def __init__(self, sorted_similar_folders):
-        self.similar_folders = sorted_similar_folders
+        self.sorted_similar_folders = sorted_similar_folders
 
-    # סיווג התיקיות הדומות לפי איכות
+    def select_better_folder(self):
+        """
+        Select the better folder between duplicate folders.
+        """
+        for folder_pair, similarities in self.sorted_similar_folders:
+            folder_path, other_folder_path = folder_pair
+            
+            # Check if the other folder is still available (not deleted in previous iterations)
+            if os.path.exists(other_folder_path):
+                print(f"Folder: {folder_path}")
+                print(f"Similar folder: {other_folder_path}")
+                
+                # Ask user to select the better folder
+                choice = input("Which folder do you want to keep? (Enter '1' for first folder, '2' for second folder): ")
+                
+                # If user chooses the second folder, ask for deletion confirmation
+                if choice == '2':
+                    confirm_delete = input("Do you want to delete the second folder? (y/n): ")
+                    if confirm_delete.lower() == 'y':
+                        self.delete_folder(other_folder_path)
+                print()
+
+    def delete_folder(self, folder_path):
+        """
+        Delete the specified folder.
+        """
+        shutil.rmtree(folder_path)
+        print(f"Deleted folder: {folder_path}")
+
     def quality_sort(self):
-        # בדיקה אם השירים מכילים תמונת אלבום
-        # MusicManger.check_albumart()
+        """
+        Compare folders based on certain quality criteria.
+        """
+        for folder_pair, similarities in self.sorted_similar_folders:
+            folder_path, other_folder_path = folder_pair
+            folder_quality = self.compare_quality(folder_path, other_folder_path)
+            print(f"Folder: {folder_path}")
+            print(f"Similar folder: {other_folder_path}")
+            print(f"Quality of {folder_path}: {folder_quality}")
+            print(f"Quality of {other_folder_path}: {1 - folder_quality}")
+            print()
 
-        # בדיקה אם שמות הקבצים זהים מידי
+    def compare_quality(self, folder_path1, folder_path2):
+        """
+        Compare the quality of two folders.
+        """
+        # Check if the songs contain an album art
+        # You can implement this logic using any method you prefer. For demonstration, let's assume it's always present.
+        album_art_present1 = True
+        album_art_present2 = True
 
-        # בדיקה אם שמות הקבצים באנגלית?
+        # Check if the file names are too identical
+        # You can use the check_generic_names function from the FolderComparer class for this
+        folder_comparer = FolderComparer([])
+        folder1_similar_names = folder_comparer.check_generic_names(os.listdir(folder_path1))
+        folder2_similar_names = folder_comparer.check_generic_names(os.listdir(folder_path2))
 
-        # 
-        pass
+        # Calculate quality based on the tests
+        quality1 = 1 if album_art_present1 and not folder1_similar_names else 0
+        quality2 = 1 if album_art_present2 and not folder2_similar_names else 0
+
+        # Returning the quality of the first folder (can be adjusted based on comparison logic)
+        return quality1
 
 
 
