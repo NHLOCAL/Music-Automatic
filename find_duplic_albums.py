@@ -4,7 +4,6 @@ from difflib import SequenceMatcher
 from mutagen.easyid3 import EasyID3
 from mutagen import File
 import re
-from main import MusicManger
 
 class FolderComparer:
     def __init__(self, folder_paths):
@@ -126,8 +125,6 @@ class FolderComparer:
         return similar_folders
 
 
-
-
     # בדיקה אם רשימת קבצים בתיקיה הם בעלי שמות דומים מידי
     def check_generic_names(self, files_list):
         n = len(files_list)
@@ -185,9 +182,7 @@ class FolderComparer:
 
 import shutil
 
-class SelectAndThrow:
-    def __init__(self, sorted_similar_folders):
-        self.sorted_similar_folders = sorted_similar_folders
+class SelectAndThrow(FolderComparer):
 
     def select_better_folder(self):
         """
@@ -218,49 +213,89 @@ class SelectAndThrow:
         shutil.rmtree(folder_path)
         print(f"Deleted folder: {folder_path}")
 
+    def extract_folder_info(self):
+        folder_structure = self.folder_files
+        quality_compar = defaultdict(dict)
+        
+        for folder, files in folder_structure.items():
+            total_files = len(files)
+            quality_compar[folder]['empty_names'] = sum(1 for file_info in files if file_info['file'] is None)
+            quality_compar[folder]['empty_titles'] = sum(1 for file_info in files if file_info['title'] is None)
+            quality_compar[folder]['empty_artists'] = sum(1 for file_info in files if file_info['artist'] is None)
+            quality_compar[folder]['empty_albums'] = sum(1 for file_info in files if file_info['album'] is None)
+            quality_compar[folder]['total_files'] = total_files
+            
+            # Calculate scores
+            for key in ['empty_names', 'empty_titles', 'empty_artists', 'empty_albums']:
+                quality_compar[folder][f'{key}_score'] = quality_compar[folder][key] / total_files if total_files > 0 else 0
+        
+        return quality_compar
+
+
     def quality_sort(self):
         """
         Compare folders based on certain quality criteria.
         """
+        # Determine the maximum length of folder paths for formatting
+        max_folder_path_length = 60
+        
+        print(f'{"Folder Name":<{max_folder_path_length}} {"Quality Score"}')
+        print('-' * (max_folder_path_length + 20))
+        
         for folder_pair, similarities in self.sorted_similar_folders:
             folder_path, other_folder_path = folder_pair
             folder_quality1, folder_quality2 = self.compare_quality(folder_path, other_folder_path)
-            print(f"Folder: {folder_path}")
-            print(f"Similar folder: {other_folder_path}")
-            print(f"Quality of {folder_path}: {folder_quality1}")
-            print(f"Quality of {other_folder_path}: {folder_quality2}")
+            
+            if folder_quality1 > folder_quality2:
+                print(colors.GREEN + f'{folder_path:<{max_folder_path_length}} {folder_quality1}' + colors.RESET)
+                print(f'{other_folder_path:<{max_folder_path_length}} {folder_quality2}')
+            elif folder_quality2 > folder_quality1:
+                print(f'{folder_path:<{max_folder_path_length}} {folder_quality1}')
+                print(colors.GREEN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2}' + colors.RESET)
+            else:
+                print(colors.CYAN + f'{folder_path:<{max_folder_path_length}} {folder_quality1}' + colors.RESET)
+                print(colors.CYAN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2}' + colors.RESET)
             print()
+
+
 
     def compare_quality(self, folder_path1, folder_path2):
         """
         Compare the quality of two folders.
         """
-
-        files_list1 = [i for i in os.listdir(folder_path1) if i.lower().endswith((".mp3", ".flac"))]
-
-        files_list2 = [i for i in os.listdir(folder_path2) if i.lower().endswith((".mp3", ".flac"))]
-
         # Check if the songs contain an album art
         # You can implement this logic using any method you prefer. For demonstration, let's assume it's always present.
         album_art_present1 = self.check_albumart(folder_path1)
         album_art_present2 = self.check_albumart(folder_path2)
 
-        # Check if the file names are too identical
-        # You can use the check_generic_names function from the FolderComparer class for this
-        folder_comparer = FolderComparer([r'C:\Users\משתמש\Documents\space_automatic'])
-        folder1_generic_names = folder_comparer.check_generic_names(files_list1)
-        folder2_generic_names = folder_comparer.check_generic_names(files_list2)
+        # פרמטרים:
+        # - שמות קבצים דומים מידי
+        # - שמות כותרות דומים מידי
+        # - שמות אמן ריקים
+        # - שמות אלבום ריקים
 
-        grade_generic1 = 0 if folder1_generic_names else 1
-        grade_generic2 = 0 if folder2_generic_names else 1
-        
+        # Extract folder information for both paths
+        quality_compar = self.extract_folder_info()
+
+        folder_quality1 = quality_compar[folder_path1]
+        folder_quality2 = quality_compar[folder_path2]
+
+        # Comparing quality based on the difference in scores
+        keys = ['empty_names_score', 'empty_titles_score', 'empty_artists_score', 'empty_albums_score']
+
+        quality_difference = defaultdict(dict)
+        for key in keys:
+            quality_difference[key] = 2 if folder_quality1[key] > folder_quality2[key] else 1 if folder_quality1[key] < folder_quality2[key] else None
+
+        quality_difference['albumart_score'] = 2 if album_art_present1 > album_art_present2 else 1 if album_art_present1 < album_art_present2 else None
+
 
         # Calculate quality based on the tests
-        quality1 = 1 - album_art_present1 + grade_generic1
-        quality2 = 1 - album_art_present2 + grade_generic2
+        folder_quality1 = sum(1 for score in quality_difference.values() if score == 1)
+        folder_quality2 = sum(1 for score in quality_difference.values() if score == 2)
 
         # Returning the quality of the first folder (can be adjusted based on comparison logic)
-        return quality1, quality2
+        return folder_quality1, folder_quality2
 
     def check_albumart(self, folder_path):
         '''בדיקה אם שירים מכילים תמונת אלבום'''
@@ -292,5 +327,17 @@ class SelectAndThrow:
 
 if __name__ == "__main__":
     folder_paths = [r"C:\Users\משתמש\Documents\space_automatic"]
-    comparer = FolderComparer(folder_paths)
+    comparer = SelectAndThrow(folder_paths)
     comparer.main()
+
+
+
+# ANSI color codes
+class colors:
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    MAGENTA = '\033[95m'
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
