@@ -184,54 +184,6 @@ import shutil
 
 class SelectAndThrow(FolderComparer):
 
-    def select_better_folder(self):
-        """
-        Select the better folder between duplicate folders.
-        """
-        for folder_pair, similarities in self.sorted_similar_folders:
-            folder_path, other_folder_path = folder_pair
-            
-            # Check if the other folder is still available (not deleted in previous iterations)
-            if os.path.exists(other_folder_path):
-                print(f"Folder: {folder_path}")
-                print(f"Similar folder: {other_folder_path}")
-                
-                # Ask user to select the better folder
-                choice = input("Which folder do you want to keep? (Enter '1' for first folder, '2' for second folder): ")
-                
-                # If user chooses the second folder, ask for deletion confirmation
-                if choice == '2':
-                    confirm_delete = input("Do you want to delete the second folder? (y/n): ")
-                    if confirm_delete.lower() == 'y':
-                        self.delete_folder(other_folder_path)
-                print()
-
-    def delete_folder(self, folder_path):
-        """
-        Delete the specified folder.
-        """
-        shutil.rmtree(folder_path)
-        print(f"Deleted folder: {folder_path}")
-
-    def extract_folder_info(self):
-        folder_structure = self.folder_files
-        quality_compar = defaultdict(dict)
-        
-        for folder, files in folder_structure.items():
-            total_files = len(files)
-            quality_compar[folder]['empty_names'] = sum(1 for file_info in files if file_info['file'] is None)
-            quality_compar[folder]['empty_titles'] = sum(1 for file_info in files if file_info['title'] is None)
-            quality_compar[folder]['empty_artists'] = sum(1 for file_info in files if file_info['artist'] is None)
-            quality_compar[folder]['empty_albums'] = sum(1 for file_info in files if file_info['album'] is None)
-            quality_compar[folder]['total_files'] = total_files
-            
-            # Calculate scores
-            for key in ['empty_names', 'empty_titles', 'empty_artists', 'empty_albums']:
-                quality_compar[folder][f'{key}_score'] = quality_compar[folder][key] / total_files if total_files > 0 else 0
-        
-        return quality_compar
-
-
     def quality_sort(self):
         """
         Compare folders based on certain quality criteria.
@@ -258,21 +210,13 @@ class SelectAndThrow(FolderComparer):
             print()
 
 
-
     def compare_quality(self, folder_path1, folder_path2):
         """
         Compare the quality of two folders.
         """
         # Check if the songs contain an album art
-        # You can implement this logic using any method you prefer. For demonstration, let's assume it's always present.
         album_art_present1 = self.check_albumart(folder_path1)
         album_art_present2 = self.check_albumart(folder_path2)
-
-        # פרמטרים:
-        # - שמות קבצים דומים מידי
-        # - שמות כותרות דומים מידי
-        # - שמות אמן ריקים
-        # - שמות אלבום ריקים
 
         # Extract folder information for both paths
         quality_compar = self.extract_folder_info()
@@ -296,6 +240,26 @@ class SelectAndThrow(FolderComparer):
 
         # Returning the quality of the first folder (can be adjusted based on comparison logic)
         return folder_quality1, folder_quality2
+    
+
+    def extract_folder_info(self):
+        folder_structure = self.folder_files
+        quality_compar = defaultdict(dict)
+        
+        for folder, files in folder_structure.items():
+            total_files = len(files)
+            quality_compar[folder]['empty_names'] = sum(1 for file_info in files if file_info['file'] is None)
+            quality_compar[folder]['empty_titles'] = sum(1 for file_info in files if file_info['title'] is None)
+            quality_compar[folder]['empty_artists'] = sum(1 for file_info in files if file_info['artist'] is None)
+            quality_compar[folder]['empty_albums'] = sum(1 for file_info in files if file_info['album'] is None)
+            quality_compar[folder]['total_files'] = total_files
+            
+            # Calculate scores
+            for key in ['empty_names', 'empty_titles', 'empty_artists', 'empty_albums']:
+                quality_compar[folder][f'{key}_score'] = quality_compar[folder][key] / total_files if total_files > 0 else 0
+        
+        return quality_compar
+    
 
     def check_albumart(self, folder_path):
         '''בדיקה אם שירים מכילים תמונת אלבום'''
