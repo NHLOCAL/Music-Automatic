@@ -2,6 +2,7 @@ import os
 from collections import defaultdict
 from difflib import SequenceMatcher
 from mutagen.easyid3 import EasyID3
+from mutagen import File
 import re
 from main import MusicManger
 
@@ -234,23 +235,57 @@ class SelectAndThrow:
         """
         Compare the quality of two folders.
         """
+
+        files_list1 = [i for i in os.listdir(folder_path1) if i.lower().endswith((".mp3", ".flac"))]
+
+        files_list2 = [i for i in os.listdir(folder_path2) if i.lower().endswith((".mp3", ".flac"))]
+
         # Check if the songs contain an album art
         # You can implement this logic using any method you prefer. For demonstration, let's assume it's always present.
-        album_art_present1 = True
-        album_art_present2 = True
+        album_art_present1 = self.check_albumart(folder_path1)
+        album_art_present2 = self.check_albumart(folder_path2)
 
         # Check if the file names are too identical
         # You can use the check_generic_names function from the FolderComparer class for this
-        folder_comparer = FolderComparer([])
-        folder1_similar_names = folder_comparer.check_generic_names(os.listdir(folder_path1))
-        folder2_similar_names = folder_comparer.check_generic_names(os.listdir(folder_path2))
+        folder_comparer = FolderComparer([r'C:\Users\משתמש\Documents\space_automatic'])
+        folder1_generic_names = folder_comparer.check_generic_names(files_list1)
+        folder2_generic_names = folder_comparer.check_generic_names(files_list2)
+
+        grade_generic1 = 0 if folder1_generic_names else 1
+        grade_generic2 = 0 if folder2_generic_names else 1
+        
 
         # Calculate quality based on the tests
-        quality1 = 1 if album_art_present1 and not folder1_similar_names else 0
-        quality2 = 1 if album_art_present2 and not folder2_similar_names else 0
+        quality1 = 1 - album_art_present1 + grade_generic1
+        quality2 = 1 - album_art_present2 + grade_generic2
 
         # Returning the quality of the first folder (can be adjusted based on comparison logic)
-        return quality1
+        return quality1, quality2
+
+    def check_albumart(self, folder_path):
+        '''בדיקה אם שירים מכילים תמונת אלבום'''
+        files_procces = set()
+        files_list = [i for i in os.listdir(folder_path) if i.lower().endswith((".mp3", ".flac"))]
+        
+        for file in files_list:
+            result = False
+            file_path = os.path.join(folder_path, file)
+            meta_file = File(file_path)
+            
+            try:
+                for k in meta_file.keys():
+                    if not u'covr' in k and not u'APIC' in k:
+                        result = False
+                    else:
+                        result = True
+                        break
+            
+            except: pass
+            
+            if result is False:
+                files_procces.add(file_path)
+        
+        return len(files_procces) / len(files_list)
 
 
 
