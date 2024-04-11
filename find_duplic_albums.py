@@ -224,11 +224,11 @@ class SelectAndThrow:
         """
         for folder_pair, similarities in self.sorted_similar_folders:
             folder_path, other_folder_path = folder_pair
-            folder_quality = self.compare_quality(folder_path, other_folder_path)
+            folder_quality1, folder_quality2 = self.compare_quality(folder_path, other_folder_path)
             print(f"Folder: {folder_path}")
             print(f"Similar folder: {other_folder_path}")
-            print(f"Quality of {folder_path}: {folder_quality}")
-            print(f"Quality of {other_folder_path}: {1 - folder_quality}")
+            print(f"Quality of {folder_path}: {folder_quality1}")
+            print(f"Quality of {other_folder_path}: {folder_quality2}")
             print()
 
     def compare_quality(self, folder_path1, folder_path2):
