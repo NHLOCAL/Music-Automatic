@@ -167,7 +167,12 @@ class FolderComparer:
         self.similar_folders = self.find_similar_folders(self.folder_files)
         
         # Sort similar folders by weighted score in descending order
-        self.sorted_similar_folders = sorted(self.similar_folders.items(), key=lambda x: x[1]['weighted_score'], reverse=True)
+        self.sorted_similar_folders = self.sorted_similar_folders = sorted(
+    (folder_info for folder_info in self.similar_folders.items() if folder_info[1]['weighted_score'] >= 4.0),
+    key=lambda x: x[1]['weighted_score'],
+    reverse=True
+)
+
         
         for folder_pair, similarities in self.sorted_similar_folders:
             folder_path, other_folder_path = folder_pair
@@ -180,19 +185,18 @@ class FolderComparer:
 
 
 
-import shutil
-
 class SelectAndThrow(FolderComparer):
 
     def quality_sort(self):
         """
         Compare folders based on certain quality criteria.
         """
+
         # Determine the maximum length of folder paths for formatting
         max_folder_path_length = 60
-        
         print(f'{"Folder Name":<{max_folder_path_length}} {"Quality Score"}')
         print('-' * (max_folder_path_length + 20))
+
         
         for folder_pair, similarities in self.sorted_similar_folders:
             folder_path, other_folder_path = folder_pair
@@ -214,6 +218,9 @@ class SelectAndThrow(FolderComparer):
         """
         Compare the quality of two folders.
         """
+
+        # בדיקה אם המטאדאטה / שמות הקובץ באנגלית = איכות נמוכה יותר
+
         # Check if the songs contain an album art
         album_art_present1 = self.check_albumart(folder_path1)
         album_art_present2 = self.check_albumart(folder_path2)
@@ -225,13 +232,14 @@ class SelectAndThrow(FolderComparer):
         folder_quality2 = quality_compar[folder_path2]
 
         # Comparing quality based on the difference in scores
-        keys = ['empty_names_score', 'empty_titles_score', 'empty_artists_score', 'empty_albums_score']
+        keys = ['empty_names_score', 'empty_titles_score', 'empty_artists_score', 'empty_albums_score', 'english_names_score', 'english_titles_score', 'english_artists_score', 'english_albums_score']
 
         quality_difference = defaultdict(dict)
-        for key in keys:
-            quality_difference[key] = 2 if folder_quality1[key] > folder_quality2[key] else 1 if folder_quality1[key] < folder_quality2[key] else None
 
-        quality_difference['albumart_score'] = 2 if album_art_present1 > album_art_present2 else 1 if album_art_present1 < album_art_present2 else None
+        for key in keys:
+            quality_difference[key] = 2 if folder_quality1[key] > folder_quality2[key] else 1 if folder_quality1[key] < folder_quality2[key] else 0
+
+        quality_difference['albumart_score'] = 2 if album_art_present1 > album_art_present2 else 1 if album_art_present1 < album_art_present2 else 0
 
 
         # Calculate quality based on the tests
@@ -245,6 +253,9 @@ class SelectAndThrow(FolderComparer):
     def extract_folder_info(self):
         folder_structure = self.folder_files
         quality_compar = defaultdict(dict)
+
+        def contains_english(text):
+            return bool(re.search(r'[a-zA-Z]', text))
         
         for folder, files in folder_structure.items():
             total_files = len(files)
@@ -252,10 +263,17 @@ class SelectAndThrow(FolderComparer):
             quality_compar[folder]['empty_titles'] = sum(1 for file_info in files if file_info['title'] is None)
             quality_compar[folder]['empty_artists'] = sum(1 for file_info in files if file_info['artist'] is None)
             quality_compar[folder]['empty_albums'] = sum(1 for file_info in files if file_info['album'] is None)
+
+            # Check if items contain English letters
+            quality_compar[folder]['english_names'] = sum(1 for file_info in files if file_info['file'] and contains_english(file_info['file']))
+            quality_compar[folder]['english_titles'] = sum(1 for file_info in files if file_info['title'] and contains_english(file_info['title']))
+            quality_compar[folder]['english_artists'] = sum(1 for file_info in files if file_info['artist'] and contains_english(file_info['artist']))
+            quality_compar[folder]['english_albums'] = sum(1 for file_info in files if file_info['album'] and contains_english(file_info['album']))
+                    
             quality_compar[folder]['total_files'] = total_files
             
             # Calculate scores
-            for key in ['empty_names', 'empty_titles', 'empty_artists', 'empty_albums']:
+            for key in ['empty_names', 'empty_titles', 'empty_artists', 'empty_albums', 'english_names', 'english_titles', 'english_artists', 'english_albums']:
                 quality_compar[folder][f'{key}_score'] = quality_compar[folder][key] / total_files if total_files > 0 else 0
         
         return quality_compar
@@ -290,9 +308,10 @@ class SelectAndThrow(FolderComparer):
 
 
 if __name__ == "__main__":
-    folder_paths = [r"C:\Users\משתמש\Documents\space_automatic"]
+    folder_paths = [r"C:\Users\משתמש\Documents\space_automatic", r"D:\דברים שמתחדשים\חדשים כסליו\אוסף אייזנטל\פרחי"]
     comparer = SelectAndThrow(folder_paths)
     comparer.main()
+    comparer.quality_sort()
 
 
 
