@@ -5,6 +5,17 @@ from mutagen.easyid3 import EasyID3
 from mutagen import File
 import re
 
+
+# ANSI color codes
+class colors:
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    MAGENTA = '\033[95m'
+    CYAN = '\033[96m'
+    RESET = '\033[0m'
+
 class FolderComparer:
     def __init__(self, folder_paths):
         self.folder_paths = folder_paths
@@ -85,12 +96,15 @@ class FolderComparer:
         return self.folder_files
 
 
-    def find_similar_folders(self, folder_files):
+    def find_similar_folders(self):
         """
         Find similar folders based on the information of file lists.
         Return weighted score for all files in each folder for each parameter,
         normalized by the number of files in the folder.
         """
+
+        folder_files = self.folder_files
+
         # Define weights for each parameter
         weights = {'file': 4.5, 'album': 1.0, 'title': 3.0, 'artist': 0.5, 'folder_name': 1.0}
 
@@ -164,7 +178,7 @@ class FolderComparer:
         Main function to execute file comparison and find similar folders.
         """
         self.folder_files = self.get_file_lists()
-        self.similar_folders = self.find_similar_folders(self.folder_files)
+        self.similar_folders = self.find_similar_folders()
         
         # Sort similar folders by weighted score in descending order
         self.sorted_similar_folders = self.sorted_similar_folders = sorted(
@@ -172,7 +186,6 @@ class FolderComparer:
     key=lambda x: x[1]['weighted_score'],
     reverse=True
 )
-
         
         for folder_pair, similarities in self.sorted_similar_folders:
             folder_path, other_folder_path = folder_pair
@@ -306,21 +319,8 @@ class SelectAndThrow(FolderComparer):
 
 
 
-
 if __name__ == "__main__":
-    folder_paths = [r"C:\Users\משתמש\Documents\space_automatic", r"D:\דברים שמתחדשים\חדשים כסליו\אוסף אייזנטל\פרחי"]
+    folder_paths = [r"C:\Users\משתמש\Documents\space_automatic"]
     comparer = SelectAndThrow(folder_paths)
     comparer.main()
     comparer.quality_sort()
-
-
-
-# ANSI color codes
-class colors:
-    RED = '\033[91m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    MAGENTA = '\033[95m'
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
