@@ -21,6 +21,7 @@ class FolderComparer:
         self.folder_paths = folder_paths
         self.folder_files = defaultdict(list)
 
+
     def build_folder_structure(self, root_dir):
         """
         Generate a list of files and their corresponding folder paths.
@@ -34,6 +35,7 @@ class FolderComparer:
                     continue
 
                 yield dir_path, files_in_dir
+
 
     def gather_file_info(self, folder_path, files_in_dir):
         """
@@ -83,8 +85,6 @@ class FolderComparer:
         return file_info
 
 
-
-
     def get_file_lists(self):
         """
         Return the lists of files and their information.
@@ -106,7 +106,7 @@ class FolderComparer:
         folder_files = self.folder_files
 
         # Define weights for each parameter
-        weights = {'file': 4.5, 'album': 1.0, 'title': 3.0, 'artist': 0.5, 'folder_name': 1.0}
+        self.PARAMETER_WEIGHTS = {'file': 4.5, 'album': 1.0, 'title': 3.0, 'artist': 0.5, 'folder_name': 1.0}
 
         similar_folders = defaultdict(dict)
         processed_pairs = set()
@@ -129,7 +129,7 @@ class FolderComparer:
                         folder_similarity[parameter] = total_similarity / total_files
 
                     # Apply weights to individual scores
-                    weighted_score = sum(folder_similarity[param] * weights[param] for param in folder_similarity)
+                    weighted_score = sum(folder_similarity[param] * self.PARAMETER_WEIGHTS[param] for param in folder_similarity)
                     folder_similarity['weighted_score'] = weighted_score
 
                     if folder_similarity:
@@ -160,7 +160,6 @@ class FolderComparer:
         return average_similarity >= 0.7
 
 
-
     def similar(self, a, b):
         """
         Calculate similarity ratio between two strings.
@@ -172,7 +171,6 @@ class FolderComparer:
         return _ratio
 
 
-
     def main(self):
         """
         Main function to execute file comparison and find similar folders.
@@ -181,7 +179,7 @@ class FolderComparer:
         self.similar_folders = self.find_similar_folders()
         
         # Sort similar folders by weighted score in descending order
-        self.sorted_similar_folders = self.sorted_similar_folders = sorted(
+        self.sorted_similar_folders = sorted(
     (folder_info for folder_info in self.similar_folders.items() if folder_info[1]['weighted_score'] >= 4.0),
     key=lambda x: x[1]['weighted_score'],
     reverse=True
@@ -198,7 +196,81 @@ class FolderComparer:
 
 
 
+class ArtistComparer(FolderComparer):
+    """השוואה בין תיקיות אמנים לפי שם האמן
+    ההשוואה מתחשבת בשם התיקיה בלבד ללא פרמטרים נוספים
+    ונותנת למשתמש בחירה נרחבת מה למחוק והאם
+    """
+
+    def gather_folder_info(self):
+        """
+        Collect information about folders.
+        """
+        folder_info = defaultdict(list)
+
+        # Iterate through each main folder path
+        for folder_path in self.folder_paths:
+            # Gather subfolders for each main folder
+            for root, dirs, _ in os.walk(folder_path):
+                for _dir in dirs:
+                    dir_path = os.path.join(root, _dir)
+                    # Extract folder name
+                    folder_name = os.path.basename(dir_path)
+                    folder_info[folder_name].append(dir_path)
+
+        return folder_info
+
+
+    def find_similar_folders(self):
+        """
+        Find similar folders based on the folder names.
+        """
+        folder_info = self.gather_folder_info()
+
+        similar_folders = defaultdict(dict)
+        processed_pairs = set()
+        for folder_name, paths in folder_info.items():
+            for other_folder_name, other_paths in folder_info.items():
+                if folder_name != other_folder_name and (other_folder_name, folder_name) not in processed_pairs:
+                    folder_similarity = self.similar(folder_name, other_folder_name)
+                    similar_folders[(folder_name, other_folder_name)] = folder_similarity
+                    processed_pairs.add((folder_name, other_folder_name))
+
+        return similar_folders
+
+
+    def main(self):
+        """
+        Main function to execute folder comparison based on folder names.
+        """
+        folder_info = self.gather_folder_info()
+        similar_folders = self.find_similar_folders()
+
+        # Sort similar folders by similarity score in descending order
+        sorted_similar_folders = sorted(similar_folders.items(), key=lambda x: x[1], reverse=True)
+
+        # Print sorted similar folders with formatted similarity scores
+        for folder_pair, similarity_score in sorted_similar_folders:
+            if similarity_score >= 0.4:
+                folder_name, other_folder_name = folder_pair
+                formatted_similarity_score = "{:.2f}".format(similarity_score)
+                print(f"Folder: {folder_name}")
+                print(f"Similar folder: {other_folder_name}")
+                print(f"Similarity score: {formatted_similarity_score}")
+                print()
+
+
+
+
 class SelectAndThrow(FolderComparer):
+    """השוואת איכות בין תיקיות
+    הפרמטרים הנמדדים:
+        - האם השירים מכילים תמונת אלבום
+        - האם השירים מכילים מטאדאטה
+        - האם המטאדאטה תקינה
+        - האם המטאדאטה באנגלית 
+    """
+
 
     def quality_sort(self):
         """
@@ -232,15 +304,12 @@ class SelectAndThrow(FolderComparer):
         Compare the quality of two folders.
         """
 
-        # בדיקה אם המטאדאטה / שמות הקובץ באנגלית = איכות נמוכה יותר
-
         # Check if the songs contain an album art
         album_art_present1 = self.check_albumart(folder_path1)
         album_art_present2 = self.check_albumart(folder_path2)
 
         # Extract folder information for both paths
         quality_compar = self.extract_folder_info()
-
         folder_quality1 = quality_compar[folder_path1]
         folder_quality2 = quality_compar[folder_path2]
 
