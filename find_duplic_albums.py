@@ -262,7 +262,7 @@ class ArtistComparer(FolderComparer):
 
 
 
-class SelectAndThrow(FolderComparer):
+class SelectQuality(FolderComparer):
     """השוואת איכות בין תיקיות
     הפרמטרים הנמדדים:
         - האם השירים מכילים תמונת אלבום
@@ -271,8 +271,7 @@ class SelectAndThrow(FolderComparer):
         - האם המטאדאטה באנגלית 
     """
 
-
-    def quality_sort(self):
+    def view_result(self):
         """
         Compare folders based on certain quality criteria.
         """
@@ -283,9 +282,9 @@ class SelectAndThrow(FolderComparer):
         print('-' * (max_folder_path_length + 20))
 
         
-        for folder_pair, similarities in self.sorted_similar_folders:
+        for folder_pair, qualitys in self.organized_info.items():
             folder_path, other_folder_path = folder_pair
-            folder_quality1, folder_quality2 = self.compare_quality(folder_path, other_folder_path)
+            folder_quality1, folder_quality2 = qualitys
             
             if folder_quality1 > folder_quality2:
                 print(colors.GREEN + f'{folder_path:<{max_folder_path_length}} {folder_quality1}' + colors.RESET)
@@ -297,6 +296,22 @@ class SelectAndThrow(FolderComparer):
                 print(colors.CYAN + f'{folder_path:<{max_folder_path_length}} {folder_quality1}' + colors.RESET)
                 print(colors.CYAN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2}' + colors.RESET)
             print()
+
+    def get_folders_quality(self):
+        """
+        Compare folders based on certain quality criteria and organize the information.
+        """
+        self.organized_info = {}  # Initialize an empty dictionary to store organized information
+
+        for folder_pair, _ in self.sorted_similar_folders:
+            folder_path, other_folder_path = folder_pair
+            folder_quality1, folder_quality2 = self.compare_quality(folder_path, other_folder_path)
+
+            # Store the information in the dictionary with folder pair as key and quality scores as value
+            self.organized_info[folder_pair] = (folder_quality1, folder_quality2)
+
+        return self.organized_info
+
 
 
     def compare_quality(self, folder_path1, folder_path2):
@@ -387,9 +402,43 @@ class SelectAndThrow(FolderComparer):
         return len(files_procces) / len(files_list)
 
 
+class SelectAndThrow():
+    def __init__(self, organized_info):
+        self.organized_info = organized_info
+
+
+    def  view_result(self):
+        """
+        מעבר על רשימת התיקיות הדומות לפי איכות
+        """
+        pass
+   
+    
+    def delete(self):
+        """
+        מחק תיקיות לבחירה
+        """
+        for folder_pair, quality_scores in self.organized_info.items():
+            folder1, folder2 = folder_pair
+            quality1, quality2 = quality_scores
+
+            if quality1 < quality2:
+                # Delete folder1
+                # Insert code here to delete folder1
+                print(f"Deleting folder '{folder1}' due to lower quality score.")
+            elif quality1 > quality2:
+                # Delete folder2
+                # Insert code here to delete folder2
+                print(f"Deleting folder '{folder2}' due to lower quality score.")
+            else:
+                print(f"Both folders are of the same quality. Select the folder you want to delete!")
+
+
 
 if __name__ == "__main__":
     folder_paths = [r"C:\Users\משתמש\Documents\space_automatic"]
-    comparer = SelectAndThrow(folder_paths)
+    comparer = SelectQuality(folder_paths)
     comparer.main()
-    comparer.quality_sort()
+    organized_info = comparer.get_folders_quality()
+    selecter = SelectAndThrow(organized_info)
+    selecter.delete()
