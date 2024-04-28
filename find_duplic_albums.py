@@ -231,11 +231,11 @@ class ArtistComparer(FolderComparer):
 
         similar_folders = defaultdict(float)
         processed_pairs = set()
-        for _, folder_name in folder_info.items():
-            for _, other_folder_name in folder_info.items():
+        for folder_path, folder_name in folder_info.items():
+            for other_folder_path, other_folder_name in folder_info.items():
                 if folder_name != other_folder_name and (other_folder_name, folder_name) not in processed_pairs:
                     folder_similarity = self.similar(folder_name, other_folder_name)
-                    similar_folders[(folder_name, other_folder_name)] = folder_similarity
+                    similar_folders[(folder_path, other_folder_path)] = folder_similarity
                     processed_pairs.add((folder_name, other_folder_name))
 
         return similar_folders
