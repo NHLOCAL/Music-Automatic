@@ -219,7 +219,7 @@ class ArtistComparer(FolderComparer):
                         dir_path = entry.path
                         # Extract subfolder name
                         folder_name = os.path.basename(dir_path)
-                        folder_info[folder_name].append(dir_path)
+                        folder_info[dir_path].append(folder_name)
 
         return folder_info
 
@@ -259,8 +259,6 @@ class ArtistComparer(FolderComparer):
                 print(f"Similar folder: {other_folder_name}")
                 print(f"Similarity score: {formatted_similarity_score}")
                 print()
-
-
 
 
 
