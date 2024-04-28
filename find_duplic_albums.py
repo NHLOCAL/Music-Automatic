@@ -208,7 +208,7 @@ class ArtistComparer(FolderComparer):
         """
         Collect information about folders.
         """
-        folder_info = defaultdict(list)
+        folder_info = defaultdict(str)
 
         # Iterate through each main folder path
         for folder_path in self.folder_paths:
@@ -219,7 +219,7 @@ class ArtistComparer(FolderComparer):
                         dir_path = entry.path
                         # Extract subfolder name
                         folder_name = os.path.basename(dir_path)
-                        folder_info[dir_path].append(folder_name)
+                        folder_info[dir_path] = folder_name
 
         return folder_info
 
@@ -231,8 +231,8 @@ class ArtistComparer(FolderComparer):
 
         similar_folders = defaultdict(float)
         processed_pairs = set()
-        for folder_name, paths in folder_info.items():
-            for other_folder_name, _ in folder_info.items():
+        for _, folder_name in folder_info.items():
+            for _, other_folder_name in folder_info.items():
                 if folder_name != other_folder_name and (other_folder_name, folder_name) not in processed_pairs:
                     folder_similarity = self.similar(folder_name, other_folder_name)
                     similar_folders[(folder_name, other_folder_name)] = folder_similarity
