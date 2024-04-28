@@ -200,6 +200,8 @@ class ArtistComparer(FolderComparer):
     """השוואה בין תיקיות אמנים לפי שם האמן
     ההשוואה מתחשבת בשם התיקיה בלבד ללא פרמטרים נוספים
     ונותנת למשתמש בחירה נרחבת מה למחוק והאם
+    השיטה סורקת תיקיות משנה בלבד ללא רקורסיה
+    ניתן להכניס כפרמטר מספר נתיבי תיקיה עבור סריקה והשוואה בין כולם
     """
 
     def gather_folder_info(self):
@@ -210,16 +212,16 @@ class ArtistComparer(FolderComparer):
 
         # Iterate through each main folder path
         for folder_path in self.folder_paths:
-            # Gather subfolders for each main folder
-            for root, dirs, _ in os.walk(folder_path):
-                for _dir in dirs:
-                    dir_path = os.path.join(root, _dir)
-                    # Extract folder name
-                    folder_name = os.path.basename(dir_path)
-                    folder_info[folder_name].append(dir_path)
+            # Gather immediate subfolders for each main folder
+            with os.scandir(folder_path) as entries:
+                for entry in entries:
+                    if entry.is_dir():
+                        dir_path = entry.path
+                        # Extract subfolder name
+                        folder_name = os.path.basename(dir_path)
+                        folder_info[folder_name].append(dir_path)
 
         return folder_info
-
 
     def find_similar_folders(self):
         """
@@ -227,10 +229,10 @@ class ArtistComparer(FolderComparer):
         """
         folder_info = self.gather_folder_info()
 
-        similar_folders = defaultdict(dict)
+        similar_folders = defaultdict(float)
         processed_pairs = set()
         for folder_name, paths in folder_info.items():
-            for other_folder_name, other_paths in folder_info.items():
+            for other_folder_name, _ in folder_info.items():
                 if folder_name != other_folder_name and (other_folder_name, folder_name) not in processed_pairs:
                     folder_similarity = self.similar(folder_name, other_folder_name)
                     similar_folders[(folder_name, other_folder_name)] = folder_similarity
@@ -243,7 +245,6 @@ class ArtistComparer(FolderComparer):
         """
         Main function to execute folder comparison based on folder names.
         """
-        folder_info = self.gather_folder_info()
         similar_folders = self.find_similar_folders()
 
         # Sort similar folders by similarity score in descending order
@@ -258,6 +259,7 @@ class ArtistComparer(FolderComparer):
                 print(f"Similar folder: {other_folder_name}")
                 print(f"Similarity score: {formatted_similarity_score}")
                 print()
+
 
 
 
