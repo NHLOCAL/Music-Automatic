@@ -402,7 +402,21 @@ class SelectQuality(FolderComparer):
         return len(files_procces) / len(files_list)
 
 
+    def merge_info(self):
+        """
+        מיזוג מטאדאטה ומידע בין אלבומים להעלאת האיכות:
+        - העתקת תמונת אלבום חסרה
+        - החלפת מטאדאטה באנגלית / חסר / פגום
+        - הוספת חוברת אלבום
+        """
+
+        
+
+
 class SelectAndThrow():
+    """
+    בחירה ומחיקת התיקיות המיותרות
+    """
     def __init__(self, organized_info):
         self.organized_info = organized_info
 
@@ -412,6 +426,7 @@ class SelectAndThrow():
         מעבר על רשימת התיקיות הדומות לפי איכות
         """
         pass
+
    
     
     def delete(self):
