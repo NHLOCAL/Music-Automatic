@@ -9,6 +9,7 @@ from mutagen import File
 from PIL import Image
 import shutil
 import re
+from jibrish_to_hebrew import fix_jibrish, check_jibrish  # ייבוא הפונקציות החדשות
 
 # ANSI color codes
 class colors:
@@ -128,6 +129,14 @@ class FolderComparer:
             for file in music_files:
                 filepath = os.path.join(root, file)
                 file_metadata = self.extract_metadata(filepath)
+
+                # בדיקת מטאדאטה פגומה ותיקון במידת הצורך
+                for key in ['artist', 'album', 'title']:
+                    if key in file_metadata and file_metadata[key]:
+                        if check_jibrish(file_metadata[key]):
+                            fixed_value = fix_jibrish(file_metadata[key], "heb")
+                            file_metadata[key] = fixed_value
+
                 file_hash = self.get_file_hash(filepath)
                 metadata_list.append({
                     'filename': file,
@@ -189,7 +198,10 @@ class FolderComparer:
                 audio = EasyID3(file_path)
                 title = audio['title'][0] if 'title' in audio else None
                 if title:
-                    titles.append(title)
+                    # בדיקת טקסט פגום ותיקון במידת הצורך
+                    if check_jibrish(title):
+                        title = fix_jibrish(title, "heb")
+                titles.append(title) if title else None
             except Exception as e:
                 print(f"Error processing {file}: {e}")
 
@@ -206,6 +218,17 @@ class FolderComparer:
                 artist = audio['artist'][0] if 'artist' in audio else None
                 album = audio['album'][0] if 'album' in audio else None
                 title = audio['title'][0] if 'title' in audio else None
+
+                # בדיקת טקסט פגום ותיקון במידת הצורך
+                for key, value in [('artist', artist), ('album', album), ('title', title)]:
+                    if value and check_jibrish(value):
+                        fixed_value = fix_jibrish(value, "heb")
+                        if key == 'artist':
+                            artist = fixed_value
+                        elif key == 'album':
+                            album = fixed_value
+                        elif key == 'title':
+                            title = fixed_value
 
                 file_list.append({
                     'file': file,
