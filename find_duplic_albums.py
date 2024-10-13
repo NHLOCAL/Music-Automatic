@@ -29,6 +29,8 @@ class FolderComparer:
         self.CSV_FILE = "singer-list.csv"
         self.ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
         self.SIMILARITY_THRESHOLD = 0.8
+        self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
+        self.REDUCTION_FACTOR = 0.5  # פקטור הירידה בציון
 
     def build_folder_structure(self, root_dir):
         """
@@ -132,9 +134,19 @@ class FolderComparer:
                     file_similarity2 = other_folder_data['file_similarity']
                     title_similarity2 = other_folder_data['title_similarity']
 
-                    # Adjustments based on generic names similarity
-                    file_adjustment = 1 - max(file_similarity1, file_similarity2)
-                    title_adjustment = 1 - max(title_similarity1, title_similarity2)
+                    # החלטה על ההתאמה לפי הדמיון
+                    max_file_similarity = max(file_similarity1, file_similarity2)
+                    max_title_similarity = max(title_similarity1, title_similarity2)
+
+                    if max_file_similarity > self.GENERIC_SIMILARITY_THRESHOLD:
+                        file_adjustment = 1 - (max_file_similarity * self.REDUCTION_FACTOR)
+                    else:
+                        file_adjustment = 1  # ללא ירידה
+
+                    if max_title_similarity > self.GENERIC_SIMILARITY_THRESHOLD:
+                        title_adjustment = 1 - (max_title_similarity * self.REDUCTION_FACTOR)
+                    else:
+                        title_adjustment = 1  # ללא ירידה
 
                     for parameter in ['file', 'title', 'album', 'artist']:
                         total_similarity = 0
@@ -184,11 +196,8 @@ class FolderComparer:
     def similar(self, a, b):
         """
         Calculate similarity ratio between two strings.
-        If similarity level is less than 0.75, the result will be 0.
         """
         _ratio = SequenceMatcher(None, a, b).ratio()
-        if _ratio < 0.75:
-            return 0.0
         return _ratio
 
     def main(self):
