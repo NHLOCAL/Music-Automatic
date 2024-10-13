@@ -31,6 +31,7 @@ class FolderComparer:
         self.ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
         self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini'}
         self.SIMILARITY_THRESHOLD = 0.8
+        self.MINIMAL_SIMILARITY = 5.0 # הגדרת רמת הדמיון הנמוכה ביותר להצגה
         self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
         self.REDUCTION_FACTOR = 0.5  # פקטור הירידה בציון
         self.PARAMETER_WEIGHTS = {'file': 4.5, 'album': 1.0, 'title': 3.0, 'artist': 0.5, 'folder_name': 1.0}
@@ -590,7 +591,7 @@ class FolderComparer:
 
         # Sort similar folders by weighted score in descending order
         self.sorted_similar_folders = sorted(
-            (folder_info for folder_info in similar_folders.items() if folder_info[1]['weighted_score'] >= 4.0),
+            (folder_info for folder_info in similar_folders.items() if folder_info[1]['weighted_score'] >= self.MINIMAL_SIMILARITY),
             key=lambda x: x[1]['weighted_score'],
             reverse=True
         )
