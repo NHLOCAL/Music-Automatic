@@ -1,4 +1,5 @@
 import os
+import csv
 import json
 import hashlib
 import difflib
@@ -14,7 +15,24 @@ DATA_FILE = "music_data.json"  # קובץ לשמירת נתוני הסריקה
 ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}  # סיומות קבצי מוזיקה
 IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'Thumbs.db', 'desktop.ini'}  # קבצים להתעלמות
 SIMILARITY_THRESHOLD = 0.8  # סף דמיון להתיקיות לא זהות
-ARTISTS_LIST = {"Artist1", "Artist2", "Artist3"}  # רשימת שמות זמרים
+# הגדרות נוספות
+CSV_FILE = "singer-list.csv"  # קובץ ה-CSV עם רשימת הזמרים
+
+def load_artists_from_csv():
+    """טוען רשימת זמרים מקובץ CSV"""
+    artists_map = {}
+    try:
+        with open(CSV_FILE, mode='r', encoding='utf-8') as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                if len(row) == 2:
+                    key, value = row
+                    artists_map[key] = value
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+    return artists_map
+
+
 
 def load_existing_data():
     if os.path.exists(DATA_FILE):
@@ -51,7 +69,7 @@ def extract_metadata(filepath):
 def extract_album_art(folder_path):
     """מוציא hash לתמונת אלבום"""
     for file in os.listdir(folder_path):
-        if file.lower() in {'cover.jpg', 'folder.jpg', 'cover.png'}:
+        if file.lower() in {'CD Cover.jpg', 'Album Cover.jpg', 'AlbumArtSmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png'}:
             try:
                 img_path = os.path.join(folder_path, file)
                 with Image.open(img_path) as img:
@@ -65,6 +83,7 @@ def extract_album_art(folder_path):
 def scan_music_library():
     """סורק את מאגר המוזיקה ואוסף נתונים"""
     music_data = load_existing_data()
+    artists_map = load_artists_from_csv()  # טעינת רשימת הזמרים מקובץ ה-CSV
     for root, dirs, files in os.walk(MUSIC_DIR):
         # פילטרת קבצי מוזיקה
         music_files = [f for f in files if os.path.splitext(f)[1].lower() in ALLOWED_EXTENSIONS]
@@ -93,12 +112,12 @@ def scan_music_library():
         artist = None
         album = None
 
-        # ניחוש שם האמן ושם האלבום
-        if folder_name in ARTISTS_LIST:
-            artist = folder_name
+        # בדיקה לפי המפתחות והערכים מקובץ ה-CSV
+        if folder_name in artists_map:
+            artist = artists_map[folder_name]  # קביעת שם האמן לפי הערך התואם
             album = parent_folder
-        elif parent_folder in ARTISTS_LIST:
-            artist = parent_folder
+        elif parent_folder in artists_map:
+            artist = artists_map[parent_folder]  # קביעת שם האמן לפי הערך התואם
             album = folder_name
         else:
             # ניחוש לפי מטאדאטה
