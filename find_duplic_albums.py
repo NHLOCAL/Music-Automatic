@@ -28,7 +28,7 @@ class FolderComparer:
         self.DATA_FILE = "music_data.json"
         self.CSV_FILE = "singer-list.csv"
         self.ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
-        self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'Thumbs.db', 'desktop.ini'}
+        self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini'}
         self.SIMILARITY_THRESHOLD = 0.8
         self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
         self.REDUCTION_FACTOR = 0.5  # פקטור הירידה בציון
@@ -114,8 +114,8 @@ class FolderComparer:
     def scan_music_library(self):
         """סורק את מאגר המוזיקה ואוסף נתונים"""
         for root, dirs, files in os.walk(self.folder_paths[0]):
-            # פילטרת קבצי מוזיקה
-            music_files = [f for f in files if os.path.splitext(f)[1].lower() in self.ALLOWED_EXTENSIONS]
+            # פילטרת קבצי מוזיקה והתעלמות מקבצים לא רצויים
+            music_files = [f for f in files if os.path.splitext(f)[1].lower() in self.ALLOWED_EXTENSIONS and f.lower() not in self.IGNORED_FILES]
             if not music_files:
                 continue  # דלג על תיקיות ללא קבצי מוזיקה
 
@@ -141,25 +141,28 @@ class FolderComparer:
             artist = None
             album = None
 
-            # בדיקה לפי המפתחות והערכים מקובץ ה-CSV
-            folder_name_lower = folder_name.lower()
-            parent_folder_lower = parent_folder.lower()
-            if folder_name_lower in self.artists_map:
-                artist = self.artists_map[folder_name_lower]  # קביעת שם האמן לפי הערך התואם
-                album = parent_folder
-            elif parent_folder_lower in self.artists_map:
-                artist = self.artists_map[parent_folder_lower]  # קביעת שם האמן לפי הערך התואם
-                album = folder_name
-            else:
-                # ניחוש לפי מטאדאטה
-                for file_meta in metadata_list:
-                    if 'artist' in file_meta['metadata'] and file_meta['metadata']['artist']:
-                        artist = file_meta['metadata']['artist']
-                        break
-                for file_meta in metadata_list:
-                    if 'album' in file_meta['metadata'] and file_meta['metadata']['album']:
-                        album = file_meta['metadata']['album']
-                        break
+            # **עדיפות ראשונה לשם האמן מהמטאדאטה**
+            for file_meta in metadata_list:
+                if 'artist' in file_meta['metadata'] and file_meta['metadata']['artist']:
+                    artist = file_meta['metadata']['artist'].strip()
+                    break
+
+            # **בדיקה אם שם האמן נמצא במפתחות ה-CSV**
+            if artist and artist.lower() in self.artists_map:
+                artist = self.artists_map[artist.lower()]
+
+            # **אם שם האמן לא נקבע מהמטאדאטה, קבע אותו לפי שם תיקיית האב מתוך ה-CSV**
+            if not artist:
+                parent_folder_lower = parent_folder.lower()
+                if parent_folder_lower in self.artists_map:
+                    artist = self.artists_map[parent_folder_lower]
+
+            # **קביעת שם האלבום רק אם הוא קיים במטאדאטה**
+            for file_meta in metadata_list:
+                if 'album' in file_meta['metadata'] and file_meta['metadata']['album']:
+                    album = file_meta['metadata']['album'].strip()
+                    break
+            # אין קביעה של שם האלבום לפי שם התיקיה אם לא קיים במטאדאטה
 
             self.music_data[folder_hash] = {
                 'path': root,
@@ -228,7 +231,7 @@ class FolderComparer:
         for root, dirs, _ in os.walk(root_dir):
             for _dir in dirs:
                 dir_path = os.path.join(root, _dir)
-                files_in_dir = [i for i in os.listdir(dir_path) if os.path.splitext(i)[1].lower() in self.ALLOWED_EXTENSIONS]
+                files_in_dir = [i for i in os.listdir(dir_path) if os.path.splitext(i)[1].lower() in self.ALLOWED_EXTENSIONS and i.lower() not in self.IGNORED_FILES]
 
                 # התעלמות מתיקיות עם פחות מקבצי מוזיקה מסוימים
                 if len(files_in_dir) <= 2:
@@ -297,8 +300,12 @@ class FolderComparer:
         Compare the quality of two folders.
         """
         quality_compar = self.extract_folder_info()
-        folder_quality1 = quality_compar[folder_path1]
-        folder_quality2 = quality_compar[folder_path2]
+        folder_quality1_dict = quality_compar.get(folder_path1, {})
+        folder_quality2_dict = quality_compar.get(folder_path2, {})
+
+        # חישוב ציון איכות כולל מכל הציונים
+        folder_quality1 = sum(folder_quality1_dict.values())
+        folder_quality2 = sum(folder_quality2_dict.values())
 
         # Compare album art presence
         album_art_present1 = self.check_albumart(folder_path1)
@@ -308,7 +315,6 @@ class FolderComparer:
         elif album_art_present2 > album_art_present1:
             folder_quality2 += 1
 
-        # Returning the quality scores
         return folder_quality1, folder_quality2
 
     def extract_folder_info(self):
@@ -316,7 +322,7 @@ class FolderComparer:
         אוסף מידע על תיקיות עבור השוואת איכות.
         """
         folder_structure = self.folder_files
-        quality_compar = defaultdict(float)
+        quality_compar = defaultdict(dict)
 
         def contains_english(text):
             return bool(re.search(r'[a-zA-Z]', text))
@@ -339,22 +345,22 @@ class FolderComparer:
             english_albums = sum(1 for file_info in files['files'] if file_info['album'] and contains_english(file_info['album']))
 
             # חישוב ציונים
-            quality_compar[folder] += (empty_names / total_files) * -1  # ציון שלילי עבור שמות ריקים
-            quality_compar[folder] += (empty_titles / total_files) * -1
-            quality_compar[folder] += (empty_artists / total_files) * -1
-            quality_compar[folder] += (empty_albums / total_files) * -1
+            quality_compar[folder]['empty_names_score'] = empty_names / total_files if total_files > 0 else 0
+            quality_compar[folder]['empty_titles_score'] = empty_titles / total_files if total_files > 0 else 0
+            quality_compar[folder]['empty_artists_score'] = empty_artists / total_files if total_files > 0 else 0
+            quality_compar[folder]['empty_albums_score'] = empty_albums / total_files if total_files > 0 else 0
 
-            quality_compar[folder] += (english_names / total_files) * 1
-            quality_compar[folder] += (english_titles / total_files) * 1
-            quality_compar[folder] += (english_artists / total_files) * 1
-            quality_compar[folder] += (english_albums / total_files) * 1
+            quality_compar[folder]['english_names_score'] = english_names / total_files if total_files > 0 else 0
+            quality_compar[folder]['english_titles_score'] = english_titles / total_files if total_files > 0 else 0
+            quality_compar[folder]['english_artists_score'] = english_artists / total_files if total_files > 0 else 0
+            quality_compar[folder]['english_albums_score'] = english_albums / total_files if total_files > 0 else 0
 
         return quality_compar
 
     def check_albumart(self, folder_path):
         '''בדיקה אם שירים מכילים תמונת אלבום'''
         files_processed = set()
-        files_list = [i for i in os.listdir(folder_path) if os.path.splitext(i)[1].lower() in self.ALLOWED_EXTENSIONS]
+        files_list = [i for i in os.listdir(folder_path) if os.path.splitext(i)[1].lower() in self.ALLOWED_EXTENSIONS and i.lower() not in self.IGNORED_FILES]
 
         if not files_list:
             return 0.0
@@ -372,7 +378,7 @@ class FolderComparer:
             except:
                 pass
 
-        return album_art_present / len(files_list)
+        return album_art_present / len(files_list) if len(files_list) > 0 else 0.0
 
     def get_folders_quality(self):
         """
@@ -558,7 +564,7 @@ class FolderComparer:
         """הפונקציה הראשית למציאת תיקיות דומות"""
         self.scan_music_library()
         similar_folders = self.find_similar_folders()
-        
+
         # Sort similar folders by weighted score in descending order
         self.sorted_similar_folders = sorted(
             (folder_info for folder_info in similar_folders.items() if folder_info[1]['weighted_score'] >= 4.0),
