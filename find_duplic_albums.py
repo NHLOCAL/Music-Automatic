@@ -36,7 +36,7 @@ class FolderComparer:
         self.MINIMAL_SIMILARITY = 5.0  # הגדרת רמת הדמיון הנמוכה ביותר להצגה
         self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
         self.REDUCTION_FACTOR = 0.5  # פקטור הירידה בציון
-        self.PARAMETER_WEIGHTS = {'file': 4.5, 'album': 1.0, 'title': 3.0, 'artist': 0.5, 'folder_name': 1.0, 'bitrate': 2.0}
+        self.PARAMETER_WEIGHTS = {'file': 3.9, 'album': 2.0, 'title': 2.5, 'artist': 0.5, 'folder_name': 1.0, 'bitrate': 0.1}
         self.artists_map = self.load_artists_from_csv()
         self.preferred_bitrate = preferred_bitrate
         self.load_music_data()
@@ -210,7 +210,7 @@ class FolderComparer:
                     # בדיקת טקסט פגום ותיקון במידת הצורך
                     if check_jibrish(title):
                         title = fix_jibrish(title, "heb")
-                titles.append(title) if title else None
+                    titles.append(title)
             except Exception as e:
                 print(f"Error processing {file}: {e}")
 
@@ -243,12 +243,16 @@ class FolderComparer:
                 metadata = self.extract_metadata(file_path)
                 bitrate = metadata.get('bitrate', None)
 
+                # איסוף כל המטאדאטה
+                all_metadata = metadata
+
                 file_list.append({
                     'file': file,
                     'artist': artist,
                     'album': album,
                     'title': title,
-                    'bitrate': bitrate
+                    'bitrate': bitrate,
+                    'metadata': all_metadata
                 })
             except Exception as e:
                 print(f"Error processing {file}: {e}")
@@ -396,7 +400,6 @@ class FolderComparer:
 
     def check_albumart(self, folder_path):
         '''בדיקה אם שירים מכילים תמונת אלבום'''
-        files_processed = set()
         files_list = [i for i in os.listdir(folder_path) if os.path.splitext(i)[1].lower() in self.ALLOWED_EXTENSIONS and i.lower() not in self.IGNORED_FILES]
 
         if not files_list:
@@ -495,6 +498,10 @@ class FolderComparer:
                             total_similarity += similarity_score
                         folder_similarity[parameter] = total_similarity / total_files if total_files > 0 else 0.0
 
+                    # השוואת מטאדאטה נוספת
+                    additional_metadata_score = self.compare_additional_metadata(files, other_folder_data['files'])
+                    folder_similarity['additional_metadata'] = additional_metadata_score
+
                     # Apply weights to individual scores
                     weighted_score = sum(folder_similarity[param] * self.PARAMETER_WEIGHTS.get(param, 1.0) for param in folder_similarity)
                     folder_similarity['weighted_score'] = weighted_score
@@ -504,6 +511,31 @@ class FolderComparer:
                         processed_pairs.add((folder_path, other_folder_path))
 
         return similar_folders
+
+    def compare_additional_metadata(self, files1, files2):
+        """השוואת מטאדאטה נוספת בין שני רשימות קבצים"""
+        total_matches = 0
+        total_items = 0
+
+        for file_info1, file_info2 in zip(files1, files2):
+            metadata1 = file_info1.get('metadata', {})
+            metadata2 = file_info2.get('metadata', {})
+            keys1 = set(metadata1.keys())
+            keys2 = set(metadata2.keys())
+            common_keys = keys1 & keys2
+
+            for key in common_keys:
+                value1 = metadata1.get(key)
+                value2 = metadata2.get(key)
+                if value1 and value2:
+                    if isinstance(value1, str) and isinstance(value2, str):
+                        if value1.lower() == value2.lower():
+                            total_matches += 0.2
+                    elif value1 == value2:
+                        total_matches += 0.2
+                total_items += 0.2
+
+        return total_matches
 
     def find_similar_folders_enhanced(self):
         """Find similar folders based on the enhanced method"""
@@ -581,9 +613,12 @@ class FolderComparer:
             avg_bitrate2 = sum(bitrate2) / len(bitrate2)
             if avg_bitrate1 == avg_bitrate2:
                 score += 1
-            else:
-                score += 0  # אין תוספת ציון אם קצב הסיביות שונה
             total += 1
+
+        # השוואת מטאדאטה נוספת
+        additional_metadata_score = self.compare_additional_metadata(folder1['files'], folder2['files'])
+        score += additional_metadata_score
+        total += (additional_metadata_score / 0.2)  # מספר הפריטים שהושוו
 
         return score / total if total > 0 else 0
 

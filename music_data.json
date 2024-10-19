@@ -263,341 +263,354 @@
     "4f22004c0afbf2fe32fa1f169a2e52ff": {
         "path": "D:\\בעלי תשובה\\אהוד בנאי\\טיפ טיפה",
         "folder_name": "טיפ טיפה",
-        "parent_folder": "אהוד בנאי",
-        "artist": "אהוד בנאי",
-        "album": "טיפ טיפה",
+    "ab80b1407a0ccd2d11451045f7c03f88": {
+        "path": "D:\\קלאסי",
+        "folder_name": "קלאסי",
+        "parent_folder": "",
+        "artist": "Elton John",
+        "album": "Tuner",
         "files": [
             {
-                "filename": "04 - אהוד בנאי - עיר מקלט.mp3",
-                "hash": "a075149df894faafad6e2f689531391e",
+                "filename": "Your Song.mp3",
+                "hash": "e3b0d4aba13fc18dc932f6a9619db7dc",
                 "metadata": {
-                    "album": "טיפ טיפה",
-                    "title": "עיר מקלט",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "4",
-                    "genre": "øå÷",
-                    "date": "1998"
+                    "album": "Tuner",
+                    "media": "DIG",
+                    "title": "Your Song",
+                    "artist": "Elton John",
+                    "genre": "Other",
+                    "bitrate": 128
                 }
             },
             {
-                "filename": "05 - אהוד בנאי - עגל הזהב.mp3",
-                "hash": "d0195c7444831b4539b192ed3283b4af",
+                "filename": "אנגלי.mp3",
+                "hash": "d6f86a030d8baaf1cf7f0e1bcf0697bd",
                 "metadata": {
-                    "album": "טיפ טיפה",
-                    "title": "עגל הזהב",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "5",
-                    "genre": "øå÷",
-                    "date": "1998"
+                    "album": "Tuner",
+                    "media": "DIG",
+                    "title": "אנגלי",
+                    "artist": "לועזי",
+                    "genre": "Other",
+                    "bitrate": 128
                 }
             },
             {
-                "filename": "06 - אהוד בנאי - גלוייה מקטמנדו.mp3",
-                "hash": "e83271bdaace6305d03d809dd3ba9875",
+                "filename": "צרפתי.mp3",
+                "hash": "24c9aa7679f1ef60399e220aa317550f",
                 "metadata": {
-                    "album": "טיפ טיפה",
-                    "title": "גלוייה מקטמנדו",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "6",
-                    "genre": "øå÷",
-                    "date": "1998"
-                }
-            },
-            {
-                "filename": "08 - אהוד בנאי - אנחת האדמה.MP3",
-                "hash": "7e45b9d9bba6560451e3423276bbe8b1",
-                "metadata": {
-                    "album": "טיפ טיפה",
-                    "title": "אנחת האדמה",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "8",
-                    "genre": "øå÷",
-                    "date": "1998"
+                    "album": "Tuner",
+                    "media": "DIG",
+                    "title": "צרפתי",
+                    "artist": "לועזי",
+                    "genre": "Other",
+                    "bitrate": 128
                 }
             }
         ],
         "album_art": null
     },
-    "8124c7e2be1621028a0be8cff62928f9": {
-        "path": "D:\\בעלי תשובה\\אהוד בנאי\\שיר חדש",
-        "folder_name": "שיר חדש",
-        "parent_folder": "אהוד בנאי",
-        "artist": "אהוד בנאי",
-        "album": "שיר חדש",
+    "a7d82e81a7ac5a7494c48afeb2f2c6b8": {
+        "path": "D:\\קלאסי\\100 Popular Classics",
+        "folder_name": "100 Popular Classics",
+        "parent_folder": "קלאסי",
+        "artist": "100 Popular Classics",
+        "album": "100 Popular Classics",
         "files": [
             {
-                "filename": "אודה לא-ל.mp3",
-                "hash": "81ada2f6de7db632eb5d1604471cb0c6",
+                "filename": "00.mp3",
+                "hash": "8352653782ce6377049bf0fb648c6de2",
                 "metadata": {
-                    "album": "שיר חדש",
-                    "title": "אודה לא-ל",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "15",
-                    "genre": "Classical",
-                    "date": "2008"
+                    "album": "100 Popular Classics",
+                    "length": "202579",
+                    "media": "DIG",
+                    "title": "00",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "20",
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "אודה לאל.mp3",
-                "hash": "993546cf9526bea67ba5ba01defee95a",
+                "filename": "01.mp3",
+                "hash": "2332965aec89fa9197858b9255dd9a21",
                 "metadata": {
-                    "album": "שיר חדש",
-                    "title": "אודה לאל",
-                    "artist": "אהוד בנאי",
+                    "album": "100 Popular Classics",
+                    "length": "302027",
+                    "media": "DIG",
+                    "title": "01",
+                    "artist": "100 Popular Classics",
                     "tracknumber": "1",
-                    "genre": "Classical",
-                    "date": "2008"
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "אזמר בשבחין.mp3",
-                "hash": "39e15a7c25664585b442f83747e0e38c",
+                "filename": "02.mp3",
+                "hash": "5a11cad3f9fcff21a1dd968978db7335",
                 "metadata": {
-                    "album": "שיר חדש",
-                    "title": "אזמר בשבחין",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "6",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "אל אדון על כל המעשים.mp3",
-                "hash": "0e90ce65ca112b1d718f309f067ecfbb",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "אל אדון על כל המעשים",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "7",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "אשת חיל.mp3",
-                "hash": "a911a2bdca405eee36bd4d6bb7e22762",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "אשת חיל",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "5",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "הנשמה לך.mp3",
-                "hash": "1b8938fb63cf6102b22232de7dcb8d63",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "הנשמה לך",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "12",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "השמיעני את קולך.mp3",
-                "hash": "c58595d578e968bfccb3d9b1da3b61db",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "השמיעני את קולך",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "9",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "התנערי מעפר.mp3",
-                "hash": "fbdc1cf3cba53d6c32cf95f3643b0d65",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "התנערי מעפר",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "11",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "לולי תורתך.mp3",
-                "hash": "b869afa5a39e9a510d9fa4a18245812a",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "לולי תורתך",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "10",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "לכו נרננה - לכה דודי.mp3",
-                "hash": "03b46c7dc0d2d9e970402154046fc45a",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "לכו נרננה - לכה דודי",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "3",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "מזמור לדוד.mp3",
-                "hash": "b39999a20e5926fcfdca6995803dcc87",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "מזמור לדוד",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "8",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "עת שערי רצון.mp3",
-                "hash": "9b1846fa5ed48c1ce9eb9ecd7e909ec4",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "עת שערי רצון",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "13",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "צור משלו אכלנו.mp3",
-                "hash": "6153b2a85c5a49ff408ea1eef3b6b674",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "צור משלו אכלנו",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "14",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "שלום עליכם.mp3",
-                "hash": "0a32e0de1f2faca5345d05baac3c844c",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "שלום עליכם",
-                    "artist": "אהוד בנאי",
-                    "tracknumber": "4",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            },
-            {
-                "filename": "שלשה דברים.mp3",
-                "hash": "de968624a70e9a658042df868cf67a1e",
-                "metadata": {
-                    "album": "שיר חדש",
-                    "title": "שלשה דברים",
-                    "artist": "אהוד בנאי",
+                    "album": "100 Popular Classics",
+                    "length": "225044",
+                    "media": "DIG",
+                    "title": "02",
+                    "artist": "100 Popular Classics",
                     "tracknumber": "2",
-                    "genre": "Classical",
-                    "date": "2008"
-                }
-            }
-        ],
-        "album_art": null
-    },
-    "88cc3d444d87b41c2cfff1bedd51ca0c": {
-        "path": "D:\\בעלי תשובה\\אהוד בר לוי",
-        "folder_name": "אהוד בר לוי",
-        "parent_folder": "בעלי תשובה",
-        "artist": null,
-        "album": null,
-        "files": [
-            {
-                "filename": "בואי בשלום.mp3",
-                "hash": "f2dc1c83fafaf911f17f8414168b1618",
-                "metadata": {
-                    "title": "בואי בשלום",
-                    "genre": "בעלי תשובה"
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "הרחמן הוא יזכנו.mp3",
-                "hash": "6ca6cf7bccee1cd933f890760441e009",
+                "filename": "03.mp3",
+                "hash": "57df1712998aaf7bead54f290b6e6806",
                 "metadata": {
-                    "title": "הרחמן הוא יזכנו",
-                    "genre": "בעלי תשובה"
+                    "album": "100 Popular Classics",
+                    "length": "251036",
+                    "media": "DIG",
+                    "title": "03",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "3",
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "הרחמן הוא ישלח.mp3",
-                "hash": "74fdf1bb02f208cc888bf412cb6eeb75",
+                "filename": "04.mp3",
+                "hash": "937b27bda6aa56ca3829d1c296c02acc",
                 "metadata": {
-                    "title": "הרחמן הוא ישלח",
-                    "genre": "בעלי תשובה"
+                    "album": "100 Popular Classics",
+                    "length": "267049",
+                    "media": "DIG",
+                    "title": "04",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "4",
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "ובחודש השביעי.mp3",
-                "hash": "f8a7ca6f2ee800217329c8772f38673c",
+                "filename": "05.mp3",
+                "hash": "6c4d60d3403e3e0b8f0d75189c7d6ea4",
                 "metadata": {
-                    "title": "ובחודש השביעי",
-                    "genre": "בעלי תשובה"
+                    "album": "100 Popular Classics",
+                    "length": "212271",
+                    "media": "DIG",
+                    "title": "05",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "5",
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "יהי שלום.mp3",
-                "hash": "c570c5cedeb94e9a93b03875e8681322",
+                "filename": "06.mp3",
+                "hash": "5f1a0cb03255b1a8ba709f6e074bf693",
                 "metadata": {
-                    "title": "יהי שלום",
-                    "genre": "בעלי תשובה"
+                    "album": "100 Popular Classics",
+                    "length": "77818",
+                    "media": "DIG",
+                    "title": "06",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "6",
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "כיצד מרקדין.mp3",
-                "hash": "8973402e2d2f52fd1fd5b97d19c882c3",
+                "filename": "07.mp3",
+                "hash": "c379498c0b9e3bdb49ad2b93d1a06862",
                 "metadata": {
-                    "title": "כיצד מרקדין",
-                    "genre": "בעלי תשובה"
+                    "album": "100 Popular Classics",
+                    "length": "174524",
+                    "media": "DIG",
+                    "title": "07",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "7",
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "מגדיל ישועות מלכו.mp3",
-                "hash": "f06b7ffb795295502ad337702e3cd671",
+                "filename": "08.mp3",
+                "hash": "cf9ec895322539f53e7de01ca17bd396",
                 "metadata": {
-                    "title": "מגדיל ישועות מלכו",
-                    "genre": "בעלי תשובה"
+                    "album": "100 Popular Classics",
+                    "length": "202553",
+                    "media": "DIG",
+                    "title": "08",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "8",
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "מעין עולם הבא.mp3",
-                "hash": "baa8d7ff25a52069f294b0e73663b2d3",
+                "filename": "09.mp3",
+                "hash": "c274a2dc3ff018b18a41b94f6d7f61aa",
                 "metadata": {
-                    "title": "מעין עולם הבא",
-                    "genre": "בעלי תשובה"
+                    "album": "100 Popular Classics",
+                    "length": "208039",
+                    "media": "DIG",
+                    "title": "09",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "9",
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "עוד ישמע.mp3",
-                "hash": "8f27fc64a162d73ea9cdb0e7995f040c",
+                "filename": "10.mp3",
+                "hash": "2ab4302bf4911332887acc28e496962c",
                 "metadata": {
-                    "title": "עוד ישמע",
-                    "genre": "בעלי תשובה"
+                    "album": "100 Popular Classics",
+                    "length": "264045",
+                    "media": "DIG",
+                    "title": "10",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "10",
+                    "genre": "genre",
+                    "bitrate": 96
                 }
             },
             {
-                "filename": "עוצו עצה.mp3",
-                "hash": "f8d256056801b8860d7891793820a399",
+                "filename": "11.mp3",
+                "hash": "a1cde77e1f745bf2e378913bf7a5ceb3",
                 "metadata": {
-                    "title": "עוצו עצה",
-                    "genre": "בעלי תשובה"
+                    "album": "100 Popular Classics",
+                    "length": "239046",
+                    "media": "DIG",
+                    "title": "11",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "11",
+                    "genre": "genre",
+                    "bitrate": 96
                 }
-            }
-        ],
-        "album_art": null
-    },
+            },
+            {
+                "filename": "12.mp3",
+                "hash": "285970e6d84f423c91117c2d57811135",
+                "metadata": {
+                    "album": "100 Popular Classics",
+                    "length": "167523",
+                    "media": "DIG",
+                    "title": "12",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "12",
+                    "genre": "genre",
+                    "bitrate": 96
+                }
+            },
+            {
+                "filename": "13.mp3",
+                "hash": "c17d489e24cae55395434dd10d51327b",
+                "metadata": {
+                    "album": "100 Popular Classics",
+                    "length": "257541",
+                    "media": "DIG",
+                    "title": "13",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "13",
+                    "genre": "genre",
+                    "bitrate": 96
+                }
+            },
+            {
+                "filename": "14.mp3",
+                "hash": "c3f24a649d6db538120c3662bdedd6ba",
+                "metadata": {
+                    "album": "100 Popular Classics",
+                    "length": "133381",
+                    "media": "DIG",
+                    "title": "14",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "14",
+                    "genre": "genre",
+                    "bitrate": 96
+                }
+            },
+            {
+                "filename": "15.mp3",
+                "hash": "ab0355961399e6c343c652ac5b8b4627",
+                "metadata": {
+                    "album": "100 Popular Classics",
+                    "length": "181707",
+                    "media": "DIG",
+                    "title": "15",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "15",
+                    "genre": "genre",
+                    "bitrate": 96
+                }
+            },
+            {
+                "filename": "16.mp3",
+                "hash": "e1c5e81c4a0e1d36e90ad46998a8a227",
+                "metadata": {
+                    "album": "100 Popular Classics",
+                    "length": "266370",
+                    "media": "DIG",
+                    "title": "16",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "16",
+                    "genre": "genre",
+                    "bitrate": 96
+                }
+            },
+            {
+                "filename": "17.mp3",
+                "hash": "db5b0adca166d3d1daf0d42904bab56b",
+                "metadata": {
+                    "album": "100 Popular Classics",
+                    "length": "175046",
+                    "media": "DIG",
+                    "title": "17",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "17",
+                    "genre": "genre",
+                    "bitrate": 96
+                }
+            },
+            {
+                "filename": "18.mp3",
+                "hash": "26e3ba9160099345e7edc1ab492fa2d0",
+                "metadata": {
+                    "album": "100 Popular Classics",
+                    "length": "423366",
+                    "media": "DIG",
+                    "title": "18",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "18",
+                    "genre": "genre",
+                    "bitrate": 96
+                }
+            },
+            {
+                "filename": "19.mp3",
+                "hash": "12ef65e82cb71daf8f74b99874ce1a1a",
+                "metadata": {
+                    "album": "100 Popular Classics",
+                    "length": "108878",
+                    "media": "DIG",
+                    "title": "19",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "19",
+                    "genre": "genre",
+                    "bitrate": 96
+                }
+            },
+            {
+                "filename": "20.mp3",
+                "hash": "f655b238daff0ea80a87522eb014bbb0",
+                "metadata": {
+                    "album": "100 Popular Classics",
+                    "length": "609541",
+                    "media": "DIG",
+                    "title": "20",
+                    "artist": "100 Popular Classics",
+                    "tracknumber": "20",
+                    "genre": "genre",
+                    "bitrate": 96
+                }
+            },
+            {
     "48f896e94d20a03649af7135aef20faa": {
         "path": "D:\\בעלי תשובה\\אהרון רזאל\\אהבת חינם",
         "folder_name": "אהבת חינם",
