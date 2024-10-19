@@ -33,7 +33,7 @@ class FolderComparer:
         self.ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
         self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini'}
         self.SIMILARITY_THRESHOLD = 0.8
-        self.MINIMAL_SIMILARITY = 50.0  # Minimum similarity percentage to display
+        self.MINIMAL_SIMILARITY = 30.0  # Minimum similarity percentage to display
         self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # Threshold for high similarity
         self.REDUCTION_FACTOR = 0.5  # Reduction factor for similarity score
         # Define weight for additional metadata
