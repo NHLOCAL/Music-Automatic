@@ -10,10 +10,10 @@ from PIL import Image
 import shutil
 import re
 
-# ייבוא הפונקציות החדשות
-from jibrish_to_hebrew import fix_jibrish, check_jibrish  
+# Import the functions for handling gibberish text
+from jibrish_to_hebrew import fix_jibrish, check_jibrish
 
-# ANSI color codes
+# ANSI color codes for terminal output
 class colors:
     RED = '\033[91m'
     GREEN = '\033[92m'
@@ -33,27 +33,29 @@ class FolderComparer:
         self.ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
         self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini'}
         self.SIMILARITY_THRESHOLD = 0.8
-        self.MINIMAL_SIMILARITY = 5.0  # הגדרת רמת הדמיון הנמוכה ביותר להצגה
-        self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
-        self.REDUCTION_FACTOR = 0.5  # פקטור הירידה בציון
-        # הגדרת קבוע עבור משקל המטאדאטה הנוספת
+        self.MINIMAL_SIMILARITY = 50.0  # Minimum similarity percentage to display
+        self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # Threshold for high similarity
+        self.REDUCTION_FACTOR = 0.5  # Reduction factor for similarity score
+        # Define weight for additional metadata
         self.ADDITIONAL_METADATA_WEIGHT = 0.5
-        # עדכון משקלי הדמיון בהתאם
+        # Adjusted parameter weights
         self.PARAMETER_WEIGHTS = {
+            'file_hash': 5.0,
             'file': 3.0,
-            'album': 2.0,
             'title': 2.5,
-            'artist': 0.5,
-            'folder_name': 1.0,
-            'album_art': 1.5,   # משקל לתמונת האלבום
-            'file_hash': 1.5    # משקל להאש של הקבצים
+            'album': 2.5,
+            'artist': 1.5,
+            'folder_name': 1.5,
+            'album_art': 1.0
         }
         self.artists_map = self.load_artists_from_csv()
         self.preferred_bitrate = preferred_bitrate
         self.load_music_data()
+        self.organized_info = {}
+        self.sorted_similar_folders = []
 
     def load_artists_from_csv(self):
-        """טוען רשימת זמרים מקובץ CSV"""
+        """Load a list of artists from a CSV file."""
         artists_map = {}
         try:
             with open(self.CSV_FILE, mode='r', encoding='utf-8') as csvfile:
@@ -67,7 +69,7 @@ class FolderComparer:
         return artists_map
 
     def load_music_data(self):
-        """טוען נתוני מוזיקה קיימים מקובץ JSON"""
+        """Load existing music data from a JSON file."""
         if os.path.exists(self.DATA_FILE):
             try:
                 with open(self.DATA_FILE, 'r', encoding='utf-8') as f:
@@ -79,7 +81,7 @@ class FolderComparer:
             self.music_data = {}
 
     def save_music_data(self):
-        """שומר נתוני מוזיקה לקובץ JSON"""
+        """Save music data to a JSON file."""
         try:
             with open(self.DATA_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.music_data, f, ensure_ascii=False, indent=4)
@@ -87,7 +89,7 @@ class FolderComparer:
             print(f"Error saving data file: {e}")
 
     def get_file_hash(self, filepath):
-        """מחשבת hash עבור קובץ"""
+        """Compute MD5 hash for a file."""
         hash_func = hashlib.md5()
         try:
             with open(filepath, 'rb') as f:
@@ -99,7 +101,7 @@ class FolderComparer:
             return None
 
     def extract_metadata(self, filepath):
-        """מוציא מטאדאטה מקובץ מוזיקה כולל קצב סיביות"""
+        """Extract metadata from a music file, including bitrate."""
         try:
             audio = File(filepath, easy=True)
             if audio is None:
@@ -107,9 +109,9 @@ class FolderComparer:
             metadata = {}
             for key in audio.keys():
                 metadata[key] = audio.get(key, [None])[0]
-            # הוספת קצב סיביות
+            # Add bitrate
             if audio.info and hasattr(audio.info, 'bitrate'):
-                metadata['bitrate'] = audio.info.bitrate // 1000  # קצב סיביות ב kbps
+                metadata['bitrate'] = audio.info.bitrate // 1000  # Bitrate in kbps
             else:
                 metadata['bitrate'] = None
             return metadata
@@ -118,14 +120,14 @@ class FolderComparer:
             return {}
 
     def extract_album_art(self, folder_path):
-        """מוציא hash לתמונת אלבום"""
+        """Extract hash of the album art image."""
         album_art_files = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png'}
         for file in os.listdir(folder_path):
             if file.lower() in album_art_files:
                 try:
                     img_path = os.path.join(folder_path, file)
                     with Image.open(img_path) as img:
-                        img = img.resize((100, 100))  # קיבוץ בגודל אחיד
+                        img = img.resize((100, 100))  # Resize to a standard size
                         img_bytes = img.tobytes()
                         return hashlib.md5(img_bytes).hexdigest()
                 except Exception as e:
@@ -133,24 +135,24 @@ class FolderComparer:
         return None
 
     def scan_music_library(self):
-        """סורק את מאגר המוזיקה ואוסף נתונים"""
+        """Scan the music library and collect data."""
         for root, dirs, files in os.walk(self.folder_paths[0]):
-            # פילטרת קבצי מוזיקה והתעלמות מקבצים לא רצויים
+            # Filter music files and ignore unwanted files
             music_files = [f for f in files if os.path.splitext(f)[1].lower() in self.ALLOWED_EXTENSIONS and f.lower() not in self.IGNORED_FILES]
             if not music_files:
-                continue  # דלג על תיקיות ללא קבצי מוזיקה
+                continue  # Skip folders without music files
 
             folder_hash = hashlib.md5(root.encode('utf-8')).hexdigest()
             if folder_hash in self.music_data:
                 print(f"Skipping already scanned folder: {root}")
-                continue  # דלג על תיקיות שכבר נסרקו
+                continue  # Skip already scanned folders
 
             metadata_list = []
             for file in music_files:
                 filepath = os.path.join(root, file)
                 file_metadata = self.extract_metadata(filepath)
 
-                # בדיקת מטאדאטה פגומה ותיקון במידת הצורך
+                # Check for gibberish metadata and fix if necessary
                 for key in ['artist', 'album', 'title']:
                     if key in file_metadata and file_metadata[key]:
                         if check_jibrish(file_metadata[key]):
@@ -170,28 +172,28 @@ class FolderComparer:
             artist = None
             album = None
 
-            # **עדיפות ראשונה לשם האמן מהמטאדאטה**
+            # Prioritize artist name from metadata
             for file_meta in metadata_list:
                 if 'artist' in file_meta['metadata'] and file_meta['metadata']['artist']:
                     artist = file_meta['metadata']['artist'].strip()
                     break
 
-            # **בדיקה אם שם האמן נמצא במפתחות ה-CSV**
+            # Check if artist name is in the CSV map
             if artist and artist.lower() in self.artists_map:
                 artist = self.artists_map[artist.lower()]
 
-            # **אם שם האמן לא נקבע מהמטאדאטה, קבע אותו לפי שם תיקיית האב מתוך ה-CSV**
+            # If artist not set from metadata, set it from parent folder name in CSV
             if not artist:
                 parent_folder_lower = parent_folder.lower()
                 if parent_folder_lower in self.artists_map:
                     artist = self.artists_map[parent_folder_lower]
 
-            # **קביעת שם האלבום רק אם הוא קיים במטאדאטה**
+            # Set album name only if it exists in metadata
             for file_meta in metadata_list:
                 if 'album' in file_meta['metadata'] and file_meta['metadata']['album']:
                     album = file_meta['metadata']['album'].strip()
                     break
-            # אין קביעה של שם האלבום לפי שם התיקיה אם לא קיים במטאדאטה
+            # Do not set album name from folder name if not in metadata
 
             self.music_data[folder_hash] = {
                 'path': root,
@@ -218,7 +220,7 @@ class FolderComparer:
                 audio = EasyID3(file_path)
                 title = audio['title'][0] if 'title' in audio else None
                 if title:
-                    # בדיקת טקסט פגום ותיקון במידת הצורך
+                    # Check for gibberish and fix if necessary
                     if check_jibrish(title):
                         title = fix_jibrish(title, "heb")
                     titles.append(title)
@@ -239,7 +241,7 @@ class FolderComparer:
                 album = audio['album'][0] if 'album' in audio else None
                 title = audio['title'][0] if 'title' in audio else None
 
-                # בדיקת טקסט פגום ותיקון במידת הצורך
+                # Check for gibberish and fix if necessary
                 for key, value in [('artist', artist), ('album', album), ('title', title)]:
                     if value and check_jibrish(value):
                         fixed_value = fix_jibrish(value, "heb")
@@ -250,13 +252,13 @@ class FolderComparer:
                         elif key == 'title':
                             title = fixed_value
 
-                # הוספת קצב סיביות
+                # Add bitrate
                 metadata = self.extract_metadata(file_path)
 
-                # איסוף כל המטאדאטה
+                # Collect all metadata
                 all_metadata = metadata
 
-                # קבלת האש של הקובץ
+                # Get file hash
                 file_hash = self.get_file_hash(file_path)
 
                 file_list.append({
@@ -275,7 +277,8 @@ class FolderComparer:
             folder_path: {
                 'files': file_list,
                 'file_similarity': file_similarity,
-                'title_similarity': title_similarity
+                'title_similarity': title_similarity,
+                'album_art': self.extract_album_art(folder_path)
             }
         }
 
@@ -288,7 +291,7 @@ class FolderComparer:
                 dir_path = os.path.join(root, _dir)
                 files_in_dir = [i for i in os.listdir(dir_path) if os.path.splitext(i)[1].lower() in self.ALLOWED_EXTENSIONS and i.lower() not in self.IGNORED_FILES]
 
-                # התעלמות מתיקיות עם פחות מקבצי מוזיקה מסוימים
+                # Ignore folders with fewer than a certain number of music files
                 if len(files_in_dir) <= 2:
                     continue
 
@@ -333,216 +336,8 @@ class FolderComparer:
         average_similarity = total_similarity / total_pairs
         return average_similarity
 
-    def gather_folder_info(self):
-        """
-        אוסף מידע על תיקיות אמנים לפי שם האמן.
-        """
-        folder_info = defaultdict(str)
-
-        # איסוף תיקיות ראשיות
-        for folder_path in self.folder_paths:
-            with os.scandir(folder_path) as entries:
-                for entry in entries:
-                    if entry.is_dir():
-                        dir_path = entry.path
-                        folder_name = os.path.basename(dir_path)
-                        folder_info[dir_path] = folder_name
-
-        return folder_info
-
-    def compare_quality(self, folder_path1, folder_path2):
-        """
-        Compare the quality of two folders.
-        """
-        quality_compar = self.extract_folder_info()
-        folder_quality1_dict = quality_compar.get(folder_path1, {})
-        folder_quality2_dict = quality_compar.get(folder_path2, {})
-
-        # חישוב ציון איכות כולל מכל הציונים
-        folder_quality1 = sum(folder_quality1_dict.values())
-        folder_quality2 = sum(folder_quality2_dict.values())
-
-        # Compare album art presence
-        album_art_present1 = self.check_albumart(folder_path1)
-        album_art_present2 = self.check_albumart(folder_path2)
-        if album_art_present1 > album_art_present2:
-            folder_quality1 += 1
-        elif album_art_present2 > album_art_present1:
-            folder_quality2 += 1
-
-        return folder_quality1, folder_quality2
-
-    def extract_folder_info(self):
-        """
-        אוסף מידע על תיקיות עבור השוואת איכות.
-        """
-        folder_structure = self.folder_files
-        quality_compar = defaultdict(dict)
-
-        def contains_english(text):
-            return bool(re.search(r'[a-zA-Z]', text))
-
-        for folder, files in folder_structure.items():
-            total_files = len(files['files'])
-            if total_files == 0:
-                continue
-
-            # ספירת פריטים ריקים
-            empty_names = sum(1 for file_info in files['files'] if not file_info['file'])
-            empty_titles = sum(1 for file_info in files['files'] if not file_info['title'])
-            empty_artists = sum(1 for file_info in files['files'] if not file_info['artist'])
-            empty_albums = sum(1 for file_info in files['files'] if not file_info['album'])
-
-            # ספירת פריטים עם שמות באנגלית
-            english_names = sum(1 for file_info in files['files'] if file_info['file'] and contains_english(file_info['file']))
-            english_titles = sum(1 for file_info in files['files'] if file_info['title'] and contains_english(file_info['title']))
-            english_artists = sum(1 for file_info in files['files'] if file_info['artist'] and contains_english(file_info['artist']))
-            english_albums = sum(1 for file_info in files['files'] if file_info['album'] and contains_english(file_info['album']))
-
-            # חישוב ציונים
-            quality_compar[folder]['empty_names_score'] = empty_names / total_files if total_files > 0 else 0
-            quality_compar[folder]['empty_titles_score'] = empty_titles / total_files if total_files > 0 else 0
-            quality_compar[folder]['empty_artists_score'] = empty_artists / total_files if total_files > 0 else 0
-            quality_compar[folder]['empty_albums_score'] = empty_albums / total_files if total_files > 0 else 0
-
-            quality_compar[folder]['english_names_score'] = english_names / total_files if total_files > 0 else 0
-            quality_compar[folder]['english_titles_score'] = english_titles / total_files if total_files > 0 else 0
-            quality_compar[folder]['english_artists_score'] = english_artists / total_files if total_files > 0 else 0
-            quality_compar[folder]['english_albums_score'] = english_albums / total_files if total_files > 0 else 0
-
-        return quality_compar
-
-    def check_albumart(self, folder_path):
-        '''בדיקה אם שירים מכילים תמונת אלבום'''
-        files_list = [i for i in os.listdir(folder_path) if os.path.splitext(i)[1].lower() in self.ALLOWED_EXTENSIONS and i.lower() not in self.IGNORED_FILES]
-
-        if not files_list:
-            return 0.0
-
-        album_art_present = 0
-        for file in files_list:
-            file_path = os.path.join(folder_path, file)
-            try:
-                audio = File(file_path)
-                if audio:
-                    for key in audio.keys():
-                        if key.startswith('APIC') or key == 'covr':
-                            album_art_present += 1
-                            break
-            except:
-                pass
-
-        return album_art_present / len(files_list) if len(files_list) > 0 else 0.0
-
-    def get_folders_quality(self):
-        """
-        Compare folders based on certain quality criteria and organize the information.
-        """
-        self.organized_info = {}  # Initialize an empty dictionary to store organized information
-
-        for folder_pair, _ in self.sorted_similar_folders:
-            folder_path, other_folder_path = folder_pair
-            folder_quality1, folder_quality2 = self.compare_quality(folder_path, other_folder_path)
-
-            # Store the information in the dictionary with folder pair as key and quality scores as value
-            self.organized_info[folder_pair] = (folder_quality1, folder_quality2)
-
-        return self.organized_info
-
-    def find_similar_folders(self):
-        """
-        Find similar folders based on the information of file lists.
-        Return weighted score for all files in each folder for each parameter,
-        normalized by the number of files in the folder.
-        """
-        folder_files = self.folder_files
-
-        similar_folders = defaultdict(dict)
-        processed_pairs = set()
-        for folder_path, folder_data in folder_files.items():
-            files = folder_data['files']
-            for other_folder_path, other_folder_data in folder_files.items():
-                if folder_path != other_folder_path and (other_folder_path, folder_path) not in processed_pairs and len(files) == len(other_folder_data['files']):
-                    folder_similarity = {}
-                    total_files = len(files)
-
-                    # Calculate folder name similarity
-                    folder_name_similarity = self.similar(os.path.basename(folder_path).lower(), os.path.basename(other_folder_path).lower())
-                    folder_similarity['folder_name'] = folder_name_similarity
-
-                    # Get average similarities
-                    file_similarity1 = folder_data['file_similarity']
-                    title_similarity1 = folder_data['title_similarity']
-                    file_similarity2 = other_folder_data['file_similarity']
-                    title_similarity2 = other_folder_data['title_similarity']
-
-                    # החלטה על ההתאמה לפי הדמיון
-                    max_file_similarity = max(file_similarity1, file_similarity2)
-                    max_title_similarity = max(title_similarity1, title_similarity2)
-
-                    if max_file_similarity > self.GENERIC_SIMILARITY_THRESHOLD:
-                        file_adjustment = 1 - (max_file_similarity * self.REDUCTION_FACTOR)
-                    else:
-                        file_adjustment = 1  # ללא ירידה
-
-                    if max_title_similarity > self.GENERIC_SIMILARITY_THRESHOLD:
-                        title_adjustment = 1 - (max_title_similarity * self.REDUCTION_FACTOR)
-                    else:
-                        title_adjustment = 1  # ללא ירידה
-
-                    # השוואת פרמטרים עיקריים
-                    for parameter in ['file', 'title', 'album', 'artist', 'album_art', 'file_hash']:
-                        total_similarity = 0
-                        for file_info, other_file_info in zip(files, other_folder_data['files']):
-                            if parameter == 'album_art':
-                                # השוואת תמונת האלבום
-                                if folder_data.get('album_art') and other_folder_data.get('album_art'):
-                                    similarity_score = 1.0 if folder_data['album_art'] == other_folder_data['album_art'] else 0.0
-                                else:
-                                    similarity_score = 0.0
-                            elif parameter == 'file_hash':
-                                # השוואת האש של הקבצים
-                                if file_info.get('file_hash') and other_file_info.get('file_hash'):
-                                    similarity_score = 1.0 if file_info['file_hash'] == other_file_info['file_hash'] else 0.0
-                                else:
-                                    similarity_score = 0.0
-                            else:
-                                if file_info[parameter] and other_file_info[parameter]:
-                                    similarity_score = self.similar(str(file_info[parameter]).lower(), str(other_file_info[parameter]).lower())
-                                else:
-                                    similarity_score = 0.0
-                                if parameter == 'file':
-                                    similarity_score *= file_adjustment
-                                elif parameter == 'title':
-                                    similarity_score *= title_adjustment
-                            total_similarity += similarity_score
-                        folder_similarity[parameter] = total_similarity / total_files if total_files > 0 else 0.0
-
-                    # השוואת מטאדאטה נוספת עם משקל 0.5 לכל פריט
-                    additional_metadata_scores = self.compare_additional_metadata(files, other_folder_data['files'])
-                    folder_similarity['additional_metadata'] = additional_metadata_scores
-
-                    # Apply weights to individual scores
-                    weighted_score = sum(folder_similarity[param] * self.PARAMETER_WEIGHTS.get(param, 0) for param in self.PARAMETER_WEIGHTS)
-
-                    # הוספת ציוני מטאדאטה נוספת
-                    total_additional_weight = 0
-                    for meta_param, meta_score in additional_metadata_scores.items():
-                        weighted_score += meta_score * self.ADDITIONAL_METADATA_WEIGHT  # משקל 0.5 לכל פריט מטאדאטה נוסף
-                        total_additional_weight += self.ADDITIONAL_METADATA_WEIGHT
-
-                    # נרמול הציון הכולל ל-10
-                    max_possible_score = sum(self.PARAMETER_WEIGHTS.values()) + total_additional_weight
-                    folder_similarity['weighted_score'] = (weighted_score / max_possible_score) * 10
-
-                    if folder_similarity:
-                        similar_folders[(folder_path, other_folder_path)] = folder_similarity
-                        processed_pairs.add((folder_path, other_folder_path))
-
-        return similar_folders
-
     def compare_additional_metadata(self, files1, files2):
-        """השוואת מטאדאטה נוספת בין שני רשימות קבצים"""
+        """Compare additional metadata between two lists of files."""
         total_files = len(files1)
         metadata_match_counts = defaultdict(int)
 
@@ -563,21 +358,122 @@ class FolderComparer:
                     elif value1 == value2:
                         metadata_match_counts[key] += 1
 
-        # חישוב ציון עבור כל פריט מטאדאטה
+        # Calculate score for each metadata item
         metadata_scores = {}
         for key, count in metadata_match_counts.items():
-            metadata_scores[key] = count / total_files  # ציון בין 0 ל-1
+            metadata_scores[key] = count / total_files  # Score between 0 and 1
 
         return metadata_scores
 
-    def find_similar_folders_enhanced(self):
-        """Find similar folders based on the enhanced method"""
+    def find_similar_folders(self):
+        """
+        Find similar folders based on the information of file lists.
+        Calculate the percentage of matching file hashes and include it in the weighted scoring.
+        """
+        folder_files = self.folder_files
+        similar_folders = defaultdict(dict)
+        processed_pairs = set()
+        for folder_path, folder_data in folder_files.items():
+            files = folder_data['files']
+            for other_folder_path, other_folder_data in folder_files.items():
+                if folder_path != other_folder_path and (other_folder_path, folder_path) not in processed_pairs and len(files) == len(other_folder_data['files']):
+                    folder_similarity = {}
+                    total_files = len(files)
+                    
+                    # Step 1: Calculate the percentage of matching file hashes
+                    matching_hashes = sum(
+                        1 for file_info, other_file_info in zip(files, other_folder_data['files'])
+                        if file_info.get('file_hash') == other_file_info.get('file_hash')
+                    )
+                    file_hash_match_percentage = matching_hashes / total_files if total_files > 0 else 0.0
+                    folder_similarity['file_hash'] = file_hash_match_percentage
+                    
+                    # Check if all file hashes match
+                    if file_hash_match_percentage == 1.0:
+                        # Folders are identical
+                        folder_similarity['identical'] = True
+                        folder_similarity['weighted_score'] = 100.0  # Maximum score
+                    else:
+                        # Proceed with weighted scoring
+                        # Calculate folder name similarity
+                        folder_name_similarity = self.similar(os.path.basename(folder_path).lower(), os.path.basename(other_folder_path).lower())
+                        folder_similarity['folder_name'] = folder_name_similarity
+
+                        # Get average similarities
+                        file_similarity1 = folder_data['file_similarity']
+                        title_similarity1 = folder_data['title_similarity']
+                        file_similarity2 = other_folder_data['file_similarity']
+                        title_similarity2 = other_folder_data['title_similarity']
+
+                        # Adjustment factors
+                        max_file_similarity = max(file_similarity1, file_similarity2)
+                        max_title_similarity = max(title_similarity1, title_similarity2)
+
+                        if max_file_similarity > self.GENERIC_SIMILARITY_THRESHOLD:
+                            file_adjustment = 1 - (max_file_similarity * self.REDUCTION_FACTOR)
+                        else:
+                            file_adjustment = 1  # No reduction
+
+                        if max_title_similarity > self.GENERIC_SIMILARITY_THRESHOLD:
+                            title_adjustment = 1 - (max_title_similarity * self.REDUCTION_FACTOR)
+                        else:
+                            title_adjustment = 1  # No reduction
+
+                        # Compare main parameters
+                        for parameter in ['file', 'title', 'album', 'artist', 'album_art']:
+                            total_similarity = 0
+                            for file_info, other_file_info in zip(files, other_folder_data['files']):
+                                if parameter == 'album_art':
+                                    # Compare album art
+                                    if folder_data.get('album_art') and other_folder_data.get('album_art'):
+                                        similarity_score = 1.0 if folder_data['album_art'] == other_folder_data['album_art'] else 0.0
+                                    else:
+                                        similarity_score = 0.0
+                                else:
+                                    if file_info.get(parameter) and other_file_info.get(parameter):
+                                        similarity_score = self.similar(str(file_info[parameter]).lower(), str(other_file_info[parameter]).lower())
+                                    else:
+                                        similarity_score = 0.0
+                                    if parameter == 'file':
+                                        similarity_score *= file_adjustment
+                                    elif parameter == 'title':
+                                        similarity_score *= title_adjustment
+                                total_similarity += similarity_score
+                            folder_similarity[parameter] = total_similarity / total_files if total_files > 0 else 0.0
+
+                        # Compare additional metadata
+                        additional_metadata_scores = self.compare_additional_metadata(files, other_folder_data['files'])
+                        folder_similarity['additional_metadata'] = additional_metadata_scores
+
+                        # Apply weights to individual scores
+                        weighted_score = sum(folder_similarity[param] * self.PARAMETER_WEIGHTS.get(param, 0) for param in self.PARAMETER_WEIGHTS)
+
+                        # Add additional metadata scores
+                        total_additional_weight = 0
+                        for meta_param, meta_score in additional_metadata_scores.items():
+                            weighted_score += meta_score * self.ADDITIONAL_METADATA_WEIGHT
+                            total_additional_weight += self.ADDITIONAL_METADATA_WEIGHT
+
+                        # Total possible weight
+                        max_possible_score = sum(self.PARAMETER_WEIGHTS.values()) + total_additional_weight
+
+                        # Normalize the final score to get a percentage
+                        folder_similarity['weighted_score'] = (weighted_score / max_possible_score) * 100
+
+                    if folder_similarity:
+                        similar_folders[(folder_path, other_folder_path)] = folder_similarity
+                        processed_pairs.add((folder_path, other_folder_path))
+
+        return similar_folders
+
+    def find_similar_folders_main(self):
+        """Main function to find similar folders based on the enhanced method."""
         self.scan_music_library()
         similar_folders = self.find_similar_folders()
 
         # Sort similar folders by weighted score in descending order
         self.sorted_similar_folders = sorted(
-            (folder_info for folder_info in similar_folders.items() if folder_info[1]['weighted_score'] >= self.MINIMAL_SIMILARITY),
+            (folder_info for folder_info in similar_folders.items() if folder_info[1].get('weighted_score', 0) >= self.MINIMAL_SIMILARITY),
             key=lambda x: x[1]['weighted_score'],
             reverse=True
         )
@@ -586,16 +482,20 @@ class FolderComparer:
             folder_path, other_folder_path = folder_pair
             print(f"Folder: {folder_path}")
             print(f"Similar folder: {other_folder_path}")
-            print("Similarity scores:")
-            for parameter, score in similarities.items():
-                if parameter == 'additional_metadata':
-                    print("- Additional Metadata Matches:")
-                    for meta, meta_score in score.items():
-                        print(f"  - {meta.capitalize()}: {meta_score}")
-                else:
-                    if parameter != 'weighted_score':
-                        print(f"- {parameter.capitalize()}: {score}")
-            print(f"Total Similarity Score: {similarities['weighted_score']}/10")
+            if similarities.get('identical'):
+                print("Folders are identical based on file hashes.")
+                print("Total Similarity Score: 100%")
+            else:
+                print("Similarity scores:")
+                for parameter, score in similarities.items():
+                    if parameter == 'additional_metadata':
+                        print("- Additional Metadata Matches:")
+                        for meta, meta_score in score.items():
+                            print(f"  - {meta.capitalize()}: {meta_score}")
+                    else:
+                        if parameter not in ['weighted_score', 'identical']:
+                            print(f"- {parameter.capitalize()}: {score}")
+                print(f"Total Similarity Score: {similarities['weighted_score']:.2f}%")
             print()
 
     def main(self):
@@ -605,36 +505,40 @@ class FolderComparer:
         self.get_file_lists()
         self.find_similar_folders_main()
 
-    def find_similar_folders_main(self):
-        """הפונקציה הראשית למציאת תיקיות דומות"""
-        self.scan_music_library()
-        similar_folders = self.find_similar_folders()
-
-        # Sort similar folders by weighted score in descending order
-        self.sorted_similar_folders = sorted(
-            (folder_info for folder_info in similar_folders.items() if folder_info[1]['weighted_score'] >= self.MINIMAL_SIMILARITY),
-            key=lambda x: x[1]['weighted_score'],
-            reverse=True
-        )
+    def get_folders_quality(self):
+        """
+        Compare folders based on certain quality criteria and organize the information.
+        """
+        self.organized_info = {}  # Initialize an empty dictionary to store organized information
 
         for folder_pair, similarities in self.sorted_similar_folders:
             folder_path, other_folder_path = folder_pair
-            print(f"Folder: {folder_path}")
-            print(f"Similar folder: {other_folder_path}")
-            print("Similarity scores:")
-            for parameter, score in similarities.items():
-                if parameter == 'additional_metadata':
-                    print("- Additional Metadata Matches:")
-                    for meta, meta_score in score.items():
-                        print(f"  - {meta.capitalize()}: {meta_score}")
-                else:
-                    if parameter != 'weighted_score':
-                        print(f"- {parameter.capitalize()}: {score}")
-            print(f"Total Similarity Score: {similarities['weighted_score']}/10")
-            print()
+            folder_quality1, folder_quality2 = self.compare_quality(folder_path, other_folder_path)
+
+            # Store the information in the dictionary with folder pair as key and quality scores as value
+            self.organized_info[folder_pair] = (folder_quality1, folder_quality2)
+
+        return self.organized_info
+
+    def compare_quality(self, folder_path1, folder_path2):
+        """
+        Compare the quality of two folders.
+        """
+        # For simplicity, we'll use the weighted score as the quality measure
+        folder_quality1 = self.get_folder_weighted_score(folder_path1)
+        folder_quality2 = self.get_folder_weighted_score(folder_path2)
+
+        return folder_quality1, folder_quality2
+
+    def get_folder_weighted_score(self, folder_path):
+        """Get the weighted score of a folder from the sorted similar folders."""
+        for folder_pair, similarities in self.sorted_similar_folders:
+            if folder_path in folder_pair:
+                return similarities.get('weighted_score', 0)
+        return 0
 
 class SelectQuality(FolderComparer):
-    """השוואת איכות בין תיקיות"""
+    """Compare the quality between folders."""
 
     def view_result(self):
         """
@@ -650,34 +554,19 @@ class SelectQuality(FolderComparer):
             folder_quality1, folder_quality2 = qualitys
 
             if folder_quality1 > folder_quality2:
-                print(colors.GREEN + f'{folder_path:<{max_folder_path_length}} {folder_quality1}' + colors.RESET)
-                print(f'{other_folder_path:<{max_folder_path_length}} {folder_quality2}')
+                print(colors.GREEN + f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%' + colors.RESET)
+                print(f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%')
             elif folder_quality2 > folder_quality1:
-                print(f'{folder_path:<{max_folder_path_length}} {folder_quality1}')
-                print(colors.GREEN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2}' + colors.RESET)
+                print(f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%')
+                print(colors.GREEN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%' + colors.RESET)
             else:
-                print(colors.CYAN + f'{folder_path:<{max_folder_path_length}} {folder_quality1}' + colors.RESET)
-                print(colors.CYAN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2}' + colors.RESET)
+                print(colors.CYAN + f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%' + colors.RESET)
+                print(colors.CYAN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%' + colors.RESET)
             print()
-
-    def get_folders_quality(self):
-        """
-        Compare folders based on certain quality criteria and organize the information.
-        """
-        self.organized_info = {}  # Initialize an empty dictionary to store organized information
-
-        for folder_pair, _ in self.sorted_similar_folders:
-            folder_path, other_folder_path = folder_pair
-            folder_quality1, folder_quality2 = self.compare_quality(folder_path, other_folder_path)
-
-            # Store the information in the dictionary with folder pair as key and quality scores as value
-            self.organized_info[folder_pair] = (folder_quality1, folder_quality2)
-
-        return self.organized_info
 
 class SelectAndThrow:
     """
-    בחירה ומחיקת התיקיות המיותרות
+    Choose and delete the redundant folders.
     """
     def __init__(self, organized_info, preferred_bitrate):
         self.organized_info = organized_info
@@ -697,14 +586,14 @@ class SelectAndThrow:
             folder_quality1, folder_quality2 = qualitys
 
             if folder_quality1 > folder_quality2:
-                print(colors.GREEN + f'{folder_path:<{max_folder_path_length}} {folder_quality1}' + colors.RESET)
-                print(f'{other_folder_path:<{max_folder_path_length}} {folder_quality2}')
+                print(colors.GREEN + f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%' + colors.RESET)
+                print(f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%')
             elif folder_quality2 > folder_quality1:
-                print(f'{folder_path:<{max_folder_path_length}} {folder_quality1}')
-                print(colors.GREEN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2}' + colors.RESET)
+                print(f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%')
+                print(colors.GREEN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%' + colors.RESET)
             else:
-                print(colors.CYAN + f'{folder_path:<{max_folder_path_length}} {folder_quality1}' + colors.RESET)
-                print(colors.CYAN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2}' + colors.RESET)
+                print(colors.CYAN + f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%' + colors.RESET)
+                print(colors.CYAN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%' + colors.RESET)
             print()
 
     def delete(self):
@@ -718,15 +607,15 @@ class SelectAndThrow:
             if quality1 < quality2:
                 # Delete folder1
                 print(f"Deleting folder '{folder1}' due to lower quality score.")
-                # Uncomment the line הבא כדי למחוק את התיקיה בפועל
+                # Uncomment the line below to actually delete the folder
                 # shutil.rmtree(folder1)
             elif quality2 < quality1:
                 # Delete folder2
                 print(f"Deleting folder '{folder2}' due to lower quality score.")
-                # Uncomment the line הבא כדי למחוק את התיקיה בפועל
+                # Uncomment the line below to actually delete the folder
                 # shutil.rmtree(folder2)
             else:
-                print(f"Both folders are of the same quality. Select the folder you want to delete!")
+                print(f"Both folders '{folder1}' and '{folder2}' have the same quality. Please select the folder you want to delete!")
 
 if __name__ == "__main__":
     print('הכנס נתיב לתיקיה')
@@ -736,7 +625,7 @@ if __name__ == "__main__":
         exit(1)
     folder_paths = [folder_path]
 
-    # שלב נוסף: בחירת קצב הסיביות המועדף
+    # Additional step: Choose preferred bitrate
     print("בחר את קצב הסיביות המועדף עליך:")
     print("1. איכות ברירת מחדל (128 kbps)")
     print("2. איכות גבוהה ביותר")
@@ -749,16 +638,16 @@ if __name__ == "__main__":
         print("בחירה לא תקינה. ברירת המחדל היא 128 kbps.")
         preferred_bitrate = '128'
 
-    # שלב 1: השוואת איכות התיקיות
+    # Step 1: Compare folder qualities
     comparer = SelectQuality(folder_paths, preferred_bitrate)
     comparer.main()
     organized_info = comparer.get_folders_quality()
 
-    # שלב 2: הצגת התוצאות
+    # Step 2: Display results
     selecter = SelectAndThrow(organized_info, preferred_bitrate)
     selecter.view_result()
 
-    # שלב 3: בחירה ומחיקת התיקיות
+    # Step 3: Choose and delete folders
     user_input = input("\nהאם ברצונך למחוק את התיקיות המיותרות? (y/n): ").strip().lower()
     if user_input == 'y':
         selecter.delete()
