@@ -9,7 +9,9 @@ from mutagen import File
 from PIL import Image
 import shutil
 import re
-from jibrish_to_hebrew import fix_jibrish, check_jibrish  # ייבוא הפונקציות החדשות
+
+# ייבוא הפונקציות החדשות
+from jibrish_to_hebrew import fix_jibrish, check_jibrish  
 
 # ANSI color codes
 class colors:
@@ -22,7 +24,7 @@ class colors:
     RESET = '\033[0m'
 
 class FolderComparer:
-    def __init__(self, folder_paths):
+    def __init__(self, folder_paths, preferred_bitrate):
         self.folder_paths = folder_paths
         self.folder_files = defaultdict(dict)
         self.music_data = {}
@@ -31,11 +33,12 @@ class FolderComparer:
         self.ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
         self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini'}
         self.SIMILARITY_THRESHOLD = 0.8
-        self.MINIMAL_SIMILARITY = 5.0 # הגדרת רמת הדמיון הנמוכה ביותר להצגה
+        self.MINIMAL_SIMILARITY = 5.0  # הגדרת רמת הדמיון הנמוכה ביותר להצגה
         self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
         self.REDUCTION_FACTOR = 0.5  # פקטור הירידה בציון
-        self.PARAMETER_WEIGHTS = {'file': 4.5, 'album': 1.0, 'title': 3.0, 'artist': 0.5, 'folder_name': 1.0}
+        self.PARAMETER_WEIGHTS = {'file': 4.5, 'album': 1.0, 'title': 3.0, 'artist': 0.5, 'folder_name': 1.0, 'bitrate': 2.0}
         self.artists_map = self.load_artists_from_csv()
+        self.preferred_bitrate = preferred_bitrate
         self.load_music_data()
 
     def load_artists_from_csv(self):
@@ -85,7 +88,7 @@ class FolderComparer:
             return None
 
     def extract_metadata(self, filepath):
-        """מוציא מטאדאטה מקובץ מוזיקה"""
+        """מוציא מטאדאטה מקובץ מוזיקה כולל קצב סיביות"""
         try:
             audio = File(filepath, easy=True)
             if audio is None:
@@ -93,6 +96,11 @@ class FolderComparer:
             metadata = {}
             for key in audio.keys():
                 metadata[key] = audio.get(key, [None])[0]
+            # הוספת קצב סיביות
+            if audio.info and hasattr(audio.info, 'bitrate'):
+                metadata['bitrate'] = audio.info.bitrate // 1000  # קצב סיביות ב kbps
+            else:
+                metadata['bitrate'] = None
             return metadata
         except Exception as e:
             print(f"Error extracting metadata from {filepath}: {e}")
@@ -231,11 +239,16 @@ class FolderComparer:
                         elif key == 'title':
                             title = fixed_value
 
+                # הוספת קצב סיביות
+                metadata = self.extract_metadata(file_path)
+                bitrate = metadata.get('bitrate', None)
+
                 file_list.append({
                     'file': file,
                     'artist': artist,
                     'album': album,
                     'title': title,
+                    'bitrate': bitrate
                 })
             except Exception as e:
                 print(f"Error processing {file}: {e}")
@@ -425,7 +438,6 @@ class FolderComparer:
         Return weighted score for all files in each folder for each parameter,
         normalized by the number of files in the folder.
         """
-
         folder_files = self.folder_files
 
         similar_folders = defaultdict(dict)
@@ -461,20 +473,30 @@ class FolderComparer:
                     else:
                         title_adjustment = 1  # ללא ירידה
 
-                    for parameter in ['file', 'title', 'album', 'artist']:
+                    for parameter in ['file', 'title', 'album', 'artist', 'bitrate']:
                         total_similarity = 0
                         for file_info, other_file_info in zip(files, other_folder_data['files']):
-                            if file_info[parameter] and other_file_info[parameter]:
-                                similarity_score = self.similar(file_info[parameter].lower(), other_file_info[parameter].lower())
-                                if parameter == 'file':
-                                    similarity_score *= file_adjustment
-                                elif parameter == 'title':
-                                    similarity_score *= title_adjustment
-                                total_similarity += similarity_score
+                            if parameter == 'bitrate':
+                                bitrate1 = file_info.get('bitrate', 0)
+                                bitrate2 = other_file_info.get('bitrate', 0)
+                                if bitrate1 and bitrate2:
+                                    similarity_score = 1.0 if bitrate1 == bitrate2 else 0.0
+                                else:
+                                    similarity_score = 0.0
+                            else:
+                                if file_info[parameter] and other_file_info[parameter]:
+                                    similarity_score = self.similar(str(file_info[parameter]).lower(), str(other_file_info[parameter]).lower())
+                                else:
+                                    similarity_score = 0.0
+                            if parameter == 'file':
+                                similarity_score *= file_adjustment
+                            elif parameter == 'title':
+                                similarity_score *= title_adjustment
+                            total_similarity += similarity_score
                         folder_similarity[parameter] = total_similarity / total_files if total_files > 0 else 0.0
 
                     # Apply weights to individual scores
-                    weighted_score = sum(folder_similarity[param] * self.PARAMETER_WEIGHTS[param] for param in folder_similarity)
+                    weighted_score = sum(folder_similarity[param] * self.PARAMETER_WEIGHTS.get(param, 1.0) for param in folder_similarity)
                     folder_similarity['weighted_score'] = weighted_score
 
                     if folder_similarity:
@@ -551,6 +573,18 @@ class FolderComparer:
                 score += 1
             total += 1
 
+        # השוואת קצב סיביות
+        bitrate1 = [f.get('bitrate', 0) for f in folder1['files']]
+        bitrate2 = [f.get('bitrate', 0) for f in folder2['files']]
+        if bitrate1 and bitrate2:
+            avg_bitrate1 = sum(bitrate1) / len(bitrate1)
+            avg_bitrate2 = sum(bitrate2) / len(bitrate2)
+            if avg_bitrate1 == avg_bitrate2:
+                score += 1
+            else:
+                score += 0  # אין תוספת ציון אם קצב הסיביות שונה
+            total += 1
+
         return score / total if total > 0 else 0
 
     def remove_numbers(self, s):
@@ -564,19 +598,43 @@ class FolderComparer:
         matches = 0
         total = min(len(metadata1), len(metadata2))
         for m1, m2 in zip(metadata1, metadata2):
+            # השוואת מטאדאטה עם התחשבות בקצב סיביות
             if m1 == m2:
                 matches += 1
+            elif m1.get('bitrate') == m2.get('bitrate'):
+                matches += 0.5  # ציון חלקי אם קצב הסיביות זהה
         return matches / total if total > 0 else 0
 
     def choose_preferred(self, folder1, folder2):
-        """Choose the higher quality folder"""
-        # Additional criteria can be added here
+        """Choose the higher quality folder based on preferred bitrate"""
+        # חישוב ממוצע קצב סיביות לכל תיקיה
+        bitrate1 = [f.get('bitrate', 0) for f in folder1['files'] if f.get('bitrate')]
+        bitrate2 = [f.get('bitrate', 0) for f in folder2['files'] if f.get('bitrate')]
+
+        avg_bitrate1 = sum(bitrate1) / len(bitrate1) if bitrate1 else 0
+        avg_bitrate2 = sum(bitrate2) / len(bitrate2) if bitrate2 else 0
+
+        # בחירה על פי קצב הסיביות המועדף
+        if self.preferred_bitrate == '128':
+            # העדפה לתיקיות עם קצב סיביות של 128
+            if avg_bitrate1 == 128 and avg_bitrate2 != 128:
+                return folder1['path']
+            elif avg_bitrate2 == 128 and avg_bitrate1 != 128:
+                return folder2['path']
+        elif self.preferred_bitrate == 'high':
+            # העדפה לתיקיות עם קצב סיביות גבוה יותר
+            if avg_bitrate1 > avg_bitrate2:
+                return folder1['path']
+            elif avg_bitrate2 > avg_bitrate1:
+                return folder2['path']
+
+        # אם שווים, השוואת מספר הקבצים
         if len(folder1['files']) > len(folder2['files']):
             return folder1['path']
-        elif len(folder1['files']) < len(folder2['files']):
+        elif len(folder2['files']) > len(folder1['files']):
             return folder2['path']
         else:
-            # If the number of files is equal, compare metadata richness
+            # אם מספר הקבצים שווה, השוואת מטאדאטה
             meta1 = sum([len(f['metadata']) for f in folder1['files']])
             meta2 = sum([len(f['metadata']) for f in folder2['files']])
             if meta1 > meta2:
@@ -658,8 +716,9 @@ class SelectAndThrow:
     """
     בחירה ומחיקת התיקיות המיותרות
     """
-    def __init__(self, organized_info):
+    def __init__(self, organized_info, preferred_bitrate):
         self.organized_info = organized_info
+        self.preferred_bitrate = preferred_bitrate
 
     def view_result(self):
         """
@@ -706,20 +765,6 @@ class SelectAndThrow:
             else:
                 print(f"Both folders are of the same quality. Select the folder you want to delete!")
 
-def load_artists_from_csv(csv_file):
-    """טוען רשימת זמרים מקובץ CSV"""
-    artists_map = {}
-    try:
-        with open(csv_file, mode='r', encoding='utf-8') as csvfile:
-            reader = csv.reader(csvfile)
-            for row in reader:
-                if len(row) == 2:
-                    key, value = row
-                    artists_map[key.strip().lower()] = value.strip()
-    except Exception as e:
-        print(f"Error reading CSV file: {e}")
-    return artists_map
-
 if __name__ == "__main__":
     print('הכנס נתיב לתיקיה')
     folder_path = input('>>>').strip()
@@ -728,13 +773,26 @@ if __name__ == "__main__":
         exit(1)
     folder_paths = [folder_path]
 
+    # שלב נוסף: בחירת קצב הסיביות המועדף
+    print("בחר את קצב הסיביות המועדף עליך:")
+    print("1. איכות ברירת מחדל (128 kbps)")
+    print("2. איכות גבוהה ביותר")
+    bitrate_choice = input('הכנס 1 או 2: ').strip()
+    if bitrate_choice == '1':
+        preferred_bitrate = '128'
+    elif bitrate_choice == '2':
+        preferred_bitrate = 'high'
+    else:
+        print("בחירה לא תקינה. ברירת המחדל היא 128 kbps.")
+        preferred_bitrate = '128'
+
     # שלב 1: השוואת איכות התיקיות
-    comparer = SelectQuality(folder_paths)
+    comparer = SelectQuality(folder_paths, preferred_bitrate)
     comparer.main()
     organized_info = comparer.get_folders_quality()
 
     # שלב 2: הצגת התוצאות
-    selecter = SelectAndThrow(organized_info)
+    selecter = SelectAndThrow(organized_info, preferred_bitrate)
     selecter.view_result()
 
     # שלב 3: בחירה ומחיקת התיקיות
