@@ -85,6 +85,7 @@ class FolderComparer:
         try:
             with open(self.DATA_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.music_data, f, ensure_ascii=False, indent=4)
+            print(f"Music data saved to {self.DATA_FILE}.")
         except Exception as e:
             print(f"Error saving data file: {e}")
 
@@ -95,7 +96,7 @@ class FolderComparer:
             with open(filepath, 'rb') as f:
                 for chunk in iter(lambda: f.read(4096), b""):
                     hash_func.update(chunk)
-            return hash_func.hexdigest()
+                return hash_func.hexdigest()
         except Exception as e:
             print(f"Error hashing file {filepath}: {e}")
             return None
@@ -336,35 +337,6 @@ class FolderComparer:
         average_similarity = total_similarity / total_pairs
         return average_similarity
 
-    def compare_additional_metadata(self, files1, files2):
-        """Compare additional metadata between two lists of files."""
-        total_files = len(files1)
-        metadata_match_counts = defaultdict(int)
-
-        for file_info1, file_info2 in zip(files1, files2):
-            metadata1 = file_info1.get('metadata', {})
-            metadata2 = file_info2.get('metadata', {})
-            keys1 = set(metadata1.keys())
-            keys2 = set(metadata2.keys())
-            common_keys = keys1 & keys2 - {'artist', 'album', 'title', 'bitrate'}
-
-            for key in common_keys:
-                value1 = metadata1.get(key)
-                value2 = metadata2.get(key)
-                if value1 and value2:
-                    if isinstance(value1, str) and isinstance(value2, str):
-                        if value1.lower() == value2.lower():
-                            metadata_match_counts[key] += 1
-                    elif value1 == value2:
-                        metadata_match_counts[key] += 1
-
-        # Calculate score for each metadata item
-        metadata_scores = {}
-        for key, count in metadata_match_counts.items():
-            metadata_scores[key] = count / total_files  # Score between 0 and 1
-
-        return metadata_scores
-
     def find_similar_folders(self):
         """
         Find similar folders based on the information of file lists.
@@ -462,9 +434,41 @@ class FolderComparer:
 
                     if folder_similarity:
                         similar_folders[(folder_path, other_folder_path)] = folder_similarity
+                        processed_pairs.add((folder_path, folder_path))
+                        processed_pairs.add((other_folder_path, other_folder_path))
                         processed_pairs.add((folder_path, other_folder_path))
+                        processed_pairs.add((other_folder_path, folder_path))
 
         return similar_folders
+
+    def compare_additional_metadata(self, files1, files2):
+        """Compare additional metadata between two lists of files."""
+        total_files = len(files1)
+        metadata_match_counts = defaultdict(int)
+
+        for file_info1, file_info2 in zip(files1, files2):
+            metadata1 = file_info1.get('metadata', {})
+            metadata2 = file_info2.get('metadata', {})
+            keys1 = set(metadata1.keys())
+            keys2 = set(metadata2.keys())
+            common_keys = keys1 & keys2 - {'artist', 'album', 'title', 'bitrate'}
+
+            for key in common_keys:
+                value1 = metadata1.get(key)
+                value2 = metadata2.get(key)
+                if value1 and value2:
+                    if isinstance(value1, str) and isinstance(value2, str):
+                        if value1.lower() == value2.lower():
+                            metadata_match_counts[key] += 1
+                    elif value1 == value2:
+                        metadata_match_counts[key] += 1
+
+        # Calculate score for each metadata item
+        metadata_scores = {}
+        for key, count in metadata_match_counts.items():
+            metadata_scores[key] = count / total_files  # Score between 0 and 1
+
+        return metadata_scores
 
     def find_similar_folders_main(self):
         """Main function to find similar folders based on the enhanced method."""
@@ -505,40 +509,119 @@ class FolderComparer:
         self.get_file_lists()
         self.find_similar_folders_main()
 
+class SelectQuality(FolderComparer):
+    """Compare the quality between folders."""
+
     def get_folders_quality(self):
         """
         Compare folders based on certain quality criteria and organize the information.
         """
         self.organized_info = {}  # Initialize an empty dictionary to store organized information
+        folder_quality_scores = {}  # To store quality scores for each folder
 
+        # First, compute quality scores for each folder
+        for folder_path, folder_data in self.folder_files.items():
+            quality_score = self.compute_folder_quality(folder_path, folder_data)
+            folder_quality_scores[folder_path] = quality_score
+
+        # Now, for each pair of similar folders, retrieve their quality scores and compare
         for folder_pair, similarities in self.sorted_similar_folders:
-            folder_path, other_folder_path = folder_pair
-            folder_quality1, folder_quality2 = self.compare_quality(folder_path, other_folder_path)
+            folder_path1, folder_path2 = folder_pair
+            folder_quality1 = folder_quality_scores.get(folder_path1, 0)
+            folder_quality2 = folder_quality_scores.get(folder_path2, 0)
 
             # Store the information in the dictionary with folder pair as key and quality scores as value
             self.organized_info[folder_pair] = (folder_quality1, folder_quality2)
 
         return self.organized_info
 
-    def compare_quality(self, folder_path1, folder_path2):
+    def compute_folder_quality(self, folder_path, folder_data):
         """
-        Compare the quality of two folders.
+        Compute the quality score for a folder based on specified parameters.
         """
-        # For simplicity, we'll use the weighted score as the quality measure
-        folder_quality1 = self.get_folder_weighted_score(folder_path1)
-        folder_quality2 = self.get_folder_weighted_score(folder_path2)
+        # Initialize scores
+        hebrew_metadata_count = 0
+        metadata_complete_count = 0
+        total_files = len(folder_data['files'])
+        total_bitrate = 0
+        album_art_score = 1 if folder_data.get('album_art') else 0
+        repetitive_names_score = 1 - max(folder_data.get('title_similarity', 0), folder_data.get('file_similarity', 0))
 
-        return folder_quality1, folder_quality2
+        for file_info in folder_data['files']:
+            metadata = file_info.get('metadata', {})
+            title = metadata.get('title')
+            artist = metadata.get('artist')
+            album = metadata.get('album')
+            bitrate = metadata.get('bitrate')
 
-    def get_folder_weighted_score(self, folder_path):
-        """Get the weighted score of a folder from the sorted similar folders."""
-        for folder_pair, similarities in self.sorted_similar_folders:
-            if folder_path in folder_pair:
-                return similarities.get('weighted_score', 0)
-        return 0
+            # Check for Hebrew metadata
+            hebrew_in_metadata = False
+            for field in [title, artist, album]:
+                if field and self.contains_hebrew(field):
+                    hebrew_in_metadata = True
+                    break
+            if hebrew_in_metadata:
+                hebrew_metadata_count += 1
 
-class SelectQuality(FolderComparer):
-    """Compare the quality between folders."""
+            # Check for metadata completeness (not empty or corrupted)
+            metadata_complete = True
+            for field in [title, artist, album]:
+                if not field or check_jibrish(field):
+                    metadata_complete = False
+                    break
+            if metadata_complete:
+                metadata_complete_count +=1
+
+            # Collect bitrate
+            if bitrate:
+                total_bitrate += bitrate
+
+        # Compute scores
+        hebrew_metadata_score = hebrew_metadata_count / total_files if total_files > 0 else 0
+        metadata_completeness_score = metadata_complete_count / total_files if total_files > 0 else 0
+
+        # Compute bitrate score
+        if total_files > 0:
+            average_bitrate = total_bitrate / total_files
+            bitrate_score = self.compute_bitrate_score(average_bitrate)
+        else:
+            bitrate_score = 0
+
+        # Now, combine scores
+        # We can assign weights to each parameter
+        weights = {
+            'hebrew_metadata_score': 2.0,
+            'metadata_completeness_score': 2.0,
+            'album_art_score': 1.0,
+            'bitrate_score': 2.0,
+            'repetitive_names_score': 1.0
+        }
+
+        total_weight = sum(weights.values())
+        total_score = (
+            hebrew_metadata_score * weights['hebrew_metadata_score'] +
+            metadata_completeness_score * weights['metadata_completeness_score'] +
+            album_art_score * weights['album_art_score'] +
+            bitrate_score * weights['bitrate_score'] +
+            repetitive_names_score * weights['repetitive_names_score']
+        ) / total_weight
+
+        return total_score * 100  # Return as percentage
+
+    def contains_hebrew(self, text):
+        """Check if the text contains Hebrew characters."""
+        return any('\u0590' <= c <= '\u05EA' for c in text)
+
+    def compute_bitrate_score(self, average_bitrate):
+        """Compute the bitrate score according to user preference."""
+        if self.preferred_bitrate == 'high':
+            # Assuming higher bitrate is better, and max bitrate is say 320 kbps
+            return min(average_bitrate / 320, 1.0)
+        elif self.preferred_bitrate == '128':
+            # Compute how close the average bitrate is to 128 kbps
+            return max(1 - abs(average_bitrate - 128) / 192, 0)  # Max difference is 192 (320-128)
+        else:
+            return 0
 
     def view_result(self):
         """
@@ -644,12 +727,12 @@ if __name__ == "__main__":
     organized_info = comparer.get_folders_quality()
 
     # Step 2: Display results
-    selecter = SelectAndThrow(organized_info, preferred_bitrate)
-    selecter.view_result()
+    comparer.view_result()
 
     # Step 3: Choose and delete folders
     user_input = input("\nהאם ברצונך למחוק את התיקיות המיותרות? (y/n): ").strip().lower()
     if user_input == 'y':
+        selecter = SelectAndThrow(organized_info, preferred_bitrate)
         selecter.delete()
         print("התיקיות נמחקו.")
     else:
