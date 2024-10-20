@@ -716,6 +716,156 @@ class SelectQuality(FolderComparer):
         for param, score in breakdown.items():
             print(f'  {param}: {score:.2f}%')
 
+class MergeFolders:
+    def __init__(self, organized_info, folder_files, preferred_bitrate):
+        self.organized_info = organized_info
+        self.folder_files = folder_files
+        self.preferred_bitrate = preferred_bitrate
+
+    def merge(self):
+        # Iterate over folder pairs
+        for folder_pair, quality_scores in self.organized_info.items():
+            folder1, folder2 = folder_pair
+            (quality1, breakdown1), (quality2, breakdown2) = quality_scores
+
+            # Decide preferred folder
+            preferred_folder, other_folder = self.decide_preferred_folder(folder1, folder2, quality1, quality2)
+
+            # Perform merging from other_folder to preferred_folder
+            self.merge_folders(preferred_folder, other_folder)
+
+    def decide_preferred_folder(self, folder1, folder2, quality1, quality2):
+        # Implement the logic according to the user's rules
+        # If the bitrate of the files is the same in both folders, prefer the folder with the higher quality score.
+        # If the bitrate is different, prefer the folder with the better bitrate (according to user definition).
+
+        # Get average bitrate of each folder
+        folder_data1 = self.folder_files[folder1]
+        folder_data2 = self.folder_files[folder2]
+
+        avg_bitrate1 = self.get_average_bitrate(folder_data1)
+        avg_bitrate2 = self.get_average_bitrate(folder_data2)
+
+        # Now, compare the bitrates
+        if avg_bitrate1 == avg_bitrate2:
+            # Bitrates are the same, prefer the folder with higher quality score
+            if quality1 >= quality2:
+                return folder1, folder2
+            else:
+                return folder2, folder1
+        else:
+            # Bitrates are different
+            preferred_bitrate = self.preferred_bitrate
+            if preferred_bitrate == 'high':
+                # Prefer the folder with the higher bitrate
+                if avg_bitrate1 >= avg_bitrate2:
+                    return folder1, folder2
+                else:
+                    return folder2, folder1
+            elif preferred_bitrate == '128':
+                # Prefer the folder with bitrate closest to 128 kbps from above
+                # If one folder has bitrate less than 128, prefer the folder with higher bitrate in any case
+                if avg_bitrate1 < 128 and avg_bitrate2 >= 128:
+                    return folder2, folder1
+                elif avg_bitrate2 < 128 and avg_bitrate1 >= 128:
+                    return folder1, folder2
+                else:
+                    # Both are >=128 or both are <128
+                    diff1 = avg_bitrate1 - 128 if avg_bitrate1 >= 128 else float('inf')
+                    diff2 = avg_bitrate2 - 128 if avg_bitrate2 >= 128 else float('inf')
+                    if diff1 <= diff2:
+                        return folder1, folder2
+                    else:
+                        return folder2, folder1
+            else:
+                # Should not reach here, default to higher bitrate
+                if avg_bitrate1 >= avg_bitrate2:
+                    return folder1, folder2
+                else:
+                    return folder2, folder1
+
+    def get_average_bitrate(self, folder_data):
+        total_bitrate = 0
+        count = 0
+        for file_info in folder_data['files']:
+            bitrate = file_info.get('bitrate')
+            if bitrate:
+                total_bitrate += bitrate
+                count += 1
+        if count > 0:
+            return total_bitrate / count
+        else:
+            return 0
+
+    def merge_folders(self, preferred_folder, other_folder):
+        # Now, we need to merge data from other_folder into preferred_folder
+        # For each file in preferred_folder, find the corresponding file in other_folder
+        # We can match files by file hash or by file name
+
+        preferred_files = self.folder_files[preferred_folder]['files']
+        other_files = self.folder_files[other_folder]['files']
+
+        # Create a mapping from file_hash to file_info for quick lookup
+        other_files_hash_map = {file_info.get('file_hash'): file_info for file_info in other_files}
+
+        for pref_file_info in preferred_files:
+            pref_file_hash = pref_file_info.get('file_hash')
+            pref_file_path = os.path.join(preferred_folder, pref_file_info['file'])
+
+            # Find the corresponding file in other_files
+            other_file_info = other_files_hash_map.get(pref_file_hash)
+
+            if not other_file_info:
+                # Try matching by file name
+                other_file_info = next((fi for fi in other_files if fi['file'] == pref_file_info['file']), None)
+
+            if other_file_info:
+                other_file_path = os.path.join(other_folder, other_file_info['file'])
+                # Merge metadata
+                self.merge_file_metadata(pref_file_path, other_file_path)
+
+        # Merge album art if needed
+        self.merge_album_art(preferred_folder, other_folder)
+
+    def merge_file_metadata(self, pref_file_path, other_file_path):
+        # Read metadata from both files
+        pref_audio = File(pref_file_path, easy=True)
+        other_audio = File(other_file_path, easy=True)
+
+        if not pref_audio or not other_audio:
+            return
+
+        # For each metadata field, if pref_audio lacks it and other_audio has it, copy it
+        for key in other_audio.keys():
+            if key not in pref_audio or not pref_audio.get(key):
+                pref_audio[key] = other_audio[key]
+
+        # Save the updated metadata to the preferred file
+        try:
+            pref_audio.save()
+            print(f"Updated metadata for file: {pref_file_path}")
+        except Exception as e:
+            print(f"Error saving metadata for file {pref_file_path}: {e}")
+
+    def merge_album_art(self, preferred_folder, other_folder):
+        # Check if preferred_folder has album art
+        preferred_album_art_files = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png', 'תמונה.jpg'}
+        preferred_has_album_art = any(os.path.isfile(os.path.join(preferred_folder, f)) for f in preferred_album_art_files)
+
+        if not preferred_has_album_art:
+            # Check if other_folder has album art
+            for file in os.listdir(other_folder):
+                if file.lower() in preferred_album_art_files:
+                    # Copy album art file to preferred_folder
+                    src = os.path.join(other_folder, file)
+                    dst = os.path.join(preferred_folder, file)
+                    try:
+                        shutil.copy2(src, dst)
+                        print(f"Copied album art from {src} to {dst}")
+                    except Exception as e:
+                        print(f"Error copying album art from {src} to {dst}: {e}")
+                    break
+
 class SelectAndThrow:
     """
     Choose and delete the redundant folders.
@@ -781,7 +931,11 @@ if __name__ == "__main__":
     # Step 2: Display results
     comparer.view_result()
 
-    # Step 3: Choose and delete folders
+    # Step 3: Merge folders before deletion
+    merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate)
+    merger.merge()
+
+    # Step 4: Choose and delete folders
     user_input = input("\nהאם ברצונך למחוק את התיקיות המיותרות? (y/n): ").strip().lower()
     if user_input == 'y':
         selecter = SelectAndThrow(organized_info, preferred_bitrate)
