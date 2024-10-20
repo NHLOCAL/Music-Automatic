@@ -31,6 +31,7 @@ class FolderComparer:
         self.DATA_FILE = "music_data.json"
         self.CSV_FILE = "singer-list.csv"
         self.ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
+        self.LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
         self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini'}
         self.SIMILARITY_THRESHOLD = 0.8
         self.MINIMAL_SIMILARITY = 30.0  # Minimum similarity percentage to display
@@ -269,7 +270,8 @@ class FolderComparer:
                     'title': title,
                     'bitrate': metadata.get('bitrate', None),
                     'metadata': all_metadata,
-                    'file_hash': file_hash
+                    'file_hash': file_hash,
+                    'extension': os.path.splitext(file)[1].lower()
                 })
             except Exception as e:
                 print(f"Error processing {file}: {e}")
@@ -351,7 +353,7 @@ class FolderComparer:
                 if folder_path != other_folder_path and (other_folder_path, folder_path) not in processed_pairs and len(files) == len(other_folder_data['files']):
                     folder_similarity = {}
                     total_files = len(files)
-                    
+
                     # Step 1: Calculate the percentage of matching file hashes
                     matching_hashes = sum(
                         1 for file_info, other_file_info in zip(files, other_folder_data['files'])
@@ -359,7 +361,7 @@ class FolderComparer:
                     )
                     file_hash_match_percentage = matching_hashes / total_files if total_files > 0 else 0.0
                     folder_similarity['file_hash'] = file_hash_match_percentage
-                    
+
                     # Check if all file hashes match
                     if file_hash_match_percentage == 1.0:
                         # Folders are identical
@@ -518,11 +520,13 @@ class SelectQuality(FolderComparer):
         """
         self.organized_info = {}  # Initialize an empty dictionary to store organized information
         folder_quality_scores = {}  # To store quality scores for each folder
+        folder_quality_details = {}  # To store the breakdown of quality parameters
 
         # First, compute quality scores for each folder
         for folder_path, folder_data in self.folder_files.items():
-            quality_score = self.compute_folder_quality(folder_path, folder_data)
+            quality_score, quality_breakdown = self.compute_folder_quality(folder_path, folder_data)
             folder_quality_scores[folder_path] = quality_score
+            folder_quality_details[folder_path] = quality_breakdown
 
         # Now, for each pair of similar folders, retrieve their quality scores and compare
         for folder_pair, similarities in self.sorted_similar_folders:
@@ -530,8 +534,11 @@ class SelectQuality(FolderComparer):
             folder_quality1 = folder_quality_scores.get(folder_path1, 0)
             folder_quality2 = folder_quality_scores.get(folder_path2, 0)
 
+            quality_breakdown1 = folder_quality_details.get(folder_path1, {})
+            quality_breakdown2 = folder_quality_details.get(folder_path2, {})
+
             # Store the information in the dictionary with folder pair as key and quality scores as value
-            self.organized_info[folder_pair] = (folder_quality1, folder_quality2)
+            self.organized_info[folder_pair] = ((folder_quality1, quality_breakdown1), (folder_quality2, quality_breakdown2))
 
         return self.organized_info
 
@@ -546,6 +553,13 @@ class SelectQuality(FolderComparer):
         total_bitrate = 0
         album_art_score = 1 if folder_data.get('album_art') else 0
         repetitive_names_score = 1 - max(folder_data.get('title_similarity', 0), folder_data.get('file_similarity', 0))
+        lossless_format_count = 0
+        consistent_artist_count = 0
+        consistent_album_count = 0
+        lyrics_count = 0
+
+        artists = set()
+        albums = set()
 
         for file_info in folder_data['files']:
             metadata = file_info.get('metadata', {})
@@ -553,6 +567,14 @@ class SelectQuality(FolderComparer):
             artist = metadata.get('artist')
             album = metadata.get('album')
             bitrate = metadata.get('bitrate')
+            extension = file_info.get('extension')
+            has_lyrics = 'lyrics' in metadata
+
+            # Collect artists and albums
+            if artist:
+                artists.add(artist)
+            if album:
+                albums.add(album)
 
             # Check for Hebrew metadata
             hebrew_in_metadata = False
@@ -576,6 +598,14 @@ class SelectQuality(FolderComparer):
             if bitrate:
                 total_bitrate += bitrate
 
+            # Check for lossless format
+            if extension in self.LOSSLESS_EXTENSIONS:
+                lossless_format_count +=1
+
+            # Check for lyrics
+            if has_lyrics:
+                lyrics_count +=1
+
         # Compute scores
         hebrew_metadata_score = hebrew_metadata_count / total_files if total_files > 0 else 0
         metadata_completeness_score = metadata_complete_count / total_files if total_files > 0 else 0
@@ -587,6 +617,16 @@ class SelectQuality(FolderComparer):
         else:
             bitrate_score = 0
 
+        # Consistency in artist and album
+        consistent_artist_score = 1 if len(artists) == 1 else 0
+        consistent_album_score = 1 if len(albums) == 1 else 0
+
+        # Lossless format score
+        lossless_format_score = lossless_format_count / total_files if total_files > 0 else 0
+
+        # Lyrics availability score
+        lyrics_score = lyrics_count / total_files if total_files > 0 else 0
+
         # Now, combine scores
         # We can assign weights to each parameter
         weights = {
@@ -594,7 +634,11 @@ class SelectQuality(FolderComparer):
             'metadata_completeness_score': 2.0,
             'album_art_score': 1.0,
             'bitrate_score': 2.0,
-            'repetitive_names_score': 1.0
+            'repetitive_names_score': 1.0,
+            'consistent_artist_score': 1.5,
+            'consistent_album_score': 1.5,
+            'lossless_format_score': 2.0,
+            'lyrics_score': 1.0
         }
 
         total_weight = sum(weights.values())
@@ -603,10 +647,27 @@ class SelectQuality(FolderComparer):
             metadata_completeness_score * weights['metadata_completeness_score'] +
             album_art_score * weights['album_art_score'] +
             bitrate_score * weights['bitrate_score'] +
-            repetitive_names_score * weights['repetitive_names_score']
+            repetitive_names_score * weights['repetitive_names_score'] +
+            consistent_artist_score * weights['consistent_artist_score'] +
+            consistent_album_score * weights['consistent_album_score'] +
+            lossless_format_score * weights['lossless_format_score'] +
+            lyrics_score * weights['lyrics_score']
         ) / total_weight
 
-        return total_score * 100  # Return as percentage
+        # Prepare quality breakdown for transparency
+        quality_breakdown = {
+            'Hebrew Metadata Score': hebrew_metadata_score * 100,
+            'Metadata Completeness Score': metadata_completeness_score * 100,
+            'Album Art Score': album_art_score * 100,
+            'Bitrate Score': bitrate_score * 100,
+            'Repetitive Names Score': repetitive_names_score * 100,
+            'Consistent Artist Score': consistent_artist_score * 100,
+            'Consistent Album Score': consistent_album_score * 100,
+            'Lossless Format Score': lossless_format_score * 100,
+            'Lyrics Score': lyrics_score * 100,
+        }
+
+        return total_score * 100, quality_breakdown  # Return as percentage
 
     def contains_hebrew(self, text):
         """Check if the text contains Hebrew characters."""
@@ -625,7 +686,7 @@ class SelectQuality(FolderComparer):
 
     def view_result(self):
         """
-        Display the quality comparison of folders.
+        Display the quality comparison of folders with detailed breakdown.
         """
         # Determine the maximum length of folder paths for formatting
         max_folder_path_length = 60
@@ -633,19 +694,27 @@ class SelectQuality(FolderComparer):
         print('-' * (max_folder_path_length + 20))
 
         for folder_pair, qualitys in self.organized_info.items():
-            folder_path, other_folder_path = folder_pair
-            folder_quality1, folder_quality2 = qualitys
+            (folder_path1, (folder_quality1, breakdown1)), (folder_path2, (folder_quality2, breakdown2)) = ((folder_pair[0], qualitys[0]), (folder_pair[1], qualitys[1]))
 
+            # Compare and display the folders
+            print(f'{folder_path1:<{max_folder_path_length}} {folder_quality1:.2f}%')
+            self.print_quality_breakdown(breakdown1)
+            print(f'{folder_path2:<{max_folder_path_length}} {folder_quality2:.2f}%')
+            self.print_quality_breakdown(breakdown2)
+
+            # Highlight the better folder
             if folder_quality1 > folder_quality2:
-                print(colors.GREEN + f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%' + colors.RESET)
-                print(f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%')
+                print(colors.GREEN + f"עדיף: {folder_path1}" + colors.RESET)
             elif folder_quality2 > folder_quality1:
-                print(f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%')
-                print(colors.GREEN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%' + colors.RESET)
+                print(colors.GREEN + f"עדיף: {folder_path2}" + colors.RESET)
             else:
-                print(colors.CYAN + f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%' + colors.RESET)
-                print(colors.CYAN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%' + colors.RESET)
-            print()
+                print(colors.YELLOW + "שתי התיקיות באיכות זהה." + colors.RESET)
+            print('-' * (max_folder_path_length + 20))
+
+    def print_quality_breakdown(self, breakdown):
+        """Print the breakdown of quality parameters."""
+        for param, score in breakdown.items():
+            print(f'  {param}: {score:.2f}%')
 
 class SelectAndThrow:
     """
@@ -659,25 +728,8 @@ class SelectAndThrow:
         """
         Display the list of similar folders with quality comparison.
         """
-        # Determine the maximum length of folder paths for formatting
-        max_folder_path_length = 60
-        print(f'{"Folder Name":<{max_folder_path_length}} {"Quality Score"}')
-        print('-' * (max_folder_path_length + 20))
-
-        for folder_pair, qualitys in self.organized_info.items():
-            folder_path, other_folder_path = folder_pair
-            folder_quality1, folder_quality2 = qualitys
-
-            if folder_quality1 > folder_quality2:
-                print(colors.GREEN + f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%' + colors.RESET)
-                print(f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%')
-            elif folder_quality2 > folder_quality1:
-                print(f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%')
-                print(colors.GREEN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%' + colors.RESET)
-            else:
-                print(colors.CYAN + f'{folder_path:<{max_folder_path_length}} {folder_quality1:.2f}%' + colors.RESET)
-                print(colors.CYAN + f'{other_folder_path:<{max_folder_path_length}} {folder_quality2:.2f}%' + colors.RESET)
-            print()
+        # The view_result is now handled in SelectQuality with detailed breakdown
+        pass
 
     def delete(self):
         """
@@ -685,7 +737,7 @@ class SelectAndThrow:
         """
         for folder_pair, quality_scores in self.organized_info.items():
             folder1, folder2 = folder_pair
-            quality1, quality2 = quality_scores
+            (quality1, _), (quality2, _) = quality_scores
 
             if quality1 < quality2:
                 # Delete folder1
