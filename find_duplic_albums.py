@@ -723,12 +723,12 @@ class MergeFolders:
         self.preferred_bitrate = preferred_bitrate
 
     def merge(self):
-        # Iterate over folder pairs
+        # חזור על זוגות תיקיות
         for folder_pair, quality_scores in self.organized_info.items():
             folder1, folder2 = folder_pair
             (quality1, breakdown1), (quality2, breakdown2) = quality_scores
 
-            # Decide preferred folder
+            # קבע תיקייה מועדפת
             preferred_folder, other_folder = self.decide_preferred_folder(folder1, folder2, quality1, quality2)
 
             # בצע מיזוג מתיקיה_אחרת לתיקיה מועדפת
@@ -798,33 +798,33 @@ class MergeFolders:
             return 0
 
     def merge_folders(self, preferred_folder, other_folder):
-        # Now, we need to merge data from other_folder into preferred_folder
-        # For each file in preferred_folder, find the corresponding file in other_folder
-        # We can match files by file hash or by file name
+        # כעת, עלינו למזג נתונים מתיקיה_אחרת לתיקיה מועדפת
+        # עבור כל קובץ ב-preference_folder, מצא את הקובץ המתאים בתיקייה_other
+        # אנו יכולים להתאים קבצים לפי hash של קובץ או לפי שם קובץ
 
         preferred_files = self.folder_files[preferred_folder]['files']
         other_files = self.folder_files[other_folder]['files']
 
-        # Create a mapping from file_hash to file_info for quick lookup
+        # צור מיפוי מ-file_hash ל-file_info לחיפוש מהיר
         other_files_hash_map = {file_info.get('file_hash'): file_info for file_info in other_files}
 
         for pref_file_info in preferred_files:
             pref_file_hash = pref_file_info.get('file_hash')
             pref_file_path = os.path.join(preferred_folder, pref_file_info['file'])
 
-            # Find the corresponding file in other_files
+            # מצא את הקובץ המתאים ב- other_files
             other_file_info = other_files_hash_map.get(pref_file_hash)
 
             if not other_file_info:
-                # Try matching by file name
+                # נסה להתאים לפי שם הקובץ
                 other_file_info = next((fi for fi in other_files if fi['file'] == pref_file_info['file']), None)
 
             if other_file_info:
                 other_file_path = os.path.join(other_folder, other_file_info['file'])
-                # Merge metadata
+                # מיזוג מטא נתונים
                 self.merge_file_metadata(pref_file_path, other_file_path)
 
-        # Merge album art if needed
+        # מיזוג אמנות אלבום במידת הצורך
         self.merge_album_art(preferred_folder, other_folder)
 
     def merge_file_metadata(self, pref_file_path, other_file_path):
@@ -937,15 +937,21 @@ if __name__ == "__main__":
     # Step 2: Display results
     comparer.view_result()
 
-    # Step 3: Merge folders before deletion
-    merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate)
-    merger.merge()
-
-    # Step 4: Choose and delete folders
-    user_input = input("\nהאם ברצונך למחוק את התיקיות המיותרות? (y/n): ").strip().lower()
+    # Step 3: Confirm folder merge
+    user_input = input("\nהאם ברצונך למזג את התיקיות? (y/n): ").strip().lower()
     if user_input == 'y':
-        selecter = SelectAndThrow(organized_info, preferred_bitrate)
-        selecter.delete()
-        print("התיקיות נמחקו.")
+        # Step 4: Merge folders
+        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate)
+        merger.merge()
+
+        # Step 5: Choose and delete folders
+        user_input = input("\nהאם ברצונך למחוק את התיקיות המיותרות? (y/n): ").strip().lower()
+        if user_input == 'y':
+            selecter = SelectAndThrow(organized_info, preferred_bitrate)
+            selecter.delete()
+            print("התיקיות נמחקו.")
+        else:
+            print("המחיקה בוטלה.")
     else:
+        print("מיזוג התיקיות בוטל.")
         print("המחיקה בוטלה.")
