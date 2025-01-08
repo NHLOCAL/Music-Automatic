@@ -10,10 +10,10 @@ from PIL import Image
 import shutil
 import re
 
-# Import the functions for handling gibberish text
+# ייבא את הפונקציות לטיפול בטקסט ג'יבריש
 from jibrish_to_hebrew import fix_jibrish, check_jibrish
 
-# ANSI color codes for terminal output
+# קודי צבע ANSI עבור פלט מסוף
 class colors:
     RED = '\033[91m'
     GREEN = '\033[92m'
@@ -34,10 +34,10 @@ class FolderComparer:
         self.LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
         self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini'}
         self.SIMILARITY_THRESHOLD = 0.8
-        self.MINIMAL_SIMILARITY = 30.0  # Minimum similarity percentage to display
-        self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # Threshold for high similarity
-        self.REDUCTION_FACTOR = 0.5  # Reduction factor for similarity score
-        # Define weight for additional metadata
+        self.MINIMAL_SIMILARITY = 30.0  # אחוז דמיון מינימלי לתצוגה
+        self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
+        self.REDUCTION_FACTOR = 0.5  # מקדם הפחתה לציון דמיון
+        # הגדר משקל עבור מטא נתונים נוספים
         self.ADDITIONAL_METADATA_WEIGHT = 0.5
         # Adjusted parameter weights
         self.PARAMETER_WEIGHTS = {
@@ -111,9 +111,9 @@ class FolderComparer:
             metadata = {}
             for key in audio.keys():
                 metadata[key] = audio.get(key, [None])[0]
-            # Add bitrate
+            # הוסף קצב סיביות
             if audio.info and hasattr(audio.info, 'bitrate'):
-                metadata['bitrate'] = audio.info.bitrate // 1000  # Bitrate in kbps
+                metadata['bitrate'] = audio.info.bitrate // 1000  # קצב סיביות ב-kbps
             else:
                 metadata['bitrate'] = None
             return metadata
@@ -129,7 +129,7 @@ class FolderComparer:
                 try:
                     img_path = os.path.join(folder_path, file)
                     with Image.open(img_path) as img:
-                        img = img.resize((100, 100))  # Resize to a standard size
+                        img = img.resize((100, 100))  # שנה את הגודל לגודל סטנדרטי
                         img_bytes = img.tobytes()
                         return hashlib.md5(img_bytes).hexdigest()
                 except Exception as e:
@@ -731,24 +731,24 @@ class MergeFolders:
             # Decide preferred folder
             preferred_folder, other_folder = self.decide_preferred_folder(folder1, folder2, quality1, quality2)
 
-            # Perform merging from other_folder to preferred_folder
+            # בצע מיזוג מתיקיה_אחרת לתיקיה מועדפת
             self.merge_folders(preferred_folder, other_folder)
 
     def decide_preferred_folder(self, folder1, folder2, quality1, quality2):
-        # Implement the logic according to the user's rules
-        # If the bitrate of the files is the same in both folders, prefer the folder with the higher quality score.
-        # If the bitrate is different, prefer the folder with the better bitrate (according to user definition).
+        # יישם את ההיגיון לפי חוקי המשתמש
+        # אם קצב הסיביות של הקבצים זהה בשתי התיקיות, העדיפו את התיקיה עם ציון האיכות הגבוה יותר.
+        # אם קצב הסיביות שונה, העדיפו את התיקיה עם קצב הסיביות הטוב יותר (לפי הגדרת המשתמש).
 
-        # Get average bitrate of each folder
+        # קבל קצב סיביות ממוצע של כל תיקיה
         folder_data1 = self.folder_files[folder1]
         folder_data2 = self.folder_files[folder2]
 
         avg_bitrate1 = self.get_average_bitrate(folder_data1)
         avg_bitrate2 = self.get_average_bitrate(folder_data2)
 
-        # Now, compare the bitrates
+        # כעת, השווה את קצבי הסיביות
         if avg_bitrate1 == avg_bitrate2:
-            # Bitrates are the same, prefer the folder with higher quality score
+            # קצבי הסיביות זהים, העדיפו את התיקיה עם ציון איכות גבוה יותר
             if quality1 >= quality2:
                 return folder1, folder2
             else:
@@ -763,8 +763,8 @@ class MergeFolders:
                 else:
                     return folder2, folder1
             elif preferred_bitrate == '128':
-                # Prefer the folder with bitrate closest to 128 kbps from above
-                # If one folder has bitrate less than 128, prefer the folder with higher bitrate in any case
+                # העדיפו את התיקיה עם קצב סיביות הקרוב ביותר ל-128 kbps מלמעלה
+                # אם לתיקיה אחת יש קצב סיביות נמוך מ-128, העדיפו בכל מקרה את התיקיה עם קצב סיביות גבוה יותר
                 if avg_bitrate1 < 128 and avg_bitrate2 >= 128:
                     return folder2, folder1
                 elif avg_bitrate2 < 128 and avg_bitrate1 >= 128:
@@ -828,19 +828,25 @@ class MergeFolders:
         self.merge_album_art(preferred_folder, other_folder)
 
     def merge_file_metadata(self, pref_file_path, other_file_path):
-        # Read metadata from both files
-        pref_audio = File(pref_file_path, easy=True)
-        other_audio = File(other_file_path, easy=True)
+        # קרא מטא נתונים משני הקבצים
+        pref_audio = None
+        other_audio = None
+        try:
+            pref_audio = File(pref_file_path, easy=True)
+            other_audio = File(other_file_path, easy=True)
+        except Exception as e:
+            print(f"Error reading metadata from files {pref_file_path} and {other_file_path}: {e}")
 
         if not pref_audio or not other_audio:
+            print(f"Skipping metadata merge due to error")
             return
 
-        # For each metadata field, if pref_audio lacks it and other_audio has it, copy it
+        # עבור כל שדה מטא-נתונים, אם אין אותו ב-pref_audio ול-other_audio יש אותו, העתק אותו
         for key in other_audio.keys():
             if key not in pref_audio or not pref_audio.get(key):
                 pref_audio[key] = other_audio[key]
 
-        # Save the updated metadata to the preferred file
+        # שמור את המטא נתונים המעודכנים בקובץ המועדף
         try:
             pref_audio.save()
             print(f"Updated metadata for file: {pref_file_path}")
