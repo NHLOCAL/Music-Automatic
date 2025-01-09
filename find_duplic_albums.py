@@ -836,22 +836,28 @@ class MergeFolders:
             other_audio = File(other_file_path, easy=True)
         except Exception as e:
             print(f"Error reading metadata from files {pref_file_path} and {other_file_path}: {e}")
-
-        if not pref_audio or not other_audio:
-            print(f"Skipping metadata merge due to error")
             return
 
+        if not pref_audio or not other_audio:
+            print(f"Skipping metadata merge due to error or missing audio objects")
+            return
+        
+        metadata_changed = False
         # עבור כל שדה מטא-נתונים, אם אין אותו ב-pref_audio ול-other_audio יש אותו, העתק אותו
         for key in other_audio.keys():
             if key not in pref_audio or not pref_audio.get(key):
                 pref_audio[key] = other_audio[key]
-
-        # שמור את המטא נתונים המעודכנים בקובץ המועדף
-        try:
-            pref_audio.save()
-            print(f"Updated metadata for file: {pref_file_path}")
-        except Exception as e:
-            print(f"Error saving metadata for file {pref_file_path}: {e}")
+                metadata_changed = True
+                
+        # שמור את המטא נתונים המעודכנים בקובץ המועדף, רק אם היה שינוי
+        if metadata_changed:
+            try:
+                pref_audio.save()
+                print(f"Updated metadata for file: {pref_file_path}")
+            except Exception as e:
+                print(f"Error saving metadata for file {pref_file_path}: {e}")
+        else:
+            print(f"No metadata changes for file: {pref_file_path}")
 
     def merge_album_art(self, preferred_folder, other_folder):
         # Check if preferred_folder has album art
