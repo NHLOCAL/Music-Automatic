@@ -717,15 +717,30 @@ class SelectQuality(FolderComparer):
             print(f'  {param}: {score:.2f}%')
 
 class MergeFolders:
-    def __init__(self, organized_info, folder_files, preferred_bitrate):
+    def __init__(self, organized_info, folder_files, preferred_bitrate, sorted_similar_folders):
         self.organized_info = organized_info
         self.folder_files = folder_files
         self.preferred_bitrate = preferred_bitrate
+        self.sorted_similar_folders = sorted_similar_folders
+        # סף דמיון מינימלי למיזוג
+        self.MINIMUM_SIMILARITY_SCORE_FOR_MERGE = 85.0
 
     def merge(self):
         # חזור על זוגות תיקיות
-        for folder_pair, quality_scores in self.organized_info.items():
+        for folder_pair, similarities in self.sorted_similar_folders:
             folder1, folder2 = folder_pair
+
+            # בדוק את ציון הדמיון
+            similarity_score = similarities.get('weighted_score', 0)
+            if similarity_score < self.MINIMUM_SIMILARITY_SCORE_FOR_MERGE:
+                print(f"Skipping merge for {folder1} and {folder2} due to low similarity score: {similarity_score:.2f}%")
+                continue
+
+            quality_scores = self.organized_info.get(folder_pair)
+            if not quality_scores:
+                print(f"Skipping merge for {folder1} and {folder2} due to missing quality information.")
+                continue
+
             (quality1, breakdown1), (quality2, breakdown2) = quality_scores
 
             # קבע תיקייה מועדפת
@@ -939,6 +954,7 @@ if __name__ == "__main__":
     comparer = SelectQuality(folder_paths, preferred_bitrate)
     comparer.main()
     organized_info = comparer.get_folders_quality()
+    sorted_similar_folders = comparer.sorted_similar_folders
 
     # Step 2: Display results
     comparer.view_result()
@@ -947,7 +963,7 @@ if __name__ == "__main__":
     user_input = input("\nהאם ברצונך למזג את התיקיות? (y/n): ").strip().lower()
     if user_input == 'y':
         # Step 4: Merge folders
-        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate)
+        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders)
         merger.merge()
 
         # Step 5: Choose and delete folders
