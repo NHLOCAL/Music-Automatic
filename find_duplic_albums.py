@@ -856,14 +856,14 @@ class MergeFolders:
         if not pref_audio or not other_audio:
             print(f"Skipping metadata merge due to error or missing audio objects")
             return
-        
+
         metadata_changed = False
         # עבור כל שדה מטא-נתונים, אם אין אותו ב-pref_audio ול-other_audio יש אותו, העתק אותו
         for key in other_audio.keys():
             if key not in pref_audio or not pref_audio.get(key):
                 pref_audio[key] = other_audio[key]
                 metadata_changed = True
-                
+
         # שמור את המטא נתונים המעודכנים בקובץ המועדף, רק אם היה שינוי
         if metadata_changed:
             try:
@@ -897,9 +897,10 @@ class SelectAndThrow:
     """
     Choose and delete the redundant folders.
     """
-    def __init__(self, organized_info, preferred_bitrate):
+    def __init__(self, organized_info, preferred_bitrate, similarity_threshold_delete):
         self.organized_info = organized_info
         self.preferred_bitrate = preferred_bitrate
+        self.similarity_threshold_delete = similarity_threshold_delete
 
     def view_result(self):
         """
@@ -910,24 +911,52 @@ class SelectAndThrow:
 
     def delete(self):
         """
-        Delete selected folders.
+        Delete selected folders based on quality and similarity threshold, with report and confirmation.
         """
+        folders_to_delete_report = []
+
         for folder_pair, quality_scores in self.organized_info.items():
             folder1, folder2 = folder_pair
             (quality1, _), (quality2, _) = quality_scores
+            similarity_score = 0
+            for folder_data in self.organized_info.keys():
+                if folder_data == folder_pair:
+                    similarity_score = self.organized_info[folder_pair][0][0] # get the similarity score from organized_info
+                    break
 
-            if quality1 < quality2:
-                # Delete folder1
-                print(f"Deleting folder '{folder1}' due to lower quality score.")
-                # Uncomment the line below to actually delete the folder
-                # shutil.rmtree(folder1)
-            elif quality2 < quality1:
-                # Delete folder2
-                print(f"Deleting folder '{folder2}' due to lower quality score.")
-                # Uncomment the line below to actually delete the folder
-                # shutil.rmtree(folder2)
+            if similarity_score >= self.similarity_threshold_delete: # check if the similarity score is above the user defined threshold
+                if quality1 < quality2:
+                    folders_to_delete_report.append((folder1, folder2, quality1, quality2))
+                elif quality2 < quality1:
+                    folders_to_delete_report.append((folder2, folder1, quality2, quality1))
+                # If qualities are equal, the user will need to decide manually, so we won't automatically delete.
+
+        if not folders_to_delete_report:
+            print("לא נמצאו תיקיות למחיקה לפי רמת הדמיון והאיכות שצוינו.")
+            return
+
+        print(colors.YELLOW + "\nדוח תיקיות לסקירה ומחיקה אפשרית:" + colors.RESET)
+        for folder_to_delete, better_folder, quality_to_delete, better_quality in folders_to_delete_report:
+            print(f"- תיקייה למחיקה: '{folder_to_delete}' (ציון איכות: {quality_to_delete:.2f}%)")
+            print(f"  תיקייה עדיפה: '{better_folder}' (ציון איכות: {better_quality:.2f}%)")
+
+        confirmation = input(colors.YELLOW + "\nהאם ברצונך למחוק את התיקיות המיותרות שצוינו לעיל? (y/n): " + colors.RESET).strip().lower()
+        if confirmation == 'y':
+            deleted_folders = []
+            for folder_to_delete, _, _, _ in folders_to_delete_report:
+                try:
+                    shutil.rmtree(folder_to_delete)
+                    deleted_folders.append(folder_to_delete)
+                    print(colors.RED + f"נמחקה תיקייה: '{folder_to_delete}'" + colors.RESET)
+                except Exception as e:
+                    print(colors.RED + f"שגיאה במחיקת תיקייה '{folder_to_delete}': {e}" + colors.RESET)
+            if deleted_folders:
+                print(colors.GREEN + "המחיקה הושלמה." + colors.RESET)
             else:
-                print(f"Both folders '{folder1}' and '{folder2}' have the same quality. Please select the folder you want to delete!")
+                print("לא נמחקו תיקיות.")
+        else:
+            print("המחיקה בוטלה על ידי המשתמש.")
+
 
 if __name__ == "__main__":
     print('הכנס נתיב לתיקיה')
@@ -966,14 +995,21 @@ if __name__ == "__main__":
         merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders)
         merger.merge()
 
-        # Step 5: Choose and delete folders
-        user_input = input("\nהאם ברצונך למחוק את התיקיות המיותרות? (y/n): ").strip().lower()
-        if user_input == 'y':
-            selecter = SelectAndThrow(organized_info, preferred_bitrate)
-            selecter.delete()
-            print("התיקיות נמחקו.")
-        else:
-            print("המחיקה בוטלה.")
+        # Step 5: Get similarity threshold for deletion
+        similarity_threshold_delete_input = input("הכנס את אחוז ההתאמה המינימלי למחיקת תיקיות (לדוגמה, 80 לאחוז התאמה של 80% ומעלה): ").strip()
+        try:
+            similarity_threshold_delete = float(similarity_threshold_delete_input)
+            if not 0 <= similarity_threshold_delete <= 100:
+                raise ValueError
+        except ValueError:
+            print("סף התאמה לא תקין. שימוש בברירת מחדל של 100%.")
+            similarity_threshold_delete = 100.0
+
+        # Step 6: Choose and delete folders with similarity threshold
+        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete)
+        selecter.delete()
+        print("המחיקה הושלמה (ראה דוח מחיקה למעלה).")
+
     else:
         print("מיזוג התיקיות בוטל.")
         print("המחיקה בוטלה.")
