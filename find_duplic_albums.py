@@ -897,10 +897,11 @@ class SelectAndThrow:
     """
     Choose and delete the redundant folders.
     """
-    def __init__(self, organized_info, preferred_bitrate, similarity_threshold_delete):
+    def __init__(self, organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders):
         self.organized_info = organized_info
         self.preferred_bitrate = preferred_bitrate
         self.similarity_threshold_delete = similarity_threshold_delete
+        self.sorted_similar_folders = sorted_similar_folders # Receive sorted_similar_folders
 
     def view_result(self):
         """
@@ -915,20 +916,16 @@ class SelectAndThrow:
         """
         folders_to_delete_report = []
 
-        for folder_pair, quality_scores in self.organized_info.items():
+        for (folder_pair, similarities), quality_scores in zip(self.sorted_similar_folders, self.organized_info.values()): # Iterate over sorted_similar_folders
             folder1, folder2 = folder_pair
             (quality1, _), (quality2, _) = quality_scores
-            similarity_score = 0
-            for folder_data in self.organized_info.keys():
-                if folder_data == folder_pair:
-                    similarity_score = self.organized_info[folder_pair][0][0] # get the similarity score from organized_info
-                    break
+            similarity_score = similarities.get('weighted_score', 0) # Get similarity from similarities dict
 
             if similarity_score >= self.similarity_threshold_delete: # check if the similarity score is above the user defined threshold
                 if quality1 < quality2:
-                    folders_to_delete_report.append((folder1, folder2, quality1, quality2))
+                    folders_to_delete_report.append((folder1, folder2, quality1, quality2, similarity_score)) # Add similarity score to report
                 elif quality2 < quality1:
-                    folders_to_delete_report.append((folder2, folder1, quality2, quality1))
+                    folders_to_delete_report.append((folder2, folder1, quality2, quality1, similarity_score)) # Add similarity score to report
                 # If qualities are equal, the user will need to decide manually, so we won't automatically delete.
 
         if not folders_to_delete_report:
@@ -936,14 +933,14 @@ class SelectAndThrow:
             return
 
         print(colors.YELLOW + "\nדוח תיקיות לסקירה ומחיקה אפשרית:" + colors.RESET)
-        for folder_to_delete, better_folder, quality_to_delete, better_quality in folders_to_delete_report:
-            print(f"- תיקייה למחיקה: '{folder_to_delete}' (ציון איכות: {quality_to_delete:.2f}%)")
+        for folder_to_delete, better_folder, quality_to_delete, better_quality, similarity_score in folders_to_delete_report: # Include similarity score in report
+            print(f"- תיקייה למחיקה: '{folder_to_delete}' (ציון איכות: {quality_to_delete:.2f}%, ציון דמיון: {similarity_score:.2f}%)") # Display similarity score in report
             print(f"  תיקייה עדיפה: '{better_folder}' (ציון איכות: {better_quality:.2f}%)")
 
         confirmation = input(colors.YELLOW + "\nהאם ברצונך למחוק את התיקיות המיותרות שצוינו לעיל? (y/n): " + colors.RESET).strip().lower()
         if confirmation == 'y':
             deleted_folders = []
-            for folder_to_delete, _, _, _ in folders_to_delete_report:
+            for folder_to_delete, _, _, _, _ in folders_to_delete_report:
                 try:
                     shutil.rmtree(folder_to_delete)
                     deleted_folders.append(folder_to_delete)
@@ -1002,11 +999,11 @@ if __name__ == "__main__":
             if not 0 <= similarity_threshold_delete <= 100:
                 raise ValueError
         except ValueError:
-            print("סף התאמה לא תקין. שימוש בברירת מחדל של 100%.")
-            similarity_threshold_delete = 100.0
+            print("סף התאמה לא תקין. שימוש בברירת מחדל של 85%.")
+            similarity_threshold_delete = 85.0
 
         # Step 6: Choose and delete folders with similarity threshold
-        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete)
+        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders) # Pass sorted_similar_folders
         selecter.delete()
         print("המחיקה הושלמה (ראה דוח מחיקה למעלה).")
 
