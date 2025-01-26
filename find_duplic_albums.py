@@ -922,7 +922,7 @@ class SelectAndThrow:
             similarity_score = similarities.get('weighted_score', 0) # Get similarity from similarities dict
 
             if similarity_score >= self.similarity_threshold_delete: # check if the similarity score is above the user defined threshold
-                if quality1 < quality2:
+                if quality1 <= quality2:
                     folders_to_delete_report.append((folder1, folder2, quality1, quality2, similarity_score)) # Add similarity score to report
                 elif quality2 < quality1:
                     folders_to_delete_report.append((folder2, folder1, quality2, quality1, similarity_score)) # Add similarity score to report
