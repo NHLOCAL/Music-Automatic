@@ -723,7 +723,7 @@ class MergeFolders:
         self.preferred_bitrate = preferred_bitrate
         self.sorted_similar_folders = sorted_similar_folders
         # סף דמיון מינימלי למיזוג
-        self.MINIMUM_SIMILARITY_SCORE_FOR_MERGE = 85.0
+        self.MINIMUM_SIMILARITY_SCORE_FOR_MERGE = 95.0
 
     def merge(self):
         # חזור על זוגות תיקיות
