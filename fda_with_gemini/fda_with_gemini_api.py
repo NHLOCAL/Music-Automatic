@@ -1,19 +1,21 @@
+# --- START OF FILE gemini_integration.py ---
+
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import json
 import base64
 import requests
 from io import BytesIO
 from PIL import Image
+from find_duplic_albums import FolderComparer, SelectQuality, colors  # ייבוא המחלקות מהקובץ המקורי
+import re # Import the regular expression module
 
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from find_duplic_albums import FolderComparer, SelectQuality, colors
-
+# --- Load Gemini System Instruction from external file ---
 SYSTEM_INST_FILE = "gemini_system_instruction.txt"
 SYSTEM_INST = ""
 try:
-    with open(SYSTEM_INST_FILE, 'r', encoding='utf-8') as f:
+    with open(SYSTEM_INST_FILE, 'r', encoding='utf-8') as f: # Explicitly specify encoding as utf-8
         SYSTEM_INST = f.read()
     print(f"System instruction loaded from {SYSTEM_INST_FILE}")
 except FileNotFoundError:
@@ -124,7 +126,7 @@ def send_and_receive() -> str:
     return resp_text
 
 def send_to_gemini_api(album_data_json):
-    """Sends album data to Gemini API and returns the response."""
+    """Sends album data to Gemini API and returns structured response."""
     conversation.clear() # נקה שיחה קודמת
     add_user_text("Analyze the following album data to determine if they are duplicates:\n" + json.dumps(album_data_json, ensure_ascii=False, indent=4))
 
@@ -137,7 +139,20 @@ def send_to_gemini_api(album_data_json):
         add_user_text("Album 2 Art (if visible)") # תן הקשר לתמונה
 
     response_text = send_and_receive()
-    return response_text
+
+    try:
+        # נסיון לפענח את התגובה המובנית של Gemini
+        # Use regex to remove any non-JSON characters from start and end
+        response_text_cleaned = re.sub(r'^[^\{]*|[^}]*$', '', response_text) # Regex for cleaning
+        response_json = json.loads(response_text_cleaned)
+        is_duplicate = response_json.get("is_duplicate", False)
+        confidence = response_json.get("confidence", 0.0)
+        reason = response_json.get("reason", "No reason provided")
+        return is_duplicate, confidence, reason
+    except json.JSONDecodeError as e: # Capture the exception for debugging
+        print(colors.YELLOW + f"Warning: Could not parse Gemini structured response. JSONDecodeError: {e}" + colors.RESET) # Print exception
+        return None, None, response_text # החזר תשובה גולמית אם הפענוח נכשל
+
 
 class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality כדי לקבל את כל הפונקציונליות הקיימת
     def find_similar_folders_main(self):
@@ -170,7 +185,7 @@ class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality �
             print(f"Similar folder: {other_folder_path}")
             if similarities.get('identical'):
                 print("Folders are identical based on file hashes.")
-                print("Total Similarity Score: 100%")
+                print(f"Total Similarity Score: 100%")
             else:
                 print("Similarity scores:")
                 for parameter, score in similarities.items():
@@ -181,11 +196,29 @@ class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality �
                     else:
                         if parameter not in ['weighted_score', 'identical']:
                             print(f"- {parameter.capitalize()}: {score}")
-                print(f"Total Similarity Score: {similarities['weighted_score']:.2f}%")
+                print(f"Total Similarity Score: {similarities['weighted_score']:.2f}%") # newline here
+
+                # Find and print Gemini's verdict if available
+                for gemini_data in self.gemini_results: # Assuming gemini_results is populated in process_with_gemini_api
+                    if gemini_data['folder_pair'] == folder_pair:
+                        is_duplicate = gemini_data['is_duplicate']
+                        confidence = gemini_data['confidence']
+                        if confidence is not None: # Check if confidence is not None before formatting
+                            print(f"Gemini Duplicate: {is_duplicate}, Confidence: {confidence:.2f}%")
+                        else:
+                            print(f"Gemini Duplicate: {is_duplicate}, Confidence: N/A") # Handle None case
+                        print(f"Gemini Reason: {gemini_data['reason']}") # Print reason on new line
+                        break # stop searching after found
+                else: # If no Gemini data found for this folder pair
+                    print() # print newline if no Gemini data
+
             print()
+
 
     def process_with_gemini_api(self, folders_for_gemini):
         """Process moderately similar folders with Gemini API for smart comparison."""
+        self.gemini_results = [] # Initialize list to store Gemini results
+
         for folder_pair, similarities in folders_for_gemini:
             folder_path1, folder_path2 = folder_pair
 
@@ -212,23 +245,36 @@ class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality �
                     "artist": folder_data1_music_data.get('artist'), # --- משתמש כעת ב-folder_data_music_data ---
                     "album_name": folder_data1_music_data.get('album'), # --- משתמש כעת ב-folder_data_music_data ---
                     "files": self.folder_files[folder_path1]['files'], # עדיין משתמש ב-folder_files עבור רשימת קבצים
-                    "album_art_base64": album_art_base64_1 if album_art_base64_1 else None
+                    "album_art_base64": folder_art_base64_1 if (folder_art_base64_1 := folder_data1_music_data.get('album_art')) else None # Fix: Album art retrieval
                 },
                 "album2": {
                     "folder_path": folder_path2,
                     "artist": folder_data2_music_data.get('artist'), # --- משתמש כעת ב-folder_data_music_data ---
                     "album_name": folder_data2_music_data.get('album'), # --- משתמש כעת ב-folder_data_music_data ---
                     "files": self.folder_files[folder_path2]['files'], # עדיין משתמש ב-folder_files עבור רשימת קבצים
-                    "album_art_base64": album_art_base64_2 if album_art_base64_2 else None
+                    "album_art_base64": folder_art_base64_2 if (folder_art_base64_2 := folder_data2_music_data.get('album_art')) else None # Fix: Album art retrieval
                 },
                 "similarity_score_script": similarities.get('weighted_score')
             }
-            # --- סוף תיקון ---
 
 
             print(f"\n--- Gemini API Comparison for folders: {folder_path1} and {folder_path2} ---")
-            gemini_response = send_to_gemini_api(album_data_json)
-            print(f"Gemini API Response:\n{gemini_response}")
+            is_duplicate, confidence, reason = send_to_gemini_api(album_data_json)
+
+            gemini_result = {
+                'folder_pair': folder_pair,
+                'is_duplicate': is_duplicate,
+                'confidence': confidence,
+                'reason': reason
+            }
+            self.gemini_results.append(gemini_result)
+
+
+            if is_duplicate is not None: # Check if parsing was successful
+                print(f"Gemini Duplicate Verdict: {is_duplicate}, Confidence: {confidence:.2f}%")
+                print(f"Gemini Reason: {reason}") # Reason is printed here now
+            else:
+                print(f"Gemini API Response (Raw):\n{reason}") # print raw response if parsing failed
 
 
 if __name__ == "__main__":
@@ -287,3 +333,5 @@ if __name__ == "__main__":
     else:
         print("מיזוג התיקיות בוטל.")
         print("המחיקה בוטלה.")
+
+# --- END OF FILE gemini_integration.py ---
