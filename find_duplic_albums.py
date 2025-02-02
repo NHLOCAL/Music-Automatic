@@ -47,7 +47,8 @@ class FolderComparer:
             'album': 2.5,
             'artist': 1.5,
             'folder_name': 1.5,
-            'album_art': 1.0
+            'album_art': 1.0,
+            'duration': 1.0 # משקל עבור אורך השיר
         }
         self.artists_map = self.load_artists_from_csv()
         self.preferred_bitrate = preferred_bitrate
@@ -103,7 +104,7 @@ class FolderComparer:
             return None
 
     def extract_metadata(self, filepath):
-        """Extract metadata from a music file, including bitrate."""
+        """Extract metadata from a music file, including bitrate and duration."""
         try:
             audio = File(filepath, easy=True)
             if audio is None:
@@ -116,6 +117,11 @@ class FolderComparer:
                 metadata['bitrate'] = audio.info.bitrate // 1000  # קצב סיביות ב-kbps
             else:
                 metadata['bitrate'] = None
+            # הוסף משך זמן
+            if audio.info and hasattr(audio.info, 'length'):
+                metadata['duration'] = audio.info.length  # משך זמן בשניות
+            else:
+                metadata['duration'] = None
             return metadata
         except Exception as e:
             print(f"Error extracting metadata from {filepath}: {e}")
@@ -269,6 +275,7 @@ class FolderComparer:
                     'album': album,
                     'title': title,
                     'bitrate': metadata.get('bitrate', None),
+                    'duration': metadata.get('duration', None), # הוסף משך זמן
                     'metadata': all_metadata,
                     'file_hash': file_hash,
                     'extension': os.path.splitext(file)[1].lower()
@@ -339,10 +346,23 @@ class FolderComparer:
         average_similarity = total_similarity / total_pairs
         return average_similarity
 
+    def calculate_duration_similarity(self, duration_diff):
+        """
+        Calculate duration similarity score based on the difference in seconds.
+        """
+        if duration_diff == 0:
+            return 1.0
+        elif duration_diff <= 10:
+            # Linear decrease for simplicity, adjust as needed
+            return max(0, 1.0 - (duration_diff / 10))
+        else:
+            return 0.0
+
     def find_similar_folders(self):
         """
         Find similar folders based on the information of file lists.
         Calculate the percentage of matching file hashes and include it in the weighted scoring.
+        Include duration similarity in the scoring.
         """
         folder_files = self.folder_files
         similar_folders = defaultdict(dict)
@@ -394,7 +414,7 @@ class FolderComparer:
                             title_adjustment = 1  # No reduction
 
                         # Compare main parameters
-                        for parameter in ['file', 'title', 'album', 'artist', 'album_art']:
+                        for parameter in ['file', 'title', 'album', 'artist', 'album_art', 'duration']: # הוסף duration
                             total_similarity = 0
                             for file_info, other_file_info in zip(files, other_folder_data['files']):
                                 if parameter == 'album_art':
@@ -403,6 +423,11 @@ class FolderComparer:
                                         similarity_score = 1.0 if folder_data['album_art'] == other_folder_data['album_art'] else 0.0
                                     else:
                                         similarity_score = 0.0
+                                elif parameter == 'duration': # עבור duration
+                                    duration1 = file_info['metadata'].get('duration', 0)
+                                    duration2 = other_file_info['metadata'].get('duration', 0)
+                                    duration_diff = abs(duration1 - duration2)
+                                    similarity_score = self.calculate_duration_similarity(duration_diff)
                                 else:
                                     if file_info.get(parameter) and other_file_info.get(parameter):
                                         similarity_score = self.similar(str(file_info[parameter]).lower(), str(other_file_info[parameter]).lower())
@@ -453,7 +478,7 @@ class FolderComparer:
             metadata2 = file_info2.get('metadata', {})
             keys1 = set(metadata1.keys())
             keys2 = set(metadata2.keys())
-            common_keys = keys1 & keys2 - {'artist', 'album', 'title', 'bitrate'}
+            common_keys = keys1 & keys2 - {'artist', 'album', 'title', 'bitrate', 'duration'} # הסר duration מפה
 
             for key in common_keys:
                 value1 = metadata1.get(key)
