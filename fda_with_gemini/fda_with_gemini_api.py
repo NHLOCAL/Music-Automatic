@@ -525,30 +525,41 @@ class FolderComparer:
         """Process moderately similar folders with Gemini API for smart comparison."""
         for folder_pair, similarities in folders_for_gemini:
             folder_path1, folder_path2 = folder_pair
-            folder_data1 = self.folder_files[folder_path1]
-            folder_data2 = self.folder_files[folder_path2]
 
-            album_art_base64_1 = folder_data1.get('album_art')
-            album_art_base64_2 = folder_data2.get('album_art')
+            folder_data1_music_data = None
+            folder_data2_music_data = None
+
+            for folder_hash, data in self.music_data.items():
+                if data['path'] == folder_path1:
+                    folder_data1_music_data = data
+                if data['path'] == folder_path2:
+                    folder_data2_music_data = data
+
+            if not folder_data1_music_data or not folder_data2_music_data:
+                print(colors.RED + f"Error: Could not find folder data in music_data for paths: {folder_path1}, {folder_path2}" + colors.RESET)
+                continue  # Skip to the next folder pair
+
+            album_art_base64_1 = folder_data1_music_data.get('album_art')
+            album_art_base64_2 = folder_data2_music_data.get('album_art')
 
             album_data_json = {
                 "album1": {
                     "folder_path": folder_path1,
-                    "artist": folder_data1.get('artist'),
-                    "album_name": folder_data1.get('album'),
-                    "files": folder_data1['files'], # Include full file metadata
+                    "artist": folder_data1_music_data.get('artist'), # --- משתמש כעת ב-folder_data_music_data ---
+                    "album_name": folder_data1_music_data.get('album'), # --- משתמש כעת ב-folder_data_music_data ---
+                    "files": self.folder_files[folder_path1]['files'], # עדיין משתמש ב-folder_files עבור רשימת קבצים
                     "album_art_base64": album_art_base64_1 if album_art_base64_1 else None
                 },
                 "album2": {
                     "folder_path": folder_path2,
-                    "artist": folder_data2.get('artist'),
-                    "album_name": folder_data2.get('album'),
-                    "files": folder_data2['files'], # Include full file metadata
+                    "artist": folder_data2_music_data.get('artist'), # --- משתמש כעת ב-folder_data_music_data ---
+                    "album_name": folder_data2_music_data.get('album'), # --- משתמש כעת ב-folder_data_music_data ---
+                    "files": self.folder_files[folder_path2]['files'], # עדיין משתמש ב-folder_files עבור רשימת קבצים
                     "album_art_base64": album_art_base64_2 if album_art_base64_2 else None
                 },
                 "similarity_score_script": similarities.get('weighted_score')
             }
-
+            
             print(f"\n--- Gemini API Comparison for folders: {folder_path1} and {folder_path2} ---")
             gemini_response = send_to_gemini_api(album_data_json)
             print(f"Gemini API Response:\n{gemini_response}")
@@ -925,7 +936,7 @@ class MergeFolders:
 
     def merge_album_art(self, preferred_folder, other_folder):
         # Check if preferred_folder has album art
-        preferred_album_art_files = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png', 'תמונה.jpg'}
+        preferred_album_art_files = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png', 'תמונה.jpg', 'עטיפה.jpg'}
         preferred_has_album_art = any(os.path.isfile(os.path.join(preferred_folder, f)) for f in preferred_album_art_files)
 
         if not preferred_has_album_art:
