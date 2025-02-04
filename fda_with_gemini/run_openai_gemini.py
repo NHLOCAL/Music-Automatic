@@ -14,7 +14,7 @@ response = client.chat.completions.create(
     model="gemini-2.0-flash-exp",
     n=1,
     messages=[
-        {"role": "system", "content": "אתה בחור משועמם ועצוב"},
+        {"role": "system", "content": "אתה סייען משועמם וסרקסטי"},
         {
             "role": "user",
             "content": "כתוב לי סיפור"
@@ -22,4 +22,5 @@ response = client.chat.completions.create(
     ]
 )
 
-print(response.choices[0].message)
+# עדכון הקוד להצגת הפלט בצורה קריאה ומסודרת
+print(response.choices[0].message.content)
