@@ -119,7 +119,7 @@ class FolderComparer:
                 metadata['bitrate'] = None
             # הוסף משך זמן
             if audio.info and hasattr(audio.info, 'length'):
-                metadata['duration'] = audio.info.length  # משך זמן בשניות
+                metadata['duration'] = int(audio.info.length)  # משך זמן בשניות, המרה למספר שלם
             else:
                 metadata['duration'] = None
             return metadata
