@@ -61,7 +61,10 @@ class FolderComparer:
 
     def _setup_logging(self):
         """Setup logging configuration."""
-        log_file = 'music_folder_comparer.log'
+        logs_dir = 'logs' # Define logs directory
+        if not os.path.exists(logs_dir): # Create logs directory if it doesn't exist
+            os.makedirs(logs_dir)
+        log_file = os.path.join(logs_dir, 'music_folder_comparer.log') # Log file path in logs directory
         log_level_numeric = getattr(logging, self.log_level.upper(), None)
         if not isinstance(log_level_numeric, int):
             print(f"Invalid log level: {self.log_level}, defaulting to INFO.")
@@ -71,7 +74,7 @@ class FolderComparer:
             level=log_level_numeric,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler(log_file, encoding='utf-8'), # Log to file
+                logging.FileHandler(log_file, encoding='utf-8'), # Log to file in logs directory
                 logging.StreamHandler() # Log to console
             ]
         )
@@ -787,7 +790,10 @@ class MergeFolders:
 
     def _setup_logging(self):
         """Setup logging configuration - re-using the same config as FolderComparer."""
-        log_file = 'music_folder_comparer.log'
+        logs_dir = 'logs' # Define logs directory
+        if not os.path.exists(logs_dir): # Create logs directory if it doesn't exist
+            os.makedirs(logs_dir)
+        log_file = os.path.join(logs_dir, 'music_folder_comparer.log') # Log file path in logs directory
         log_level_numeric = getattr(logging, self.log_level.upper(), None)
         if not isinstance(log_level_numeric, int):
             print(f"Invalid log level: {self.log_level}, defaulting to INFO.")
@@ -992,7 +998,10 @@ class SelectAndThrow:
 
     def _setup_logging(self):
         """Setup logging configuration - re-using the same config as FolderComparer."""
-        log_file = 'music_folder_comparer.log'
+        logs_dir = 'logs' # Define logs directory
+        if not os.path.exists(logs_dir): # Create logs directory if it doesn't exist
+            os.makedirs(logs_dir)
+        log_file = os.path.join(logs_dir, 'music_folder_comparer.log') # Log file path in logs directory
         log_level_numeric = getattr(logging, self.log_level.upper(), None)
         if not isinstance(log_level_numeric, int):
             print(f"Invalid log level: {self.log_level}, defaulting to INFO.")
