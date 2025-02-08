@@ -9,6 +9,7 @@ from mutagen import File
 from PIL import Image
 import shutil
 import re
+import logging
 
 # ייבא את הפונקציות לטיפול בטקסט ג'יבריש
 from jibrish_to_hebrew import fix_jibrish, check_jibrish
@@ -24,7 +25,7 @@ class colors:
     RESET = '\033[0m'
 
 class FolderComparer:
-    def __init__(self, folder_paths, preferred_bitrate):
+    def __init__(self, folder_paths, preferred_bitrate, log_level):
         self.folder_paths = folder_paths
         self.folder_files = defaultdict(dict)
         self.music_data = {}
@@ -52,9 +53,29 @@ class FolderComparer:
         }
         self.artists_map = self.load_artists_from_csv()
         self.preferred_bitrate = preferred_bitrate
+        self.log_level = log_level # Set log level from constructor
+        self._setup_logging() # Initialize logging here
         self.load_music_data()
         self.organized_info = {}
         self.sorted_similar_folders = []
+
+    def _setup_logging(self):
+        """Setup logging configuration."""
+        log_file = 'music_folder_comparer.log'
+        log_level_numeric = getattr(logging, self.log_level.upper(), None)
+        if not isinstance(log_level_numeric, int):
+            print(f"Invalid log level: {self.log_level}, defaulting to INFO.")
+            log_level_numeric = logging.INFO
+
+        logging.basicConfig(
+            level=log_level_numeric,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_file, encoding='utf-8'), # Log to file
+                logging.StreamHandler() # Log to console
+            ]
+        )
+        logging.info(f"Logging initialized at level: {self.log_level.upper()}. Logs will be saved to {log_file}")
 
     def load_artists_from_csv(self):
         """Load a list of artists from a CSV file."""
@@ -67,7 +88,7 @@ class FolderComparer:
                         key, value = row
                         artists_map[key.strip().lower()] = value.strip()
         except Exception as e:
-            print(f"Error reading CSV file: {e}")
+            logging.error(f"Error reading CSV file: {e}")
         return artists_map
 
     def load_music_data(self):
@@ -76,8 +97,9 @@ class FolderComparer:
             try:
                 with open(self.DATA_FILE, 'r', encoding='utf-8') as f:
                     self.music_data = json.load(f)
+                logging.info(f"Music data loaded from {self.DATA_FILE}.")
             except Exception as e:
-                print(f"Error loading data file: {e}")
+                logging.error(f"Error loading data file: {e}")
                 self.music_data = {}
         else:
             self.music_data = {}
@@ -87,9 +109,9 @@ class FolderComparer:
         try:
             with open(self.DATA_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.music_data, f, ensure_ascii=False, indent=4)
-            print(f"Music data saved to {self.DATA_FILE}.")
+            logging.info(f"Music data saved to {self.DATA_FILE}.")
         except Exception as e:
-            print(f"Error saving data file: {e}")
+            logging.error(f"Error saving data file: {e}")
 
     def get_file_hash(self, filepath):
         """Compute MD5 hash for a file."""
@@ -100,7 +122,7 @@ class FolderComparer:
                     hash_func.update(chunk)
                 return hash_func.hexdigest()
         except Exception as e:
-            print(f"Error hashing file {filepath}: {e}")
+            logging.error(f"Error hashing file {filepath}: {e}")
             return None
 
     def extract_metadata(self, filepath):
@@ -108,6 +130,7 @@ class FolderComparer:
         try:
             audio = File(filepath, easy=True)
             if audio is None:
+                logging.warning(f"Could not read audio metadata from {filepath}")
                 return {}
             metadata = {}
             for key in audio.keys():
@@ -124,7 +147,7 @@ class FolderComparer:
                 metadata['duration'] = None
             return metadata
         except Exception as e:
-            print(f"Error extracting metadata from {filepath}: {e}")
+            logging.error(f"Error extracting metadata from {filepath}: {e}", exc_info=True)
             return {}
 
     def extract_album_art(self, folder_path):
@@ -139,7 +162,7 @@ class FolderComparer:
                         img_bytes = img.tobytes()
                         return hashlib.md5(img_bytes).hexdigest()
                 except Exception as e:
-                    print(f"Error processing image {file} in {folder_path}: {e}")
+                    logging.error(f"Error processing image {file} in {folder_path}: {e}", exc_info=True)
         return None
 
     def scan_music_library(self):
@@ -148,11 +171,12 @@ class FolderComparer:
             # Filter music files and ignore unwanted files
             music_files = [f for f in files if os.path.splitext(f)[1].lower() in self.ALLOWED_EXTENSIONS and f.lower() not in self.IGNORED_FILES]
             if not music_files:
+                logging.debug(f"Skipping folder {root} as it contains no music files.")
                 continue  # Skip folders without music files
 
             folder_hash = hashlib.md5(root.encode('utf-8')).hexdigest()
             if folder_hash in self.music_data:
-                print(f"Skipping already scanned folder: {root}")
+                logging.info(f"Skipping already scanned folder: {root}")
                 continue  # Skip already scanned folders
 
             metadata_list = []
@@ -166,6 +190,7 @@ class FolderComparer:
                         if check_jibrish(file_metadata[key]):
                             fixed_value = fix_jibrish(file_metadata[key], "heb")
                             file_metadata[key] = fixed_value
+                            logging.debug(f"Fixed gibberish in metadata field '{key}' of file {filepath}. Original: '{file_metadata[key]}', Fixed: '{fixed_value}'")
 
                 file_hash = self.get_file_hash(filepath)
                 metadata_list.append({
@@ -212,7 +237,7 @@ class FolderComparer:
                 'files': metadata_list,
                 'album_art': album_art_hash
             }
-            print(f"Scanned folder: {root}")
+            logging.info(f"Scanned folder: {root}")
 
         self.save_music_data()
 
@@ -231,9 +256,10 @@ class FolderComparer:
                     # Check for gibberish and fix if necessary
                     if check_jibrish(title):
                         title = fix_jibrish(title, "heb")
+                        logging.debug(f"Fixed gibberish in title: Original '{audio['title'][0]}', Fixed '{title}' in file {file_path}")
                     titles.append(title)
             except Exception as e:
-                print(f"Error processing {file}: {e}")
+                logging.error(f"Error processing {file}: {e}", exc_info=True)
 
         # Get average similarities for titles and file names
         title_similarity = self.check_generic_names(titles) if titles else 0.0
@@ -253,6 +279,7 @@ class FolderComparer:
                 for key, value in [('artist', artist), ('album', album), ('title', title)]:
                     if value and check_jibrish(value):
                         fixed_value = fix_jibrish(value, "heb")
+                        logging.debug(f"Fixed gibberish in {key}: Original '{value}', Fixed '{fixed_value}' in file {file_path}")
                         if key == 'artist':
                             artist = fixed_value
                         elif key == 'album':
@@ -281,7 +308,7 @@ class FolderComparer:
                     'extension': os.path.splitext(file)[1].lower()
                 })
             except Exception as e:
-                print(f"Error processing {file}: {e}")
+                logging.error(f"Error processing {file}: {e}", exc_info=True)
 
         return {
             folder_path: {
@@ -303,6 +330,7 @@ class FolderComparer:
 
                 # Ignore folders with fewer than a certain number of music files
                 if len(files_in_dir) <= 2:
+                    logging.debug(f"Skipping folder {dir_path} as it contains less than 3 music files.")
                     continue
 
                 yield dir_path, files_in_dir
@@ -387,6 +415,7 @@ class FolderComparer:
                         # Folders are identical
                         folder_similarity['identical'] = True
                         folder_similarity['weighted_score'] = 100.0  # Maximum score
+                        logging.info(f"Folders {folder_path} and {other_folder_path} are identical based on file hashes.")
                     else:
                         # Proceed with weighted scoring
                         # Calculate folder name similarity
@@ -458,6 +487,7 @@ class FolderComparer:
 
                         # Normalize the final score to get a percentage
                         folder_similarity['weighted_score'] = (weighted_score / max_possible_score) * 100
+                        logging.debug(f"Calculated similarity score between {folder_path} and {other_folder_path}: {folder_similarity['weighted_score']:.2f}%")
 
                     if folder_similarity:
                         similar_folders[(folder_path, other_folder_path)] = folder_similarity
@@ -511,6 +541,7 @@ class FolderComparer:
 
         for folder_pair, similarities in self.sorted_similar_folders:
             folder_path, other_folder_path = folder_pair
+            logging.info(f"Found similar folders: {folder_path} and {other_folder_path} with similarity score: {similarities.get('weighted_score', 0):.2f}%")
             print(f"Folder: {folder_path}")
             print(f"Similar folder: {other_folder_path}")
             if similarities.get('identical'):
@@ -552,6 +583,7 @@ class SelectQuality(FolderComparer):
             quality_score, quality_breakdown = self.compute_folder_quality(folder_path, folder_data)
             folder_quality_scores[folder_path] = quality_score
             folder_quality_details[folder_path] = quality_breakdown
+            logging.debug(f"Computed quality score for folder {folder_path}: {quality_score:.2f}%")
 
         # Now, for each pair of similar folders, retrieve their quality scores and compare
         for folder_pair, similarities in self.sorted_similar_folders:
@@ -678,6 +710,7 @@ class SelectQuality(FolderComparer):
             lossless_format_score * weights['lossless_format_score'] +
             lyrics_score * weights['lyrics_score']
         ) / total_weight
+        logging.debug(f"Detailed quality breakdown for folder {folder_path}: {locals()}") # Log local vars for detailed debug
 
         # Prepare quality breakdown for transparency
         quality_breakdown = {
@@ -742,13 +775,32 @@ class SelectQuality(FolderComparer):
             print(f'  {param}: {score:.2f}%')
 
 class MergeFolders:
-    def __init__(self, organized_info, folder_files, preferred_bitrate, sorted_similar_folders):
+    def __init__(self, organized_info, folder_files, preferred_bitrate, sorted_similar_folders, log_level):
         self.organized_info = organized_info
         self.folder_files = folder_files
         self.preferred_bitrate = preferred_bitrate
         self.sorted_similar_folders = sorted_similar_folders
+        self.log_level = log_level
+        self._setup_logging()
         # סף דמיון מינימלי למיזוג
         self.MINIMUM_SIMILARITY_SCORE_FOR_MERGE = 95.0
+
+    def _setup_logging(self):
+        """Setup logging configuration - re-using the same config as FolderComparer."""
+        log_file = 'music_folder_comparer.log'
+        log_level_numeric = getattr(logging, self.log_level.upper(), None)
+        if not isinstance(log_level_numeric, int):
+            print(f"Invalid log level: {self.log_level}, defaulting to INFO.")
+            log_level_numeric = logging.INFO
+
+        logging.basicConfig(
+            level=log_level_numeric,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_file, encoding='utf-8'),
+                logging.StreamHandler()
+            ]
+        )
 
     def merge(self):
         # חזור על זוגות תיקיות
@@ -758,18 +810,19 @@ class MergeFolders:
             # בדוק את ציון הדמיון
             similarity_score = similarities.get('weighted_score', 0)
             if similarity_score < self.MINIMUM_SIMILARITY_SCORE_FOR_MERGE:
-                print(f"Skipping merge for {folder1} and {folder2} due to low similarity score: {similarity_score:.2f}%")
+                logging.info(f"Skipping merge for {folder1} and {folder2} due to low similarity score: {similarity_score:.2f}%")
                 continue
 
             quality_scores = self.organized_info.get(folder_pair)
             if not quality_scores:
-                print(f"Skipping merge for {folder1} and {folder2} due to missing quality information.")
+                logging.warning(f"Skipping merge for {folder1} and {folder2} due to missing quality information.")
                 continue
 
             (quality1, breakdown1), (quality2, breakdown2) = quality_scores
 
             # קבע תיקייה מועדפת
             preferred_folder, other_folder = self.decide_preferred_folder(folder1, folder2, quality1, quality2)
+            logging.info(f"Decided preferred folder for merge between {folder1} and {folder2} is: {preferred_folder}")
 
             # בצע מיזוג מתיקיה_אחרת לתיקיה מועדפת
             self.merge_folders(preferred_folder, other_folder)
@@ -785,6 +838,7 @@ class MergeFolders:
 
         avg_bitrate1 = self.get_average_bitrate(folder_data1)
         avg_bitrate2 = self.get_average_bitrate(folder_data2)
+        logging.debug(f"Average bitrate for {folder1}: {avg_bitrate1}, for {folder2}: {avg_bitrate2}")
 
         # כעת, השווה את קצבי הסיביות
         if avg_bitrate1 == avg_bitrate2:
@@ -838,6 +892,7 @@ class MergeFolders:
             return 0
 
     def merge_folders(self, preferred_folder, other_folder):
+        logging.info(f"Starting merge from {other_folder} to {preferred_folder}")
         # כעת, עלינו למזג נתונים מתיקיה_אחרת לתיקיה מועדפת
         # עבור כל קובץ ב-preference_folder, מצא את הקובץ המתאים בתיקייה_other
         # אנו יכולים להתאים קבצים לפי hash של קובץ או לפי שם קובץ
@@ -857,7 +912,7 @@ class MergeFolders:
 
             if not other_file_info:
                 # נסה להתאים לפי שם הקובץ
-                other_file_info = next((fi for fi in other_files if fi['file'] == pref_file_info['file']), None)
+                other_file_info = next((fi for fi in other_files if fi['file'] == pref_file_info['file'] and fi['file_hash'] is None and pref_file_info['file_hash'] is None ), None) # Matching by filename only if hashes are not available
 
             if other_file_info:
                 other_file_path = os.path.join(other_folder, other_file_info['file'])
@@ -866,6 +921,7 @@ class MergeFolders:
 
         # מיזוג אמנות אלבום במידת הצורך
         self.merge_album_art(preferred_folder, other_folder)
+        logging.info(f"Finished merge from {other_folder} to {preferred_folder}")
 
     def merge_file_metadata(self, pref_file_path, other_file_path):
         # קרא מטא נתונים משני הקבצים
@@ -875,11 +931,11 @@ class MergeFolders:
             pref_audio = File(pref_file_path, easy=True)
             other_audio = File(other_file_path, easy=True)
         except Exception as e:
-            print(f"Error reading metadata from files {pref_file_path} and {other_file_path}: {e}")
+            logging.error(f"Error reading metadata from files {pref_file_path} and {other_file_path}: {e}", exc_info=True)
             return
 
         if not pref_audio or not other_audio:
-            print(f"Skipping metadata merge due to error or missing audio objects")
+            logging.warning(f"Skipping metadata merge for {pref_file_path} due to error or missing audio objects")
             return
 
         metadata_changed = False
@@ -888,16 +944,17 @@ class MergeFolders:
             if key not in pref_audio or not pref_audio.get(key):
                 pref_audio[key] = other_audio[key]
                 metadata_changed = True
+                logging.debug(f"Copied metadata field '{key}' from {other_file_path} to {pref_file_path}")
 
         # שמור את המטא נתונים המעודכנים בקובץ המועדף, רק אם היה שינוי
         if metadata_changed:
             try:
                 pref_audio.save()
-                print(f"Updated metadata for file: {pref_file_path}")
+                logging.info(f"Updated metadata for file: {pref_file_path}")
             except Exception as e:
-                print(f"Error saving metadata for file {pref_file_path}: {e}")
+                logging.error(f"Error saving metadata for file {pref_file_path}: {e}", exc_info=True)
         else:
-            print(f"No metadata changes for file: {pref_file_path}")
+            logging.debug(f"No metadata changes for file: {pref_file_path}")
 
     def merge_album_art(self, preferred_folder, other_folder):
         # Check if preferred_folder has album art
@@ -913,20 +970,43 @@ class MergeFolders:
                     dst = os.path.join(preferred_folder, file)
                     try:
                         shutil.copy2(src, dst)
-                        print(f"Copied album art from {src} to {dst}")
+                        logging.info(f"Copied album art from {src} to {dst}")
                     except Exception as e:
-                        print(f"Error copying album art from {src} to {dst}: {e}")
+                        logging.error(f"Error copying album art from {src} to {dst}: {e}", exc_info=True)
                     break
+        else:
+            logging.debug(f"Preferred folder {preferred_folder} already has album art, skipping copy from {other_folder}")
+
 
 class SelectAndThrow:
     """
     Choose and delete the redundant folders.
     """
-    def __init__(self, organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders):
+    def __init__(self, organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level):
         self.organized_info = organized_info
         self.preferred_bitrate = preferred_bitrate
         self.similarity_threshold_delete = similarity_threshold_delete
         self.sorted_similar_folders = sorted_similar_folders # Receive sorted_similar_folders
+        self.log_level = log_level
+        self._setup_logging()
+
+    def _setup_logging(self):
+        """Setup logging configuration - re-using the same config as FolderComparer."""
+        log_file = 'music_folder_comparer.log'
+        log_level_numeric = getattr(logging, self.log_level.upper(), None)
+        if not isinstance(log_level_numeric, int):
+            print(f"Invalid log level: {self.log_level}, defaulting to INFO.")
+            log_level_numeric = logging.INFO
+
+        logging.basicConfig(
+            level=log_level_numeric,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_file, encoding='utf-8'),
+                logging.StreamHandler()
+            ]
+        )
+
 
     def view_result(self):
         """
@@ -949,12 +1029,15 @@ class SelectAndThrow:
             if similarity_score >= self.similarity_threshold_delete: # check if the similarity score is above the user defined threshold
                 if quality1 <= quality2:
                     folders_to_delete_report.append((folder1, folder2, quality1, quality2, similarity_score)) # Add similarity score to report
+                    logging.info(f"Identified folder for potential deletion: {folder1} (Quality: {quality1:.2f}%, Similarity: {similarity_score:.2f}%), Better folder: {folder2} (Quality: {quality2:.2f}%)")
                 elif quality2 < quality1:
                     folders_to_delete_report.append((folder2, folder1, quality2, quality1, similarity_score)) # Add similarity score to report
+                    logging.info(f"Identified folder for potential deletion: {folder2} (Quality: {quality2:.2f}%, Similarity: {similarity_score:.2f}%), Better folder: {folder1} (Quality: {quality1:.2f}%)")
                 # If qualities are equal, the user will need to decide manually, so we won't automatically delete.
 
         if not folders_to_delete_report:
             print("לא נמצאו תיקיות למחיקה לפי רמת הדמיון והאיכות שצוינו.")
+            logging.info("No folders found for deletion based on similarity and quality thresholds.")
             return
 
         print(colors.YELLOW + "\nדוח תיקיות לסקירה ומחיקה אפשרית:" + colors.RESET)
@@ -970,14 +1053,19 @@ class SelectAndThrow:
                     shutil.rmtree(folder_to_delete)
                     deleted_folders.append(folder_to_delete)
                     print(colors.RED + f"נמחקה תיקייה: '{folder_to_delete}'" + colors.RESET)
+                    logging.warning(f"Deleted folder: {folder_to_delete}")
                 except Exception as e:
                     print(colors.RED + f"שגיאה במחיקת תיקייה '{folder_to_delete}': {e}" + colors.RESET)
+                    logging.error(f"Error deleting folder '{folder_to_delete}': {e}", exc_info=True)
             if deleted_folders:
                 print(colors.GREEN + "המחיקה הושלמה." + colors.RESET)
+                logging.info("Deletion process completed.")
             else:
                 print("לא נמחקו תיקיות.")
+                logging.info("No folders were deleted.")
         else:
             print("המחיקה בוטלה על ידי המשתמש.")
+            logging.info("Deletion cancelled by user.")
 
 
 if __name__ == "__main__":
@@ -987,6 +1075,19 @@ if __name__ == "__main__":
         print("הנתיב שהוזן אינו תקין. אנא נסה שוב.")
         exit(1)
     folder_paths = [folder_path]
+
+    # Choose logging level
+    print("\nבחר רמת רישום יומן:")
+    print("1. מינימלי (INFO)")
+    print("2. מפורט (DEBUG)")
+    log_choice = input('הכנס 1 או 2: ').strip()
+    if log_choice == '1':
+        log_level = 'INFO'
+    elif log_choice == '2':
+        log_level = 'DEBUG'
+    else:
+        print("בחירה לא תקינה. ברירת המחדל היא INFO.")
+        log_level = 'INFO'
 
     # Additional step: Choose preferred bitrate
     print("בחר את קצב הסיביות המועדף עליך:")
@@ -1002,7 +1103,7 @@ if __name__ == "__main__":
         preferred_bitrate = '128'
 
     # Step 1: Compare folder qualities
-    comparer = SelectQuality(folder_paths, preferred_bitrate)
+    comparer = SelectQuality(folder_paths, preferred_bitrate, log_level)
     comparer.main()
     organized_info = comparer.get_folders_quality()
     sorted_similar_folders = comparer.sorted_similar_folders
@@ -1014,7 +1115,7 @@ if __name__ == "__main__":
     user_input = input("\nהאם ברצונך למזג את התיקיות? (y/n): ").strip().lower()
     if user_input == 'y':
         # Step 4: Merge folders
-        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders)
+        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders, log_level)
         merger.merge()
 
         # Step 5: Get similarity threshold for deletion
@@ -1028,7 +1129,7 @@ if __name__ == "__main__":
             similarity_threshold_delete = 85.0
 
         # Step 6: Choose and delete folders with similarity threshold
-        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders) # Pass sorted_similar_folders
+        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level) # Pass sorted_similar_folders
         selecter.delete()
         print("המחיקה הושלמה (ראה דוח מחיקה למעלה).")
 
