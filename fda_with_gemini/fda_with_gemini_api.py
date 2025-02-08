@@ -168,12 +168,11 @@ def send_to_gemini_api(album_data_json):
         return None, None, response_text # החזר תשובה גולמית אם הפענוח נכשל
 
 
-class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality כדי לקבל את כל הפונקציונליות הקיימת
-    def __init__(self, folder_paths, preferred_bitrate, log_level): # Add log_level
-        # Corrected super().__init__ call to use SelectQuality from correct file
-        super().__init__(folder_paths, preferred_bitrate, log_level) # Pass log_level to superclass
-        self._setup_logging()
-        self.gemini_results = [] # Initialize gemini_results here
+class GeminiEnhancedFolderComparer(SelectQuality):
+    def __init__(self, folder_paths, preferred_bitrate, log_level):
+        super().__init__(folder_paths, preferred_bitrate, log_level)
+        # self._setup_logging()  # הסר את השורה הזו
+        self.gemini_results = []
 
     def _setup_logging(self):
         """Setup logging configuration to create a new log file on each run."""
