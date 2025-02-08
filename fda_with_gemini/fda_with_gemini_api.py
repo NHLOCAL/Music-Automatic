@@ -1,15 +1,18 @@
-# --- START OF FILE gemini_integration.py ---
-
 import os
 import sys
+# Adjust path to correctly find find_duplic_albums in parent directory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import json
 import base64
 import requests
 from io import BytesIO
 from PIL import Image
-from find_duplic_albums import FolderComparer, SelectQuality, colors  # ייבוא המחלקות מהקובץ המקורי
+# Correct import to point to the file in the parent directory
+from find_duplic_albums import FolderComparer, SelectQuality, colors, MergeFolders, SelectAndThrow
 import re # Import the regular expression module
+import logging # Import logging
+import datetime  # Import datetime
+
 
 # --- Load Gemini System Instruction from external file ---
 SYSTEM_INST_FILE = "gemini_system_instruction.txt"
@@ -17,14 +20,17 @@ SYSTEM_INST = ""
 try:
     with open(SYSTEM_INST_FILE, 'r', encoding='utf-8') as f: # Explicitly specify encoding as utf-8
         SYSTEM_INST = f.read()
-    print(f"System instruction loaded from {SYSTEM_INST_FILE}")
+    logging.info(f"System instruction loaded from {SYSTEM_INST_FILE}") # Use logging
+    print(f"System instruction loaded from {SYSTEM_INST_FILE}") # Keep print for console output
 except FileNotFoundError:
+    logging.error(f"Error: {SYSTEM_INST_FILE} not found. Gemini functionality might be limited.") # Use logging
     print(colors.RED + f"Error: {SYSTEM_INST_FILE} not found. Gemini functionality might be limited." + colors.RESET)
     SYSTEM_INST = "You are a helpful AI assistant. Please determine if the provided albums are duplicates."
 
 # --- Gemini API Functions ---
 API_KEY = os.environ.get("GEMINI_API_KEY") # וודא שמשתנה הסביבה GEMINI_API_KEY מוגדר
 if not API_KEY:
+    logging.error("GEMINI_API_KEY environment variable not set. Gemini API functionality will be disabled.") # Use logging
     print(colors.RED + "Error: GEMINI_API_KEY environment variable not set. Gemini API functionality will be disabled." + colors.RESET)
     API_KEY = None
 
@@ -33,10 +39,14 @@ conversation = []  # נשמור פה את ההודעות מ'המשתמש' וה'�
 def encode_image_to_base64(image_path: str) -> str:
     if not image_path or not os.path.exists(image_path):
         return None
-    with open(image_path, "rb") as image_file:
-        encoded_bytes = base64.b64encode(image_file.read())
-        encoded_str = encoded_bytes.decode("utf-8")
-    return encoded_str
+    try:
+        with open(image_path, "rb") as image_file:
+            encoded_bytes = base64.b64encode(image_file.read())
+            encoded_str = encoded_bytes.decode("utf-8")
+        return encoded_str
+    except Exception as e:
+        logging.error(f"Error encoding image to base64: {e}", exc_info=True) # Use logging for errors
+        return None
 
 def add_user_text(message: str):
     conversation.append({
@@ -115,11 +125,14 @@ def send_and_receive() -> str:
                 })
                 resp_text = model_text
             else:
+                logging.warning("No content found in model's response.") # Use logging
                 print(colors.YELLOW + "Warning: No content found in model's response." + colors.RESET)
         else:
+            logging.warning("No response candidates received from the model.") # Use logging
             print(colors.YELLOW + "Warning: No response candidates received from the model." + colors.RESET)
 
     except requests.exceptions.RequestException as e:
+        logging.error(f"Error communicating with Gemini API: {e}", exc_info=True) # Use logging for errors
         print(colors.RED + f"Error communicating with Gemini API: {e}" + colors.RESET)
         resp_text = f"API_ERROR: {e}"
 
@@ -150,11 +163,45 @@ def send_to_gemini_api(album_data_json):
         reason = response_json.get("reason", "No reason provided")
         return is_duplicate, confidence, reason
     except json.JSONDecodeError as e: # Capture the exception for debugging
+        logging.warning(f"Could not parse Gemini structured response. JSONDecodeError: {e}") # Use logging
         print(colors.YELLOW + f"Warning: Could not parse Gemini structured response. JSONDecodeError: {e}" + colors.RESET) # Print exception
         return None, None, response_text # החזר תשובה גולמית אם הפענוח נכשל
 
 
 class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality כדי לקבל את כל הפונקציונליות הקיימת
+    def __init__(self, folder_paths, preferred_bitrate, log_level): # Add log_level
+        # Corrected super().__init__ call to use SelectQuality from correct file
+        super().__init__(folder_paths, preferred_bitrate, log_level) # Pass log_level to superclass
+        self._setup_logging()
+        self.gemini_results = [] # Initialize gemini_results here
+
+    def _setup_logging(self):
+        """Setup logging configuration to create a new log file on each run."""
+        logs_dir = 'logs' # Define logs directory
+        # Ensure logs directory is created relative to THIS script's location
+        logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), logs_dir)
+        if not os.path.exists(logs_dir):
+            os.makedirs(logs_dir, exist_ok=True) # Create logs directory if it doesn't exist
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S") # Generate timestamp for log file
+        log_file = os.path.join(logs_dir, f'music_folder_comparer_{timestamp}.log') # Log file path with timestamp
+
+        log_level_numeric = getattr(logging, self.log_level.upper(), None)
+        if not isinstance(log_level_numeric, int):
+            print(f"Invalid log level: {self.log_level}, defaulting to INFO.")
+            log_level_numeric = logging.INFO
+
+        logging.basicConfig(
+            level=log_level_numeric,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_file, encoding='utf-8'),
+                logging.StreamHandler()
+            ]
+        )
+        logging.info(f"GeminiEnhancedFolderComparer logging initialized at level: {self.log_level.upper()}. Logs will be saved to {log_file}")
+
+
     def find_similar_folders_main(self):
         """Main function to find similar folders and process with Gemini API."""
         self.scan_music_library()
@@ -172,9 +219,11 @@ class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality �
                                if 40.0 <= similarities.get('weighted_score', 0) <= 90.0] # סף דמיון 40%
 
         if folders_for_gemini:
+            logging.info("Performing smart comparison using Gemini API for moderately similar albums (40%-90% similarity).") # Use logging
             print("\nPerforming smart comparison using Gemini API for moderately similar albums (40%-90% similarity):") # הודעה מעודכנת
             self.process_with_gemini_api(folders_for_gemini)
         else:
+            logging.info("No moderately similar albums found for Gemini API comparison (40%-90% similarity).") # Use logging
             print("\nNo moderately similar albums found for Gemini API comparison (40%-90% similarity).") # הודעה מעודכנת
 
         # הדפס את כל זוגות התיקיות הדומות (כולל אלו מחוץ לטווח של Gemini)
@@ -203,13 +252,16 @@ class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality �
                     if gemini_data['folder_pair'] == folder_pair:
                         is_duplicate = gemini_data['is_duplicate']
                         confidence = gemini_data['confidence']
+                        reason = gemini_data['reason'] # Reason is now guaranteed to be defined here
                         if confidence is not None: # Check if confidence is not None before formatting
                             print(f"Gemini Duplicate: {is_duplicate}, Confidence: {confidence:.2f}%")
                         else:
                             print(f"Gemini Duplicate: {is_duplicate}, Confidence: N/A") # Handle None case
-                        print(f"Gemini Reason: {gemini_data['reason']}") # Print reason on new line
+                        print(f"Gemini Reason: {reason}") # Print reason on new line
+                        logging.info(f"Gemini API verdict for folders {folder_path} and {other_folder_path}: Duplicate={is_duplicate}, Confidence={confidence}, Reason='{reason}'") # Log Gemini verdict
                         break # stop searching after found
                 else: # If no Gemini data found for this folder pair
+                    logging.info(f"No Gemini API verdict available for folders {folder_path} and {other_folder_path}.") # Log when no Gemini data found
                     print() # print newline if no Gemini data
 
             print()
@@ -221,6 +273,7 @@ class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality �
 
         for folder_pair, similarities in folders_for_gemini:
             folder_path1, folder_path2 = folder_pair
+            logging.info(f"Processing folders {folder_path1} and {folder_path2} with Gemini API.") # Log start of Gemini processing
 
             # --- תיקון כאן - שליפת נתונים מ-music_data ---
             folder_data1_music_data = None
@@ -233,6 +286,7 @@ class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality �
                     folder_data2_music_data = data
 
             if not folder_data1_music_data or not folder_data2_music_data:
+                logging.error(f"Could not find folder data in music_data for paths: {folder_path1}, {folder_path2}") # Log error
                 print(colors.RED + f"Error: Could not find folder data in music_data for paths: {folder_path1}, {folder_path2}" + colors.RESET)
                 continue  # דלג לזוג תיקיות הבא
 
@@ -245,14 +299,14 @@ class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality �
                     "artist": folder_data1_music_data.get('artist'), # --- משתמש כעת ב-folder_data_music_data ---
                     "album_name": folder_data1_music_data.get('album'), # --- משתמש כעת ב-folder_data_music_data ---
                     "files": self.folder_files[folder_path1]['files'], # עדיין משתמש ב-folder_files עבור רשימת קבצים
-                    "album_art_base64": folder_art_base64_1 if (folder_art_base64_1 := folder_data1_music_data.get('album_art')) else None # Fix: Album art retrieval
+                    "album_art_base64": album_art_base64_1 if (folder_art_base64_1 := folder_data1_music_data.get('album_art')) else None # Fix: Album art retrieval
                 },
                 "album2": {
                     "folder_path": folder_path2,
                     "artist": folder_data2_music_data.get('artist'), # --- משתמש כעת ב-folder_data_music_data ---
                     "album_name": folder_data2_music_data.get('album'), # --- משתמש כעת ב-folder_data_music_data ---
                     "files": self.folder_files[folder_path2]['files'], # עדיין משתמש ב-folder_files עבור רשימת קבצים
-                    "album_art_base64": folder_art_base64_2 if (folder_art_base64_2 := folder_data2_music_data.get('album_art')) else None # Fix: Album art retrieval
+                    "album_art_base64": album_art_base64_2 if (folder_art_base64_2 := folder_data2_music_data.get('album_art')) else None # Fix: Album art retrieval
                 },
                 "similarity_score_script": similarities.get('weighted_score')
             }
@@ -273,8 +327,10 @@ class GeminiEnhancedFolderComparer(SelectQuality): # יורש מ-SelectQuality �
             if is_duplicate is not None: # Check if parsing was successful
                 print(f"Gemini Duplicate Verdict: {is_duplicate}, Confidence: {confidence:.2f}%")
                 print(f"Gemini Reason: {reason}") # Reason is printed here now
+                logging.info(f"Gemini API response: Duplicate={is_duplicate}, Confidence={confidence}, Reason='{reason}'") # Log successful API response
             else:
                 print(f"Gemini API Response (Raw):\n{reason}") # print raw response if parsing failed
+                logging.warning(f"Gemini API raw response (parsing failed):\n{reason}") # Log raw response due to parsing failure
 
 
 if __name__ == "__main__":
@@ -284,6 +340,19 @@ if __name__ == "__main__":
         print("הנתיב שהוזן אינו תקין. אנא נסה שוב.")
         exit(1)
     folder_paths = [folder_path]
+
+    # Choose logging level
+    print("\nבחר רמת רישום יומן:")
+    print("1. מינימלי (INFO)")
+    print("2. מפורט (DEBUG)")
+    log_choice = input('הכנס 1 או 2: ').strip()
+    if log_choice == '1':
+        log_level = 'INFO'
+    elif log_choice == '2':
+        log_level = 'DEBUG'
+    else:
+        print("בחירה לא תקינה. ברירת המחדל היא INFO.")
+        log_level = 'INFO'
 
     # Additional step: Choose preferred bitrate
     print("בחר את קצב הסיביות המועדף עליך:")
@@ -299,7 +368,7 @@ if __name__ == "__main__":
         preferred_bitrate = '128'
 
     # Step 1: Compare folder qualities - using the enhanced class
-    comparer = GeminiEnhancedFolderComparer(folder_paths, preferred_bitrate)
+    comparer = GeminiEnhancedFolderComparer(folder_paths, preferred_bitrate, log_level) # Pass log_level here
     comparer.main() # This now includes Gemini API call for 40-90% similar albums
     organized_info = comparer.get_folders_quality()
     sorted_similar_folders = comparer.sorted_similar_folders
@@ -310,9 +379,8 @@ if __name__ == "__main__":
     # Step 3: Confirm folder merge (rest of the flow remains the same)
     user_input = input("\nהאם ברצונך למזג את התיקיות? (y/n): ").strip().lower()
     if user_input == 'y':
-        from find_duplic_albums import MergeFolders, SelectAndThrow # ייבא מחלקות רק אם צריך
         # Step 4: Merge folders
-        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders)
+        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders, log_level) # Pass log_level
         merger.merge()
 
         # Step 5: Get similarity threshold for deletion
@@ -326,12 +394,10 @@ if __name__ == "__main__":
             similarity_threshold_delete = 85.0
 
         # Step 6: Choose and delete folders with similarity threshold
-        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders) # Pass sorted_similar_folders
+        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level) # Pass log_level
         selecter.delete()
         print("המחיקה הושלמה (ראה דוח מחיקה למעלה).")
 
     else:
         print("מיזוג התיקיות בוטל.")
         print("המחיקה בוטלה.")
-
-# --- END OF FILE gemini_integration.py ---
