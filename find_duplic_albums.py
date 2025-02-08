@@ -575,6 +575,9 @@ class FolderComparer:
 class SelectQuality(FolderComparer):
     """Compare the quality between folders."""
 
+    def __init__(self, folder_paths, preferred_bitrate, log_level):
+        super().__init__(folder_paths, preferred_bitrate, log_level) # Inherit logging setup
+
     def get_folders_quality(self):
         """
         Compare folders based on certain quality criteria and organize the information.
@@ -779,37 +782,19 @@ class SelectQuality(FolderComparer):
         for param, score in breakdown.items():
             print(f'  {param}: {score:.2f}%')
 
-class MergeFolders:
+class MergeFolders(FolderComparer): # Changed inheritance
     def __init__(self, organized_info, folder_files, preferred_bitrate, sorted_similar_folders, log_level):
         self.organized_info = organized_info
         self.folder_files = folder_files
         self.preferred_bitrate = preferred_bitrate
         self.sorted_similar_folders = sorted_similar_folders
         self.log_level = log_level
-        self._setup_logging()
+        # Removed _setup_logging() call - rely on parent class setup
         # סף דמיון מינימלי למיזוג
         self.MINIMUM_SIMILARITY_SCORE_FOR_MERGE = 95.0
 
-    def _setup_logging(self):
-        """Setup logging configuration - re-using the same config as FolderComparer."""
-        logs_dir = 'logs' # Define logs directory
-        if not os.path.exists(logs_dir): # Create logs directory if it doesn't exist
-            os.makedirs(logs_dir)
-        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S") # Generate timestamp
-        log_file = os.path.join(logs_dir, f'music_folder_comparer_{timestamp}.log') # Timestamped log file name
-        log_level_numeric = getattr(logging, self.log_level.upper(), None)
-        if not isinstance(log_level_numeric, int):
-            print(f"Invalid log level: {self.log_level}, defaulting to INFO.")
-            log_level_numeric = logging.INFO
+    # Removed _setup_logging method
 
-        logging.basicConfig(
-            level=log_level_numeric,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file, encoding='utf-8'),
-                logging.StreamHandler()
-            ]
-        )
 
     def merge(self):
         # חזור על זוגות תיקיות
@@ -987,38 +972,16 @@ class MergeFolders:
             logging.debug(f"Preferred folder {preferred_folder} already has album art, skipping copy from {other_folder}")
 
 
-class SelectAndThrow:
-    """
-    Choose and delete the redundant folders.
-    """
+class SelectAndThrow(FolderComparer): # Changed inheritance
     def __init__(self, organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level):
         self.organized_info = organized_info
         self.preferred_bitrate = preferred_bitrate
         self.similarity_threshold_delete = similarity_threshold_delete
         self.sorted_similar_folders = sorted_similar_folders # Receive sorted_similar_folders
         self.log_level = log_level
-        self._setup_logging()
+        # Removed _setup_logging() call - rely on parent class setup
 
-    def _setup_logging(self):
-        """Setup logging configuration - re-using the same config as FolderComparer."""
-        logs_dir = 'logs' # Define logs directory
-        if not os.path.exists(logs_dir): # Create logs directory if it doesn't exist
-            os.makedirs(logs_dir)
-        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S") # Generate timestamp
-        log_file = os.path.join(logs_dir, f'music_folder_comparer_{timestamp}.log') # Timestamped log file name
-        log_level_numeric = getattr(logging, self.log_level.upper(), None)
-        if not isinstance(log_level_numeric, int):
-            print(f"Invalid log level: {self.log_level}, defaulting to INFO.")
-            log_level_numeric = logging.INFO
-
-        logging.basicConfig(
-            level=log_level_numeric,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file, encoding='utf-8'),
-                logging.StreamHandler()
-            ]
-        )
+    # Removed _setup_logging method
 
 
     def view_result(self):
