@@ -174,17 +174,26 @@ class FolderComparer:
             for file in music_files:
                 filepath = os.path.join(root, file)
                 file_metadata = self.extract_metadata(filepath)
+                # בדיקה האם קיימת מטאדאטה בסיסית (artist, album או title)
+                if not file_metadata or not any(file_metadata.get(key) for key in ['artist', 'album', 'title']):
+                    logging.warning(f"Metadata missing or incomplete for file: {filepath}")
+                    metadata_valid = False
+                else:
+                    metadata_valid = True
+
                 for key in ['artist', 'album', 'title']:
                     if file_metadata.get(key):
                         if check_jibrish(file_metadata[key]):
                             fixed_value = fix_jibrish(file_metadata[key], "heb")
                             file_metadata[key] = fixed_value
                             logging.debug(f"Fixed gibberish in metadata field '{key}' of file {filepath}.")
+
                 file_hash = self.get_file_hash(filepath)
                 metadata_list.append({
                     'filename': file,
                     'hash': file_hash,
-                    'metadata': file_metadata
+                    'metadata': file_metadata,
+                    'metadata_valid': metadata_valid
                 })
 
             album_art_hash = self.extract_album_art(root)
@@ -221,6 +230,7 @@ class FolderComparer:
             logging.info(f"Scanned folder: {root}")
 
         self.save_music_data()
+
 
     def build_folder_structure(self, root_dir):
         for root, dirs, _ in os.walk(root_dir):
