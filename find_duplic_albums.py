@@ -159,7 +159,6 @@ class FolderComparer:
         return None
 
     def scan_music_library(self):
-        # סריקה של ספריית המוזיקה מתוך הנתיב הראשי בלבד
         for root, dirs, files in os.walk(self.folder_paths[0]):
             music_files = [f for f in files if os.path.splitext(f)[1].lower() in self.ALLOWED_EXTENSIONS and f.lower() not in self.IGNORED_FILES]
             if not music_files:
@@ -176,7 +175,7 @@ class FolderComparer:
                 filepath = os.path.join(root, file)
                 file_metadata = self.extract_metadata(filepath)
                 for key in ['artist', 'album', 'title']:
-                    if key in file_metadata and file_metadata[key]:
+                    if file_metadata.get(key):
                         if check_jibrish(file_metadata[key]):
                             fixed_value = fix_jibrish(file_metadata[key], "heb")
                             file_metadata[key] = fixed_value
@@ -343,14 +342,11 @@ class FolderComparer:
 
     def find_similar_folders(self):
         similar_folders = {}
-        # שימוש ב-combinations לעבור על כל זוגי התיקיות פעם אחת
         for (folder_path, data1), (other_folder_path, data2) in combinations(self.folder_files.items(), 2):
             if len(data1['files']) != len(data2['files']):
                 continue
             folder_similarity = {}
             total_files = len(data1['files'])
-
-            # בדיקת התאמת קבצים לפי hash
             matching_hashes = sum(
                 1 for file1, file2 in zip(data1['files'], data2['files'])
                 if file1.get('file_hash') == file2.get('file_hash')
@@ -363,7 +359,8 @@ class FolderComparer:
                 folder_similarity['weighted_score'] = 100.0
                 logging.info(f"Folders {folder_path} and {other_folder_path} are identical based on file hashes.")
             else:
-                folder_name_similarity = self.similar(folder_path.lower(), other_folder_path.lower())
+                # תיקון: השוואת שם תיקייה מבוצעת על בסיס os.path.basename
+                folder_name_similarity = self.similar(os.path.basename(folder_path).lower(), os.path.basename(other_folder_path).lower())
                 folder_similarity['folder_name'] = folder_name_similarity
 
                 file_similarity1 = data1.get('file_similarity', 0)
@@ -713,7 +710,10 @@ class SelectAndThrow(FolderComparer):
 
     def delete(self):
         folders_to_delete_report = []
-        for (folder_pair, similarities), quality_scores in zip(self.sorted_similar_folders, self.organized_info.values()):
+        for folder_pair, similarities in self.sorted_similar_folders:
+            quality_scores = self.organized_info.get(folder_pair)
+            if not quality_scores:
+                continue
             folder1, folder2 = folder_pair
             (quality1, _), (quality2, _) = quality_scores
             similarity_score = similarities.get('weighted_score', 0)
