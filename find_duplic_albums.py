@@ -11,6 +11,7 @@ import shutil
 import re
 import logging
 import datetime  # Import datetime module
+import argparse  # Added for command-line parameters
 
 # ייבא את הפונקציות לטיפול בטקסט ג'יבריש
 from jibrish_to_hebrew import fix_jibrish, check_jibrish
@@ -574,7 +575,6 @@ class FolderComparer:
 
 class SelectQuality(FolderComparer):
     """Compare the quality between folders."""
-
     def __init__(self, folder_paths, preferred_bitrate, log_level):
         super().__init__(folder_paths, preferred_bitrate, log_level) # Inherit logging setup
 
@@ -793,9 +793,6 @@ class MergeFolders(FolderComparer): # Changed inheritance
         # סף דמיון מינימלי למיזוג
         self.MINIMUM_SIMILARITY_SCORE_FOR_MERGE = 95.0
 
-    # Removed _setup_logging method
-
-
     def merge(self):
         # חזור על זוגות תיקיות
         for folder_pair, similarities in self.sorted_similar_folders:
@@ -979,10 +976,6 @@ class SelectAndThrow(FolderComparer): # Changed inheritance
         self.similarity_threshold_delete = similarity_threshold_delete
         self.sorted_similar_folders = sorted_similar_folders # Receive sorted_similar_folders
         self.log_level = log_level
-        # Removed _setup_logging() call - rely on parent class setup
-
-    # Removed _setup_logging method
-
 
     def view_result(self):
         """
@@ -997,19 +990,18 @@ class SelectAndThrow(FolderComparer): # Changed inheritance
         """
         folders_to_delete_report = []
 
-        for (folder_pair, similarities), quality_scores in zip(self.sorted_similar_folders, self.organized_info.values()): # Iterate over sorted_similar_folders
+        for (folder_pair, similarities), quality_scores in zip(self.sorted_similar_folders, self.organized_info.values()):
             folder1, folder2 = folder_pair
             (quality1, _), (quality2, _) = quality_scores
-            similarity_score = similarities.get('weighted_score', 0) # Get similarity from similarities dict
+            similarity_score = similarities.get('weighted_score', 0)
 
-            if similarity_score >= self.similarity_threshold_delete: # check if the similarity score is above the user defined threshold
+            if similarity_score >= self.similarity_threshold_delete:
                 if quality1 <= quality2:
-                    folders_to_delete_report.append((folder1, folder2, quality1, quality2, similarity_score)) # Add similarity score to report
+                    folders_to_delete_report.append((folder1, folder2, quality1, quality2, similarity_score))
                     logging.info(f"Identified folder for potential deletion: {folder1} (Quality: {quality1:.2f}%, Similarity: {similarity_score:.2f}%), Better folder: {folder2} (Quality: {quality2:.2f}%)")
                 elif quality2 < quality1:
-                    folders_to_delete_report.append((folder2, folder1, quality2, quality1, similarity_score)) # Add similarity score to report
+                    folders_to_delete_report.append((folder2, folder1, quality2, quality1, similarity_score))
                     logging.info(f"Identified folder for potential deletion: {folder2} (Quality: {quality2:.2f}%, Similarity: {similarity_score:.2f}%), Better folder: {folder1} (Quality: {quality1:.2f}%)")
-                # If qualities are equal, the user will need to decide manually, so we won't automatically delete.
 
         if not folders_to_delete_report:
             print("לא נמצאו תיקיות למחיקה לפי רמת הדמיון והאיכות שצוינו.")
@@ -1017,8 +1009,8 @@ class SelectAndThrow(FolderComparer): # Changed inheritance
             return
 
         print(colors.YELLOW + "\nדוח תיקיות לסקירה ומחיקה אפשרית:" + colors.RESET)
-        for folder_to_delete, better_folder, quality_to_delete, better_quality, similarity_score in folders_to_delete_report: # Include similarity score in report
-            print(f"- תיקייה למחיקה: '{folder_to_delete}' (ציון איכות: {quality_to_delete:.2f}%, ציון דמיון: {similarity_score:.2f}%)") # Display similarity score in report
+        for folder_to_delete, better_folder, quality_to_delete, better_quality, similarity_score in folders_to_delete_report:
+            print(f"- תיקייה למחיקה: '{folder_to_delete}' (ציון איכות: {quality_to_delete:.2f}%, ציון דמיון: {similarity_score:.2f}%)")
             print(f"  תיקייה עדיפה: '{better_folder}' (ציון איכות: {better_quality:.2f}%)")
 
         confirmation = input(colors.YELLOW + "\nהאם ברצונך למחוק את התיקיות המיותרות שצוינו לעיל? (y/n): " + colors.RESET).strip().lower()
@@ -1045,38 +1037,23 @@ class SelectAndThrow(FolderComparer): # Changed inheritance
 
 
 if __name__ == "__main__":
-    print('הכנס נתיב לתיקיה')
-    folder_path = input('>>>').strip()
-    if not os.path.isdir(folder_path):
-        print("הנתיב שהוזן אינו תקין. אנא נסה שוב.")
-        exit(1)
-    folder_paths = [folder_path]
+    parser = argparse.ArgumentParser(description="Music Folder Comparer Utility")
+    parser.add_argument("folders", nargs="+", help="One or more folder paths to scan")
+    parser.add_argument("-l", "--log-level", choices=["INFO", "DEBUG"], default="INFO", help="Set logging level")
+    parser.add_argument("-b", "--bitrate", choices=["128", "high"], default="128", help="Preferred bitrate option")
+    args = parser.parse_args()
 
-    # Choose logging level
-    print("\nבחר רמת רישום יומן:")
-    print("1. מינימלי (INFO)")
-    print("2. מפורט (DEBUG)")
-    log_choice = input('הכנס 1 או 2: ').strip()
-    if log_choice == '1':
-        log_level = 'INFO'
-    elif log_choice == '2':
-        log_level = 'DEBUG'
-    else:
-        print("בחירה לא תקינה. ברירת המחדל היא INFO.")
-        log_level = 'INFO'
+    # Validate folder paths
+    folder_paths = []
+    for path in args.folders:
+        if os.path.isdir(path):
+            folder_paths.append(path)
+        else:
+            print(f"נתיב לא תקין: {path}")
+            exit(1)
 
-    # Additional step: Choose preferred bitrate
-    print("בחר את קצב הסיביות המועדף עליך:")
-    print("1. איכות ברירת מחדל (128 kbps)")
-    print("2. איכות גבוהה ביותר")
-    bitrate_choice = input('הכנס 1 או 2: ').strip()
-    if bitrate_choice == '1':
-        preferred_bitrate = '128'
-    elif bitrate_choice == '2':
-        preferred_bitrate = 'high'
-    else:
-        print("בחירה לא תקינה. ברירת המחדל היא 128 kbps.")
-        preferred_bitrate = '128'
+    log_level = args.log_level
+    preferred_bitrate = args.bitrate
 
     # Step 1: Compare folder qualities
     comparer = SelectQuality(folder_paths, preferred_bitrate, log_level)
@@ -1105,10 +1082,9 @@ if __name__ == "__main__":
             similarity_threshold_delete = 85.0
 
         # Step 6: Choose and delete folders with similarity threshold
-        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level) # Pass sorted_similar_folders
+        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level)
         selecter.delete()
         print("המחיקה הושלמה (ראה דוח מחיקה למעלה).")
-
     else:
         print("מיזוג התיקיות בוטל.")
         print("המחיקה בוטלה.")
