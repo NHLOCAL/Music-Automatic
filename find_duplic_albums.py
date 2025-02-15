@@ -10,6 +10,7 @@ import argparse
 from collections import defaultdict
 from itertools import combinations
 import concurrent.futures
+import random
 
 from mutagen.easyid3 import EasyID3
 from mutagen import File
@@ -32,7 +33,7 @@ class colors:
 
 
 class FolderComparer:
-    def __init__(self, folder_paths, preferred_bitrate, log_level):
+    def __init__(self, folder_paths, preferred_bitrate, log_level, enable_hash=True):
         self.folder_paths = folder_paths
         self.folder_files = {}
         self.music_data = {}
@@ -48,6 +49,7 @@ class FolderComparer:
         self.ADDITIONAL_METADATA_WEIGHT = 0.5
         self.PARAMETER_WEIGHTS = {
             'file_hash': 5.0,
+            'file_size': 1.0,    # חדש – משקל לגודל הקובץ
             'file': 3.0,
             'title': 2.5,
             'album': 2.5,
@@ -59,12 +61,13 @@ class FolderComparer:
         self.artists_map = self.load_artists_from_csv()
         self.preferred_bitrate = preferred_bitrate
         self.log_level = log_level
+        self.enable_hash = enable_hash  # מאפשר/מבטל בדיקת האש
         self._setup_logging()
         self.load_music_data()
         self.organized_info = {}
         self.sorted_similar_folders = []
         self.album_art_cache = {}  # קאשינג לעיבוד תמונות
-        self.CHUNK_SIZE = 8192  # הגדלת גודל הקטע בקריאת הקבצים
+        self.CHUNK_SIZE = 8192  # גודל קטע לקריאה מלאה (משמש בחלקים אחרים)
 
     def _setup_logging(self):
         logs_dir = 'logs'
@@ -116,57 +119,68 @@ class FolderComparer:
         except Exception as e:
             logging.error(f"Error saving data file: {e}")
 
-    def get_file_hash(self, filepath):
-        hash_func = hashlib.md5()
+    def get_file_size_mb(self, filepath):
         try:
-            with open(filepath, 'rb') as f:
-                for chunk in iter(lambda: f.read(self.CHUNK_SIZE), b""):
-                    hash_func.update(chunk)
-            return hash_func.hexdigest()
+            size_bytes = os.path.getsize(filepath)
+            return size_bytes / (1024 * 1024)
         except Exception as e:
-            logging.error(f"Error hashing file {filepath}: {e}")
+            logging.error(f"Error getting file size for {filepath}: {e}")
+            return 0
+
+    def get_partial_file_hash(self, filepath):
+        """
+        מחשבת חתימה חלקית לקריאה מהירה – משלבת את הקטע מההתחלה, מהסוף, וכמה קטעים אקראיים.
+        בנוסף, גודל הקובץ מתווסף כחלק מהחתימה.
+        """
+        try:
+            file_size = os.path.getsize(filepath)
+            chunk_size = 4096  # קצב קריאה קטן יותר לחתימה חלקית
+            data_segments = []
+            with open(filepath, 'rb') as f:
+                # קטע מההתחלה
+                first_chunk = f.read(chunk_size)
+                data_segments.append(first_chunk)
+                # הוספת גודל הקובץ (כ-8 בתים)
+                file_size_bytes = file_size.to_bytes(8, byteorder='big', signed=False)
+                data_segments.append(file_size_bytes)
+                # קטע מהסוף
+                if file_size > chunk_size:
+                    f.seek(max(file_size - chunk_size, 0))
+                    last_chunk = f.read(chunk_size)
+                    data_segments.append(last_chunk)
+                # קטעים אקראיים – בודקים אם יש מספיק מקום
+                num_random_chunks = 2
+                if file_size > 2 * chunk_size:
+                    # השתמש ב־PRNG עם זרע המבוסס על גודל הקובץ וחתימת הקטע הראשון
+                    seed_value = int(hashlib.md5(first_chunk).hexdigest(), 16) ^ file_size
+                    rnd = random.Random(seed_value)
+                    for i in range(num_random_chunks):
+                        pos = rnd.randint(chunk_size, max(file_size - chunk_size, chunk_size))
+                        f.seek(pos)
+                        random_chunk = f.read(chunk_size)
+                        data_segments.append(random_chunk)
+                # איחוד כל הקטעים
+                combined = b"".join(data_segments)
+                final_hash = hashlib.sha256(combined).hexdigest()
+                return final_hash
+        except Exception as e:
+            logging.error(f"Error in partial hashing for file {filepath}: {e}", exc_info=True)
             return None
 
-    def extract_metadata(self, filepath):
-        try:
-            audio = File(filepath, easy=True)
-            if audio is None:
-                logging.warning(f"Could not read audio metadata from {filepath}")
-                return {}
-            metadata = {key: audio.get(key, [None])[0] for key in audio.keys()}
-            if audio.info and hasattr(audio.info, 'bitrate'):
-                metadata['bitrate'] = audio.info.bitrate // 1000
-            else:
-                metadata['bitrate'] = None
-            if audio.info and hasattr(audio.info, 'length'):
-                metadata['duration'] = int(audio.info.length)
-            else:
-                metadata['duration'] = None
-            return metadata
-        except Exception as e:
-            logging.error(f"Error extracting metadata from {filepath}: {e}", exc_info=True)
-            return {}
-
-    def extract_album_art(self, folder_path):
-        # בדיקה אם תוצאת עיבוד האלבום כבר קיימת בקאש
-        if folder_path in self.album_art_cache:
-            return self.album_art_cache[folder_path]
-
-        album_art_files = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png'}
-        for file in os.listdir(folder_path):
-            if file.lower() in album_art_files:
-                try:
-                    img_path = os.path.join(folder_path, file)
-                    with Image.open(img_path) as img:
-                        img = img.resize((100, 100))
-                        img_bytes = img.tobytes()
-                        art_hash = hashlib.md5(img_bytes).hexdigest()
-                        self.album_art_cache[folder_path] = art_hash
-                        return art_hash
-                except Exception as e:
-                    logging.error(f"Error processing image {file} in {folder_path}: {e}", exc_info=True)
-        self.album_art_cache[folder_path] = None
-        return None
+    def get_file_hash(self, filepath):
+        """
+        אם בדיקת האש פעילה – משתמשים באש חלקי (partial hash)
+        אחרת, מחזירים מחרוזת המבוססת על גודל הקובץ.
+        """
+        if not self.enable_hash:
+            try:
+                size = os.path.getsize(filepath)
+                return f"size:{size}"
+            except Exception as e:
+                logging.error(f"Error getting file size for hash fallback {filepath}: {e}")
+                return None
+        else:
+            return self.get_partial_file_hash(filepath)
 
     # פונקציה רקורסיבית לסריקת תיקיות באמצעות os.scandir
     def recursive_scan(self, root_dir):
@@ -229,7 +243,8 @@ class FolderComparer:
                     'filename': file,
                     'hash': file_hash,
                     'metadata': file_metadata,
-                    'metadata_valid': metadata_valid
+                    'metadata_valid': metadata_valid,
+                    'size_mb': self.get_file_size_mb(filepath)
                 })
 
             album_art_hash = self.extract_album_art(root)
@@ -269,21 +284,6 @@ class FolderComparer:
             logging.error(f"Error processing folder {root}: {e}")
             return None
 
-    # סריקת ספריית המוזיקה באמצעות עיבוד מקבילי
-    def scan_music_library(self):
-        results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as executor:
-            futures = []
-            for base_folder in self.folder_paths:
-                for folder in self.recursive_scan(base_folder):
-                    futures.append(executor.submit(self.process_music_folder, folder))
-            for future in concurrent.futures.as_completed(futures):
-                result = future.result()
-                if result:
-                    folder_hash, folder_data = result
-                    self.music_data[folder_hash] = folder_data
-        self.save_music_data()
-
     # שימוש ב־ThreadPoolExecutor לעיבוד תיקיות במקביל בעת קבלת רשימת הקבצים
     def get_file_lists(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as executor:
@@ -298,6 +298,7 @@ class FolderComparer:
 
     def gather_file_info(self, folder_path, files_in_dir):
         titles = []
+        file_list = []
         for file in files_in_dir:
             file_path = os.path.join(folder_path, file)
             try:
@@ -312,12 +313,6 @@ class FolderComparer:
             except Exception as e:
                 logging.error(f"Error processing {file}: {e}", exc_info=True)
 
-        title_similarity = self.check_generic_names(titles) if titles else 0.0
-        file_similarity = self.check_generic_names(files_in_dir)
-        file_list = []
-
-        for file in files_in_dir:
-            file_path = os.path.join(folder_path, file)
             try:
                 audio = EasyID3(file_path)
                 artist = audio.get('artist', [None])[0]
@@ -347,10 +342,14 @@ class FolderComparer:
                     'duration': metadata.get('duration'),
                     'metadata': metadata,
                     'file_hash': file_hash,
-                    'extension': os.path.splitext(file)[1].lower()
+                    'extension': os.path.splitext(file)[1].lower(),
+                    'size_mb': self.get_file_size_mb(file_path)
                 })
             except Exception as e:
                 logging.error(f"Error processing {file}: {e}", exc_info=True)
+
+        title_similarity = self.check_generic_names(titles) if titles else 0.0
+        file_similarity = self.check_generic_names(files_in_dir)
 
         return {
             folder_path: {
@@ -360,6 +359,47 @@ class FolderComparer:
                 'album_art': self.extract_album_art(folder_path)
             }
         }
+
+    def extract_metadata(self, filepath):
+        try:
+            audio = File(filepath, easy=True)
+            if audio is None:
+                logging.warning(f"Could not read audio metadata from {filepath}")
+                return {}
+            metadata = {key: audio.get(key, [None])[0] for key in audio.keys()}
+            if audio.info and hasattr(audio.info, 'bitrate'):
+                metadata['bitrate'] = audio.info.bitrate // 1000
+            else:
+                metadata['bitrate'] = None
+            if audio.info and hasattr(audio.info, 'length'):
+                metadata['duration'] = int(audio.info.length)
+            else:
+                metadata['duration'] = None
+            return metadata
+        except Exception as e:
+            logging.error(f"Error extracting metadata from {filepath}: {e}", exc_info=True)
+            return {}
+
+    def extract_album_art(self, folder_path):
+        # בדיקה אם תוצאת עיבוד האלבום כבר קיימת בקאש
+        if folder_path in self.album_art_cache:
+            return self.album_art_cache[folder_path]
+
+        album_art_files = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png'}
+        for file in os.listdir(folder_path):
+            if file.lower() in album_art_files:
+                try:
+                    img_path = os.path.join(folder_path, file)
+                    with Image.open(img_path) as img:
+                        img = img.resize((100, 100))
+                        img_bytes = img.tobytes()
+                        art_hash = hashlib.md5(img_bytes).hexdigest()
+                        self.album_art_cache[folder_path] = art_hash
+                        return art_hash
+                except Exception as e:
+                    logging.error(f"Error processing image {file} in {folder_path}: {e}", exc_info=True)
+        self.album_art_cache[folder_path] = None
+        return None
 
     # החלפת השוואת מחרוזות עם SequenceMatcher בהשוואה מהירה עם rapidfuzz
     def similar(self, a, b):
@@ -420,7 +460,6 @@ class FolderComparer:
             # מחשבים את מספר הקבצים הכולל (נשתמש ב-max כדי להבטיח ערך בין 0 ל-1)
             total_files = max(len(data1['files']), len(data2['files']))
             matching_hashes = 0
-            # סופרים עבור כל האש שנמצאת בשתי התיקיות את מינימום ההופעות
             for h in set(multiset1.keys()) & set(multiset2.keys()):
                 matching_hashes += min(multiset1[h], multiset2[h])
             file_hash_match_percentage = matching_hashes / total_files if total_files else 0.0
@@ -445,12 +484,27 @@ class FolderComparer:
                 file_adjustment = 1 - (max_file_similarity * self.REDUCTION_FACTOR) if max_file_similarity > self.GENERIC_SIMILARITY_THRESHOLD else 1
                 title_adjustment = 1 - (max_title_similarity * self.REDUCTION_FACTOR) if max_title_similarity > self.GENERIC_SIMILARITY_THRESHOLD else 1
 
-                # עבור שאר הפרמטרים, נשווה לפי רשימות ממוינות לפי שם הקובץ (לשאר ההשוואות, סדר הקבצים עדיין חשוב)
                 def normalize_filename(fname):
                     return re.sub(r'\s+', ' ', fname).strip().lower()
 
                 files1 = sorted(data1['files'], key=lambda x: normalize_filename(x.get('file', '')))
                 files2 = sorted(data2['files'], key=lambda x: normalize_filename(x.get('file', '')))
+
+                # הוספת בדיקת דמיון לגודל הקובץ (ב-MB)
+                def compare_file_sizes(files1, files2):
+                    total_similarity = 0
+                    for f1, f2 in zip(files1, files2):
+                        size1 = f1.get('size_mb', 0)
+                        size2 = f2.get('size_mb', 0)
+                        tolerance = 0.1  # הבדל עד 0.1 MB נחשב לתואם
+                        if abs(size1 - size2) <= tolerance:
+                            similarity = 1.0
+                        else:
+                            similarity = min(size1, size2) / max(size1, size2) if max(size1, size2) > 0 else 0
+                        total_similarity += similarity
+                    return total_similarity / len(files1) if files1 else 0
+
+                folder_similarity['file_size'] = compare_file_sizes(files1, files2)
 
                 for parameter in ['file', 'title', 'album', 'artist', 'album_art', 'duration']:
                     total_similarity = 0
@@ -515,14 +569,28 @@ class FolderComparer:
                 print(f"Total Similarity Score: {similarities['weighted_score']:.2f}%")
             print()
 
+    def scan_music_library(self):
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as executor:
+            futures = []
+            for base_folder in self.folder_paths:
+                for folder in self.recursive_scan(base_folder):
+                    futures.append(executor.submit(self.process_music_folder, folder))
+            for future in concurrent.futures.as_completed(futures):
+                result = future.result()
+                if result:
+                    folder_hash, folder_data = result
+                    self.music_data[folder_hash] = folder_data
+        self.save_music_data()
+
     def main(self):
         self.get_file_lists()
         self.find_similar_folders_main()
 
 
 class SelectQuality(FolderComparer):
-    def __init__(self, folder_paths, preferred_bitrate, log_level):
-        super().__init__(folder_paths, preferred_bitrate, log_level)
+    def __init__(self, folder_paths, preferred_bitrate, log_level, enable_hash=True):
+        super().__init__(folder_paths, preferred_bitrate, log_level, enable_hash)
 
     def compute_folder_quality(self, folder_path, folder_data):
         hebrew_metadata_count = 0
@@ -838,6 +906,7 @@ if __name__ == "__main__":
     parser.add_argument("folders", nargs="+", help="One or more folder paths to scan")
     parser.add_argument("-l", "--log-level", choices=["INFO", "DEBUG"], default="INFO", help="Set logging level")
     parser.add_argument("-b", "--bitrate", choices=["128", "high"], default="128", help="Preferred bitrate option")
+    parser.add_argument("--disable-hash", action="store_true", help="Disable file hash checking and rely on file size for similarity")
     args = parser.parse_args()
 
     folder_paths = []
@@ -850,8 +919,9 @@ if __name__ == "__main__":
 
     log_level = args.log_level
     preferred_bitrate = args.bitrate
+    enable_hash = not args.disable_hash
 
-    comparer = SelectQuality(folder_paths, preferred_bitrate, log_level)
+    comparer = SelectQuality(folder_paths, preferred_bitrate, log_level, enable_hash)
     comparer.main()
     organized_info = comparer.get_folders_quality()
     sorted_similar_folders = comparer.sorted_similar_folders
