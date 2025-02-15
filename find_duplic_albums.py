@@ -8,12 +8,13 @@ import logging
 import datetime
 import argparse
 from collections import defaultdict
-from difflib import SequenceMatcher
 from itertools import combinations
+import concurrent.futures
 
 from mutagen.easyid3 import EasyID3
 from mutagen import File
 from PIL import Image
+from rapidfuzz import fuzz  # משתמשים ב־rapidfuzz להשוואות מהירות של מחרוזות
 
 # ייבוא הפונקציות לטיפול בטקסט ג'יבריש
 from jibrish_to_hebrew import fix_jibrish, check_jibrish
@@ -62,6 +63,8 @@ class FolderComparer:
         self.load_music_data()
         self.organized_info = {}
         self.sorted_similar_folders = []
+        self.album_art_cache = {}  # קאשינג לעיבוד תמונות
+        self.CHUNK_SIZE = 8192  # הגדלת גודל הקטע בקריאת הקבצים
 
     def _setup_logging(self):
         logs_dir = 'logs'
@@ -117,7 +120,7 @@ class FolderComparer:
         hash_func = hashlib.md5()
         try:
             with open(filepath, 'rb') as f:
-                for chunk in iter(lambda: f.read(4096), b""):
+                for chunk in iter(lambda: f.read(self.CHUNK_SIZE), b""):
                     hash_func.update(chunk)
             return hash_func.hexdigest()
         except Exception as e:
@@ -145,6 +148,10 @@ class FolderComparer:
             return {}
 
     def extract_album_art(self, folder_path):
+        # בדיקה אם תוצאת עיבוד האלבום כבר קיימת בקאש
+        if folder_path in self.album_art_cache:
+            return self.album_art_cache[folder_path]
+
         album_art_files = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png'}
         for file in os.listdir(folder_path):
             if file.lower() in album_art_files:
@@ -153,28 +160,56 @@ class FolderComparer:
                     with Image.open(img_path) as img:
                         img = img.resize((100, 100))
                         img_bytes = img.tobytes()
-                        return hashlib.md5(img_bytes).hexdigest()
+                        art_hash = hashlib.md5(img_bytes).hexdigest()
+                        self.album_art_cache[folder_path] = art_hash
+                        return art_hash
                 except Exception as e:
                     logging.error(f"Error processing image {file} in {folder_path}: {e}", exc_info=True)
+        self.album_art_cache[folder_path] = None
         return None
 
-    def scan_music_library(self):
-        for root, dirs, files in os.walk(self.folder_paths[0]):
-            music_files = [f for f in files if os.path.splitext(f)[1].lower() in self.ALLOWED_EXTENSIONS and f.lower() not in self.IGNORED_FILES]
-            if not music_files:
+    # פונקציה רקורסיבית לסריקת תיקיות באמצעות os.scandir
+    def recursive_scan(self, root_dir):
+        yield root_dir
+        try:
+            with os.scandir(root_dir) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        yield from self.recursive_scan(entry.path)
+        except Exception as e:
+            logging.error(f"Error scanning directory {root_dir}: {e}")
+
+    # שיפור: שימוש ב-os.scandir לבניית מבנה תיקיות
+    def build_folder_structure(self, root_dir):
+        for folder in self.recursive_scan(root_dir):
+            try:
+                with os.scandir(folder) as it:
+                    files_in_dir = [entry.name for entry in it if entry.is_file() and os.path.splitext(entry.name)[1].lower() in self.ALLOWED_EXTENSIONS and entry.name.lower() not in self.IGNORED_FILES]
+                if len(files_in_dir) <= 2:
+                    logging.debug(f"Skipping folder {folder} as it contains less than 3 music files.")
+                    continue
+                yield folder, files_in_dir
+            except Exception as e:
+                logging.error(f"Error processing folder {folder}: {e}")
+
+    # עיבוד תיקייה בודדת בסריקת ספריית מוזיקה – משמש בסריקה במקביל
+    def process_music_folder(self, root):
+        try:
+            with os.scandir(root) as it:
+                files = [entry.name for entry in it if entry.is_file() and os.path.splitext(entry.name)[1].lower() in self.ALLOWED_EXTENSIONS and entry.name.lower() not in self.IGNORED_FILES]
+            if not files:
                 logging.debug(f"Skipping folder {root} as it contains no music files.")
-                continue
+                return None
 
             folder_hash = hashlib.md5(root.encode('utf-8')).hexdigest()
             if folder_hash in self.music_data:
                 logging.info(f"Skipping already scanned folder: {root}")
-                continue
+                return None
 
             metadata_list = []
-            for file in music_files:
+            for file in files:
                 filepath = os.path.join(root, file)
                 file_metadata = self.extract_metadata(filepath)
-                # בדיקה האם קיימת מטאדאטה בסיסית (artist, album או title)
                 if not file_metadata or not any(file_metadata.get(key) for key in ['artist', 'album', 'title']):
                     logging.warning(f"Metadata missing or incomplete for file: {filepath}")
                     metadata_valid = False
@@ -186,7 +221,8 @@ class FolderComparer:
                         if check_jibrish(file_metadata[key]):
                             fixed_value = fix_jibrish(file_metadata[key], "heb")
                             file_metadata[key] = fixed_value
-                            logging.debug(f"Fixed gibberish in metadata field '{key}' of file {filepath}.")
+                            if self.log_level.upper() == "DEBUG":
+                                logging.debug(f"Fixed gibberish in metadata field '{key}' of file {filepath}.")
 
                 file_hash = self.get_file_hash(filepath)
                 metadata_list.append({
@@ -218,7 +254,7 @@ class FolderComparer:
                     album = file_meta['metadata']['album'].strip()
                     break
 
-            self.music_data[folder_hash] = {
+            folder_data = {
                 'path': root,
                 'folder_name': folder_name,
                 'parent_folder': parent_folder,
@@ -228,20 +264,37 @@ class FolderComparer:
                 'album_art': album_art_hash
             }
             logging.info(f"Scanned folder: {root}")
+            return (folder_hash, folder_data)
+        except Exception as e:
+            logging.error(f"Error processing folder {root}: {e}")
+            return None
 
+    # סריקת ספריית המוזיקה באמצעות עיבוד מקבילי
+    def scan_music_library(self):
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as executor:
+            futures = []
+            for base_folder in self.folder_paths:
+                for folder in self.recursive_scan(base_folder):
+                    futures.append(executor.submit(self.process_music_folder, folder))
+            for future in concurrent.futures.as_completed(futures):
+                result = future.result()
+                if result:
+                    folder_hash, folder_data = result
+                    self.music_data[folder_hash] = folder_data
         self.save_music_data()
 
-
-    def build_folder_structure(self, root_dir):
-        for root, dirs, _ in os.walk(root_dir):
-            for _dir in dirs:
-                dir_path = os.path.join(root, _dir)
-                files_in_dir = [i for i in os.listdir(dir_path)
-                                if os.path.splitext(i)[1].lower() in self.ALLOWED_EXTENSIONS and i.lower() not in self.IGNORED_FILES]
-                if len(files_in_dir) <= 2:
-                    logging.debug(f"Skipping folder {dir_path} as it contains less than 3 music files.")
-                    continue
-                yield dir_path, files_in_dir
+    # שימוש ב־ThreadPoolExecutor לעיבוד תיקיות במקביל בעת קבלת רשימת הקבצים
+    def get_file_lists(self):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as executor:
+            futures = []
+            for folder_path in self.folder_paths:
+                for dir_path, files_in_dir in self.build_folder_structure(folder_path):
+                    futures.append(executor.submit(self.gather_file_info, dir_path, files_in_dir))
+            for future in concurrent.futures.as_completed(futures):
+                result = future.result()
+                self.folder_files.update(result)
+        return self.folder_files
 
     def gather_file_info(self, folder_path, files_in_dir):
         titles = []
@@ -253,7 +306,8 @@ class FolderComparer:
                 if title:
                     if check_jibrish(title):
                         title = fix_jibrish(title, "heb")
-                        logging.debug(f"Fixed gibberish in title in file {file_path}.")
+                        if self.log_level.upper() == "DEBUG":
+                            logging.debug(f"Fixed gibberish in title in file {file_path}.")
                     titles.append(title)
             except Exception as e:
                 logging.error(f"Error processing {file}: {e}", exc_info=True)
@@ -273,7 +327,8 @@ class FolderComparer:
                 for key, value in [('artist', artist), ('album', album), ('title', title)]:
                     if value and check_jibrish(value):
                         fixed_value = fix_jibrish(value, "heb")
-                        logging.debug(f"Fixed gibberish in {key} in file {file_path}.")
+                        if self.log_level.upper() == "DEBUG":
+                            logging.debug(f"Fixed gibberish in {key} in file {file_path}.")
                         if key == 'artist':
                             artist = fixed_value
                         elif key == 'album':
@@ -306,21 +361,16 @@ class FolderComparer:
             }
         }
 
-    def get_file_lists(self):
-        for folder_path in self.folder_paths:
-            for dir_path, files_in_dir in self.build_folder_structure(folder_path):
-                self.folder_files.update(self.gather_file_info(dir_path, files_in_dir))
-        return self.folder_files
-
+    # החלפת השוואת מחרוזות עם SequenceMatcher בהשוואה מהירה עם rapidfuzz
     def similar(self, a, b):
-        return SequenceMatcher(None, a, b).ratio()
+        return fuzz.ratio(a.lower(), b.lower()) / 100.0
 
     def check_generic_names(self, files_list):
         files_list_cleaned = [re.sub(r'\d', '', os.path.splitext(i)[0]) for i in files_list]
         total_similarity = 0.0
         total_pairs = 0
         for name1, name2 in combinations(files_list_cleaned, 2):
-            total_similarity += SequenceMatcher(None, name1, name2).ratio()
+            total_similarity += self.similar(name1, name2)
             total_pairs += 1
         return total_similarity / total_pairs if total_pairs else 0.0
 
@@ -369,8 +419,7 @@ class FolderComparer:
                 folder_similarity['weighted_score'] = 100.0
                 logging.info(f"Folders {folder_path} and {other_folder_path} are identical based on file hashes.")
             else:
-                # תיקון: השוואת שם תיקייה מבוצעת על בסיס os.path.basename
-                folder_name_similarity = self.similar(os.path.basename(folder_path).lower(), os.path.basename(other_folder_path).lower())
+                folder_name_similarity = self.similar(os.path.basename(folder_path), os.path.basename(other_folder_path))
                 folder_similarity['folder_name'] = folder_name_similarity
 
                 file_similarity1 = data1.get('file_similarity', 0)
@@ -394,7 +443,7 @@ class FolderComparer:
                             similarity_score = self.calculate_duration_similarity(duration_diff)
                         else:
                             if file1.get(parameter) and file2.get(parameter):
-                                similarity_score = self.similar(str(file1[parameter]).lower(), str(file2[parameter]).lower())
+                                similarity_score = self.similar(str(file1[parameter]), str(file2[parameter]))
                             else:
                                 similarity_score = 0.0
                             if parameter == 'file':
