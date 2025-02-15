@@ -593,6 +593,8 @@ class FolderComparer:
                 folder_similarity['duration'] = compare_duration(files1, files2)
 
                 additional_metadata_scores = self.compare_additional_metadata(data1['files'], data2['files'])
+                folder_similarity['additional_metadata'] = additional_metadata_scores  # Added for additional metadata display
+
                 applicable_weights = {k: v for k, v in self.PARAMETER_WEIGHTS.items() if not (k == "file_hash" and not self.enable_hash)}
                 weighted_score = sum(folder_similarity.get(param, 0) * applicable_weights.get(param, 0) for param in applicable_weights)
                 total_additional_weight = len(additional_metadata_scores) * self.ADDITIONAL_METADATA_WEIGHT
