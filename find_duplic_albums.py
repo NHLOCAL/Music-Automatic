@@ -403,14 +403,26 @@ class FolderComparer:
     def find_similar_folders(self):
         similar_folders = {}
         for (folder_path, data1), (other_folder_path, data2) in combinations(self.folder_files.items(), 2):
-            if len(data1['files']) != len(data2['files']):
-                continue
             folder_similarity = {}
-            total_files = len(data1['files'])
-            matching_hashes = sum(
-                1 for file1, file2 in zip(data1['files'], data2['files'])
-                if file1.get('file_hash') == file2.get('file_hash')
-            )
+            
+            # בונים multiset (מילון של ספירת הופעות) עבור file_hash בכל תיקיה
+            def build_hash_multiset(files):
+                multiset = {}
+                for file_info in files:
+                    h = file_info.get('file_hash')
+                    if h:
+                        multiset[h] = multiset.get(h, 0) + 1
+                return multiset
+
+            multiset1 = build_hash_multiset(data1['files'])
+            multiset2 = build_hash_multiset(data2['files'])
+
+            # מחשבים את מספר הקבצים הכולל (נשתמש ב-max כדי להבטיח ערך בין 0 ל-1)
+            total_files = max(len(data1['files']), len(data2['files']))
+            matching_hashes = 0
+            # סופרים עבור כל האש שנמצאת בשתי התיקיות את מינימום ההופעות
+            for h in set(multiset1.keys()) & set(multiset2.keys()):
+                matching_hashes += min(multiset1[h], multiset2[h])
             file_hash_match_percentage = matching_hashes / total_files if total_files else 0.0
             folder_similarity['file_hash'] = file_hash_match_percentage
 
@@ -433,9 +445,16 @@ class FolderComparer:
                 file_adjustment = 1 - (max_file_similarity * self.REDUCTION_FACTOR) if max_file_similarity > self.GENERIC_SIMILARITY_THRESHOLD else 1
                 title_adjustment = 1 - (max_title_similarity * self.REDUCTION_FACTOR) if max_title_similarity > self.GENERIC_SIMILARITY_THRESHOLD else 1
 
+                # עבור שאר הפרמטרים, נשווה לפי רשימות ממוינות לפי שם הקובץ (לשאר ההשוואות, סדר הקבצים עדיין חשוב)
+                def normalize_filename(fname):
+                    return re.sub(r'\s+', ' ', fname).strip().lower()
+
+                files1 = sorted(data1['files'], key=lambda x: normalize_filename(x.get('file', '')))
+                files2 = sorted(data2['files'], key=lambda x: normalize_filename(x.get('file', '')))
+
                 for parameter in ['file', 'title', 'album', 'artist', 'album_art', 'duration']:
                     total_similarity = 0
-                    for file1, file2 in zip(data1['files'], data2['files']):
+                    for file1, file2 in zip(files1, files2):
                         if parameter == 'album_art':
                             similarity_score = 1.0 if data1.get('album_art') and data2.get('album_art') and data1['album_art'] == data2['album_art'] else 0.0
                         elif parameter == 'duration':
