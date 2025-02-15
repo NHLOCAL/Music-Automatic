@@ -11,11 +11,11 @@ from collections import defaultdict
 from itertools import combinations
 import concurrent.futures
 import random
-
+from send2trash import send2trash
 from mutagen.easyid3 import EasyID3
 from mutagen import File
 from PIL import Image
-from rapidfuzz import fuzz  # משתמשים ב־rapidfuzz להשוואות מהירות של מחרוזות
+from rapidfuzz import fuzz
 
 # ייבוא הפונקציות לטיפול בטקסט ג'יבריש
 from jibrish_to_hebrew import fix_jibrish, check_jibrish
@@ -874,31 +874,32 @@ class SelectAndThrow(FolderComparer):
             print("לא נמצאו תיקיות למחיקה לפי רמת הדמיון והאיכות שצוינו.")
             logging.info("No folders found for deletion based on similarity and quality thresholds.")
             return
-        print(colors.YELLOW + "\nדוח תיקיות לסקירה ומחיקה אפשרית:" + colors.RESET)
+        print(colors.YELLOW + "\nדוח תיקיות לסקירה והעברה לסל המחזור אפשרית:" + colors.RESET)
         for folder_to_delete, better_folder, quality_to_delete, better_quality, similarity_score in folders_to_delete_report:
-            print(f"- תיקייה למחיקה: '{folder_to_delete}' (ציון איכות: {quality_to_delete:.2f}%, ציון דמיון: {similarity_score:.2f}%)")
+            print(f"- תיקייה להעברה לסל המחזור: '{folder_to_delete}' (ציון איכות: {quality_to_delete:.2f}%, ציון דמיון: {similarity_score:.2f}%)")
             print(f"  תיקייה עדיפה: '{better_folder}' (ציון איכות: {better_quality:.2f}%)")
-        confirmation = input(colors.YELLOW + "\nהאם ברצונך למחוק את התיקיות המיותרות שצוינו לעיל? (y/n): " + colors.RESET).strip().lower()
+        confirmation = input(colors.YELLOW + "\nהאם ברצונך להעביר את התיקיות המיותרות שצוינו לעיל לסל המחזור? (y/n): " + colors.RESET).strip().lower()
         if confirmation == 'y':
-            deleted_folders = []
+            trashed_folders = []
             for folder_to_delete, _, _, _, _ in folders_to_delete_report:
                 try:
-                    shutil.rmtree(folder_to_delete)
-                    deleted_folders.append(folder_to_delete)
-                    print(colors.RED + f"נמחקה תיקייה: '{folder_to_delete}'" + colors.RESET)
-                    logging.warning(f"Deleted folder: {folder_to_delete}")
+                    send2trash(folder_to_delete)  # שימוש ב-send2trash במקום shutil.rmtree
+                    trashed_folders.append(folder_to_delete)
+                    print(colors.RED + f"הועברה לסל המחזור תיקייה: '{folder_to_delete}'" + colors.RESET)
+                    logging.warning(f"Moved to trash: {folder_to_delete}")
                 except Exception as e:
-                    print(colors.RED + f"שגיאה במחיקת תיקייה '{folder_to_delete}': {e}" + colors.RESET)
-                    logging.error(f"Error deleting folder '{folder_to_delete}': {e}", exc_info=True)
-            if deleted_folders:
-                print(colors.GREEN + "המחיקה הושלמה." + colors.RESET)
-                logging.info("Deletion process completed.")
+                    print(colors.RED + f"שגיאה בהעברת תיקייה '{folder_to_delete}' לסל המחזור: {e}" + colors.RESET)
+                    logging.error(f"Error moving folder '{folder_to_delete}' to trash: {e}", exc_info=True)
+            if trashed_folders:
+                print(colors.GREEN + "ההעברה לסל המחזור הושלמה." + colors.RESET)
+                logging.info("Trash process completed.")
             else:
-                print("לא נמחקו תיקיות.")
-                logging.info("No folders were deleted.")
+                print("לא הועברו תיקיות לסל המחזור.")
+                logging.info("No folders were moved to trash.")
         else:
-            print("המחיקה בוטלה על ידי המשתמש.")
-            logging.info("Deletion cancelled by user.")
+            print("ההעברה לסל המחזור בוטלה על ידי המשתמש.")
+            logging.info("Trash process cancelled by user.")
+
 
 
 if __name__ == "__main__":
