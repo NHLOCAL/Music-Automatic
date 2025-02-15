@@ -19,6 +19,11 @@ from PIL import Image
 from rapidfuzz import fuzz
 from functools import lru_cache  # ליצירת caching לחישובי דמיון
 
+# הוספת יבוא עבור חילוץ תמונת אלבום מוטמעת
+from mutagen.mp3 import MP3
+from mutagen.flac import FLAC
+from mutagen.id3 import ID3, APIC
+
 # ייבוא הפונקציות לטיפול בטקסט ג'יבריש
 from jibrish_to_hebrew import fix_jibrish, check_jibrish
 
@@ -228,6 +233,8 @@ class FolderComparer:
                     'size_mb': self.get_file_size_mb(filepath)
                 })
 
+            # זיהוי תמונת אלבום – ניסיון ראשון על ידי חיפוש קבצי תמונה חיצוניים,
+            # ואם לא נמצא, ניסיון חילוץ תמונה מוטמעת מקבצי המוזיקה.
             album_art_hash = self.extract_album_art(root)
             folder_name = os.path.basename(root)
             parent_folder = os.path.basename(os.path.dirname(root))
@@ -398,10 +405,12 @@ class FolderComparer:
             logging.error(f"Error extracting metadata from {filepath}: {e}", exc_info=True)
             return {}
 
+    # עדכון: הוספת תמיכה בזיהוי תמונת אלבום גם מתוך קבצי תמונה חיצוניים וגם מתוך המטאדאטה המוטמעת
     def extract_album_art(self, folder_path):
         if folder_path in self.album_art_cache:
             return self.album_art_cache[folder_path]
 
+        # ניסיון חיפוש קובצי תמונה נפוצים בתיקייה
         album_art_files = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png'}
         for file in os.listdir(folder_path):
             if file.lower() in album_art_files:
@@ -415,8 +424,33 @@ class FolderComparer:
                         return art_hash
                 except Exception as e:
                     logging.error(f"Error processing image {file} in {folder_path}: {e}", exc_info=True)
-                    continue
+        # אם לא נמצא קובץ תמונה, ניסיון חילוץ תמונה מוטמעת מקבצי מוזיקה
+        for file in os.listdir(folder_path):
+            if file.lower().endswith(('.mp3', '.flac', '.aac', '.m4a', '.ogg', '.wav')):
+                file_path = os.path.join(folder_path, file)
+                embedded_art_hash = FolderComparer.extract_embedded_album_art(file_path)
+                if embedded_art_hash:
+                    self.album_art_cache[folder_path] = embedded_art_hash
+                    return embedded_art_hash
+
         self.album_art_cache[folder_path] = None
+        return None
+
+    @staticmethod
+    def extract_embedded_album_art(file_path):
+        try:
+            if file_path.lower().endswith('.mp3'):
+                audio = MP3(file_path, ID3=ID3)
+                if audio.tags:
+                    for tag in audio.tags.values():
+                        if isinstance(tag, APIC):
+                            return hashlib.md5(tag.data).hexdigest()
+            elif file_path.lower().endswith('.flac'):
+                audio = FLAC(file_path)
+                if audio.pictures:
+                    return hashlib.md5(audio.pictures[0].data).hexdigest()
+        except Exception as e:
+            logging.error(f"Error extracting embedded album art from {file_path}: {e}", exc_info=True)
         return None
 
     @staticmethod
@@ -462,7 +496,6 @@ class FolderComparer:
         metadata_scores = {key: count / total_files for key, count in metadata_match_counts.items()}
         return metadata_scores
 
-    # עדכון: השוואת דמיון בין תיקיות לפי הפרמטרים עם סף מינימלי
     def find_similar_folders(self):
         similar_folders = {}
         for (folder_path, data1), (other_folder_path, data2) in combinations(self.folder_files.items(), 2):
@@ -517,7 +550,6 @@ class FolderComparer:
                     return score / total_files if total_files > 0 else 0.0
                 folder_similarity['file_size'] = compare_file_sizes(files1, files2)
 
-                # שימוש בהתאמות קיימות של file_similarity ו-title_similarity
                 file_similarity1 = data1.get('file_similarity', 0)
                 title_similarity1 = data1.get('title_similarity', 0)
                 file_similarity2 = data2.get('file_similarity', 0)
