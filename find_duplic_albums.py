@@ -366,7 +366,14 @@ class FolderComparer:
             if audio is None:
                 logging.warning(f"Could not read audio metadata from {filepath}")
                 return {}
-            metadata = {key: audio.get(key, [None])[0] for key in audio.keys()}
+            metadata = {}
+            for key in audio.keys():
+                value = audio.get(key, [None])[0]
+                if value is not None: # הוספת תנאי כדי למנוע שגיאה אם הערך הוא None
+                    metadata[key] = str(value) # המרת הערך למחרוזת
+                else:
+                    metadata[key] = None # שמירה כ-None אם הערך המקורי הוא None
+
             if audio.info and hasattr(audio.info, 'bitrate'):
                 metadata['bitrate'] = audio.info.bitrate // 1000
             else:
