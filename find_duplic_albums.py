@@ -418,6 +418,9 @@ class FolderComparer:
             else:
                 metadata['duration'] = None
             return metadata
+        except mutagen.mp3.HeaderNotFoundError: # לוכד את השגיאה הספציפית של MPEG frame sync
+            logging.warning(f"Error extracting metadata from {filepath}: can't sync to MPEG frame. Skipping metadata extraction for this file.")
+            return {} # מחזיר מילון ריק אם לא ניתן לחלץ מטא-דאטה
         except Exception as e:
             logging.error(f"Error extracting metadata from {filepath}: {e}", exc_info=True)
             return {}
