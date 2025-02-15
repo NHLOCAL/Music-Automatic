@@ -614,22 +614,24 @@ class FolderComparer:
         )
         for folder_pair, similarities in self.sorted_similar_folders:
             folder_path, other_folder_path = folder_pair
-            logging.info(f"Found similar folders: {folder_path} and {other_folder_path} with similarity score: {similarities.get('weighted_score', 0):.2f}%")
+            similarity_score = round(similarities.get('weighted_score', 0), 2)
+            logging.info(f"Found similar folders: {folder_path} and {other_folder_path} with similarity score: {similarity_score:.2f}%")
+
             print(f"Folder: {folder_path}")
             print(f"Similar folder: {other_folder_path}")
             if similarities.get('identical'):
                 print("Folders are identical based on file hashes.")
-                print("Total Similarity Score: 100%")
+                print("Total Similarity Score: 100.00%")
             else:
                 print("Similarity scores:")
                 for parameter, score in similarities.items():
                     if parameter == 'additional_metadata':
                         print("- Additional Metadata Matches:")
                         for meta, meta_score in score.items():
-                            print(f"  - {meta.capitalize()}: {meta_score}")
+                            print(f"  - {meta.capitalize()}: {round(meta_score, 2)}")
                     elif parameter not in ['weighted_score', 'identical']:
-                        print(f"- {parameter.capitalize()}: {score}")
-                print(f"Total Similarity Score: {similarities['weighted_score']:.2f}%")
+                        print(f"- {parameter.capitalize()}: {round(score, 2)}")
+                print(f"Total Similarity Score: {similarity_score:.2f}%")
             print()
 
     def scan_music_library(self):
