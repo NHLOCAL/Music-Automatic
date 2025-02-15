@@ -48,15 +48,15 @@ class FolderComparer:
         self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
         self.REDUCTION_FACTOR = 0.5  # מקדם הפחתה לציון דמיון
         self.ADDITIONAL_METADATA_WEIGHT = 0.5
-        self.PARAMETER_WEIGHTS = {
-            'file_hash': 5.0,
-            'file_size': 1.0,    # משקל לגודל הקובץ
-            'file': 3.0,
-            'title': 2.5,
-            'album': 2.5,
-            'artist': 1.5,
-            'folder_name': 1.5,
-            'album_art': 1.0,
+        PARAMETER_WEIGHTS = {
+            'file_hash': 2.4,
+            'file_size': 0.7,
+            'file': 1.5,
+            'title': 1.5,
+            'album': 1.0,
+            'artist': 0.5,
+            'folder_name': 0.9,
+            'album_art': 0.5,
             'duration': 1.0
         }
         self.artists_map = self.load_artists_from_csv()
