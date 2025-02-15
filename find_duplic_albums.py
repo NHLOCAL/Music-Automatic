@@ -14,12 +14,13 @@ import random
 from send2trash import send2trash
 from mutagen.easyid3 import EasyID3
 from mutagen import File
+import mutagen  # הוספנו את השורה הזו כדי לתמוך בהפניות ל־mutagen
 from PIL import Image
 from rapidfuzz import fuzz
+from functools import lru_cache  # ליצירת caching לחישובי דמיון
 
 # ייבוא הפונקציות לטיפול בטקסט ג'יבריש
 from jibrish_to_hebrew import fix_jibrish, check_jibrish
-
 
 # קודי צבע ANSI עבור פלט מסוף
 class colors:
@@ -49,7 +50,7 @@ class FolderComparer:
         self.ADDITIONAL_METADATA_WEIGHT = 0.5
         self.PARAMETER_WEIGHTS = {
             'file_hash': 5.0,
-            'file_size': 1.0,    # חדש – משקל לגודל הקובץ
+            'file_size': 1.0,    # משקל לגודל הקובץ
             'file': 3.0,
             'title': 2.5,
             'album': 2.5,
@@ -67,7 +68,7 @@ class FolderComparer:
         self.organized_info = {}
         self.sorted_similar_folders = []
         self.album_art_cache = {}  # קאשינג לעיבוד תמונות
-        self.CHUNK_SIZE = 8192  # גודל קטע לקריאה מלאה (משמש בחלקים אחרים)
+        self.CHUNK_SIZE = 8192  # גודל קטע לקריאה מלאה
 
     def _setup_logging(self):
         logs_dir = 'logs'
@@ -129,29 +130,24 @@ class FolderComparer:
 
     def get_partial_file_hash(self, filepath):
         """
-        מחשבת חתימה חלקית לקריאה מהירה – משלבת את הקטע מההתחלה, מהסוף, וכמה קטעים אקראיים.
+        מחשבת חתימה חלקית לקריאה מהירה – משלבת קטע מההתחלה, מהסוף וכמה קטעים אקראיים.
         בנוסף, גודל הקובץ מתווסף כחלק מהחתימה.
         """
         try:
             file_size = os.path.getsize(filepath)
-            chunk_size = 4096  # קצב קריאה קטן יותר לחתימה חלקית
+            chunk_size = 4096
             data_segments = []
             with open(filepath, 'rb') as f:
-                # קטע מההתחלה
                 first_chunk = f.read(chunk_size)
                 data_segments.append(first_chunk)
-                # הוספת גודל הקובץ (כ-8 בתים)
                 file_size_bytes = file_size.to_bytes(8, byteorder='big', signed=False)
                 data_segments.append(file_size_bytes)
-                # קטע מהסוף
                 if file_size > chunk_size:
                     f.seek(max(file_size - chunk_size, 0))
                     last_chunk = f.read(chunk_size)
                     data_segments.append(last_chunk)
-                # קטעים אקראיים – בודקים אם יש מספיק מקום
                 num_random_chunks = 2
                 if file_size > 2 * chunk_size:
-                    # השתמש ב־PRNG עם זרע המבוסס על גודל הקובץ וחתימת הקטע הראשון
                     seed_value = int(hashlib.md5(first_chunk).hexdigest(), 16) ^ file_size
                     rnd = random.Random(seed_value)
                     for i in range(num_random_chunks):
@@ -159,7 +155,6 @@ class FolderComparer:
                         f.seek(pos)
                         random_chunk = f.read(chunk_size)
                         data_segments.append(random_chunk)
-                # איחוד כל הקטעים
                 combined = b"".join(data_segments)
                 final_hash = hashlib.sha256(combined).hexdigest()
                 return final_hash
@@ -169,20 +164,13 @@ class FolderComparer:
 
     def get_file_hash(self, filepath):
         """
-        אם בדיקת האש פעילה – משתמשים באש חלקי (partial hash)
-        אחרת, מחזירים None.
+        אם בדיקת האש פעילה – משתמשים ב-hash חלקי, אחרת מחזירים None.
         """
         if not self.enable_hash:
-            try:
-                # במקום להחזיר גודל קובץ, נחזיר None כאשר בדיקת האש מבוטלת
-                return None
-            except Exception as e:
-                logging.error(f"Error in disabled hash mode for {filepath}: {e}")
-                return None
+            return None
         else:
             return self.get_partial_file_hash(filepath)
 
-    # פונקציה רקורסיבית לסריקת תיקיות באמצעות os.scandir
     def recursive_scan(self, root_dir):
         yield root_dir
         try:
@@ -193,7 +181,6 @@ class FolderComparer:
         except Exception as e:
             logging.error(f"Error scanning directory {root_dir}: {e}")
 
-    # שיפור: שימוש ב-os.scandir לבניית מבנה תיקיות
     def build_folder_structure(self, root_dir):
         for folder in self.recursive_scan(root_dir):
             try:
@@ -206,7 +193,6 @@ class FolderComparer:
             except Exception as e:
                 logging.error(f"Error processing folder {folder}: {e}")
 
-    # עיבוד תיקייה בודדת בסריקת ספריית מוזיקה – משמש בסריקה במקביל
     def process_music_folder(self, root):
         try:
             with os.scandir(root) as it:
@@ -284,7 +270,6 @@ class FolderComparer:
             logging.error(f"Error processing folder {root}: {e}")
             return None
 
-    # שימוש ב־ThreadPoolExecutor לעיבוד תיקיות במקביל בעת קבלת רשימת הקבצים
     def get_file_lists(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as executor:
             futures = []
@@ -310,21 +295,19 @@ class FolderComparer:
                         if self.log_level.upper() == "DEBUG":
                             logging.debug(f"Fixed gibberish in title in file {file_path}.")
                     titles.append(title)
-            except mutagen.id3._util.ID3NoHeaderError: # לוכד את השגיאה הספציפית
+            except mutagen.id3._util.ID3NoHeaderError:
                 logging.warning(f"Could not read ID3 tags from file: {file_path}. Skipping EasyID3 processing for this file.")
-                title = None # מגדיר title ל-None כדי למנוע שגיאות בהמשך
-            except Exception as e: # לוכד שגיאות אחרות בקריאת EasyID3
+                title = None
+            except Exception as e:
                 logging.error(f"Error processing {file} with EasyID3: {e}", exc_info=True)
-                title = None # מגדיר title ל-None כדי למנוע שגיאות בהמשך
+                title = None
 
             try:
-                audio = EasyID3(file_path) # מנסה שוב EasyID3 - אפשר לאחד את הניסיונות לקריאה
+                audio = EasyID3(file_path)
                 artist = audio.get('artist', [None])[0]
                 album = audio.get('album', [None])[0]
-                # title כבר נקרא למעלה, אין צורך לקרוא שוב אלא אם לא הצלחנו לקרוא אותו קודם
                 if title is None:
                     title = audio.get('title', [None])[0]
-
 
                 for key, value in [('artist', artist), ('album', album), ('title', title)]:
                     if value and check_jibrish(value):
@@ -352,9 +335,9 @@ class FolderComparer:
                     'extension': os.path.splitext(file)[1].lower(),
                     'size_mb': self.get_file_size_mb(file_path)
                 })
-            except mutagen.id3._util.ID3NoHeaderError: # לוכד את השגיאה שוב, אם חוזרת פה
+            except mutagen.id3._util.ID3NoHeaderError:
                 logging.warning(f"Could not read ID3 tags again from file: {file_path}. Skipping file metadata.")
-                file_list.append({ # עדיין מוסיף רשומה, אבל עם מידע חלקי
+                file_list.append({
                     'file': file,
                     'artist': None,
                     'album': None,
@@ -366,10 +349,9 @@ class FolderComparer:
                     'extension': os.path.splitext(file)[1].lower(),
                     'size_mb': self.get_file_size_mb(file_path)
                 })
-
-            except Exception as e: # לוכד שגיאות אחרות בעיבוד כללי של הקובץ
+            except Exception as e:
                 logging.error(f"Error processing {file}: {e}", exc_info=True)
-                file_list.append({ # כמו למעלה, מוסיף רשומה עם מידע חלקי
+                file_list.append({
                     'file': file,
                     'artist': None,
                     'album': None,
@@ -382,8 +364,7 @@ class FolderComparer:
                     'size_mb': self.get_file_size_mb(file_path)
                 })
 
-
-        title_similarity = self.check_generic_names(titles) if titles and len([t for t in titles if t is not None]) > 1 else 0.0 # מוודא שיש לפחות 2 כותרים לא None לפני חישוב דמיון
+        title_similarity = self.check_generic_names(titles) if titles and len([t for t in titles if t is not None]) > 1 else 0.0
         file_similarity = self.check_generic_names(files_in_dir)
 
         return {
@@ -404,10 +385,7 @@ class FolderComparer:
             metadata = {}
             for key in audio.keys():
                 value = audio.get(key, [None])[0]
-                if value is not None: # הוספת תנאי כדי למנוע שגיאה אם הערך הוא None
-                    metadata[key] = str(value) # המרת הערך למחרוזת
-                else:
-                    metadata[key] = None # שמירה כ-None אם הערך המקורי הוא None
+                metadata[key] = str(value) if value is not None else None
 
             if audio.info and hasattr(audio.info, 'bitrate'):
                 metadata['bitrate'] = audio.info.bitrate // 1000
@@ -418,15 +396,14 @@ class FolderComparer:
             else:
                 metadata['duration'] = None
             return metadata
-        except mutagen.mp3.HeaderNotFoundError: # לוכד את השגיאה הספציפית של MPEG frame sync
+        except mutagen.mp3.HeaderNotFoundError:
             logging.warning(f"Error extracting metadata from {filepath}: can't sync to MPEG frame. Skipping metadata extraction for this file.")
-            return {} # מחזיר מילון ריק אם לא ניתן לחלץ מטא-דאטה
+            return {}
         except Exception as e:
             logging.error(f"Error extracting metadata from {filepath}: {e}", exc_info=True)
             return {}
 
     def extract_album_art(self, folder_path):
-        # בדיקה אם תוצאת עיבוד האלבום כבר קיימת בקאש
         if folder_path in self.album_art_cache:
             return self.album_art_cache[folder_path]
 
@@ -434,26 +411,27 @@ class FolderComparer:
         for file in os.listdir(folder_path):
             if file.lower() in album_art_files:
                 img_path = os.path.join(folder_path, file)
-                try: # הוספת try-except כאן
+                try:
                     with Image.open(img_path) as img:
                         img = img.resize((100, 100))
                         img_bytes = img.tobytes()
                         art_hash = hashlib.md5(img_bytes).hexdigest()
                         self.album_art_cache[folder_path] = art_hash
                         return art_hash
-                except PIL.UnidentifiedImageError as e: # לוכד את השגיאה הספציפית של PIL
-                    logging.warning(f"Error processing image {file} in {folder_path}: cannot identify image file. Skipping this image.")
-                    logging.debug(f"Detailed error: {e}") # הוספת debug log למידע נוסף על השגיאה
-                    continue # מדלג לתמונה הבאה או לתיקייה הבאה
-                except Exception as e: # לוכד שגיאות אחרות בעיבוד תמונה
+                except Exception as e:
                     logging.error(f"Error processing image {file} in {folder_path}: {e}", exc_info=True)
-                    continue # מדלג לתמונה הבאה או לתיקייה הבאה
+                    continue
         self.album_art_cache[folder_path] = None
         return None
 
-    # החלפת השוואת מחרוזות עם SequenceMatcher בהשוואה מהירה עם rapidfuzz
-    def similar(self, a, b):
+    # שימוש ב-caching עבור חישוב דמיון מחרוזות – כך שחישובים חוזרים לא יחושבו מחדש
+    @staticmethod
+    @lru_cache(maxsize=10000)
+    def cached_similar(a: str, b: str) -> float:
         return fuzz.ratio(a.lower(), b.lower()) / 100.0
+
+    def similar(self, a, b):
+        return FolderComparer.cached_similar(a, b)
 
     def check_generic_names(self, files_list):
         files_list_cleaned = [re.sub(r'\d', '', os.path.splitext(i)[0]) for i in files_list]
@@ -490,12 +468,23 @@ class FolderComparer:
         metadata_scores = {key: count / total_files for key, count in metadata_match_counts.items()}
         return metadata_scores
 
+    # שימוש ב-pre-filtering על מנת לצמצם את מספר הזוגות הנבדקים
     def find_similar_folders(self):
         similar_folders = {}
         for (folder_path, data1), (other_folder_path, data2) in combinations(self.folder_files.items(), 2):
+            # Pre-filter 1: אם הפרש במספר הקבצים גדול מ-2, דילוג על הזוג
+            if abs(len(data1['files']) - len(data2['files'])) > 2:
+                continue
+            # Pre-filter 2: אם בשתי התיקיות קיימת מטא-דאטה לאלבום, ובדמיון בין שמות האלבום נמוך מ-50%
+            album1 = data1.get('album') or ""
+            album2 = data2.get('album') or ""
+            if album1 and album2:
+                album_similarity = self.similar(album1, album2)
+                if album_similarity < 0.5:
+                    continue
+
             folder_similarity = {}
-            
-            # בונים multiset (מילון של ספירת הופעות) עבור file_hash בכל תיקיה
+
             def build_hash_multiset(files):
                 multiset = {}
                 for file_info in files:
@@ -507,7 +496,6 @@ class FolderComparer:
             multiset1 = build_hash_multiset(data1['files'])
             multiset2 = build_hash_multiset(data2['files'])
 
-            # מחשבים את מספר הקבצים הכולל (נשתמש ב-max כדי להבטיח ערך בין 0 ל-1)
             total_files = max(len(data1['files']), len(data2['files']))
             matching_hashes = 0
             for h in set(multiset1.keys()) & set(multiset2.keys()):
@@ -540,13 +528,12 @@ class FolderComparer:
                 files1 = sorted(data1['files'], key=lambda x: normalize_filename(x.get('file', '')))
                 files2 = sorted(data2['files'], key=lambda x: normalize_filename(x.get('file', '')))
 
-                # הוספת בדיקת דמיון לגודל הקובץ (ב-MB)
                 def compare_file_sizes(files1, files2):
                     total_similarity = 0
                     for f1, f2 in zip(files1, files2):
                         size1 = f1.get('size_mb', 0)
                         size2 = f2.get('size_mb', 0)
-                        tolerance = 0.1  # הבדל עד 0.1 MB נחשב לתואם
+                        tolerance = 0.1
                         if abs(size1 - size2) <= tolerance:
                             similarity = 1.0
                         else:
@@ -577,8 +564,6 @@ class FolderComparer:
                     folder_similarity[parameter] = total_similarity / total_files if total_files else 0.0
 
                 additional_metadata_scores = self.compare_additional_metadata(data1['files'], data2['files'])
-                
-                # חישוב ציון משוקלל תוך התעלמות מציון file_hash כאשר בדיקת האש מבוטלת
                 applicable_weights = {k: v for k, v in self.PARAMETER_WEIGHTS.items() if not (k == "file_hash" and not self.enable_hash)}
                 weighted_score = sum(folder_similarity.get(param, 0) * applicable_weights.get(param, 0) for param in applicable_weights)
                 total_additional_weight = len(additional_metadata_scores) * self.ADDITIONAL_METADATA_WEIGHT
@@ -719,7 +704,7 @@ class SelectQuality(FolderComparer):
 
         quality_breakdown = {
             'Hebrew Metadata Score': hebrew_metadata_score * 100,
-            'Metadata Completeness Score': metadata_completeness_score * 100,
+            'Metadata Completeness Score': metadata_complete_count * 100 / total_files if total_files else 0,
             'Album Art Score': album_art_score * 100,
             'Bitrate Score': bitrate_score * 100,
             'Repetitive Names Score': repetitive_names_score * 100,
@@ -933,7 +918,7 @@ class SelectAndThrow(FolderComparer):
             trashed_folders = []
             for folder_to_delete, _, _, _, _ in folders_to_delete_report:
                 try:
-                    send2trash(folder_to_delete)  # שימוש ב-send2trash במקום shutil.rmtree
+                    send2trash(folder_to_delete)
                     trashed_folders.append(folder_to_delete)
                     print(colors.RED + f"הועברה לסל המחזור תיקייה: '{folder_to_delete}'" + colors.RESET)
                     logging.warning(f"Moved to trash: {folder_to_delete}")
@@ -947,9 +932,8 @@ class SelectAndThrow(FolderComparer):
                 print("לא הועברו תיקיות לסל המחזור.")
                 logging.info("No folders were moved to trash.")
         else:
-            print("ההעברה לסל המחזור בוטלה על ידי המשתמש.")
+            print("העברת התיקיות לסל המחזור בוטלה על ידי המשתמש.")
             logging.info("Trash process cancelled by user.")
-
 
 
 if __name__ == "__main__":
