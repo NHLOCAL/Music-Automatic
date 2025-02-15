@@ -48,7 +48,8 @@ class FolderComparer:
         self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
         self.REDUCTION_FACTOR = 0.5  # מקדם הפחתה לציון דמיון
         self.ADDITIONAL_METADATA_WEIGHT = 0.5
-        PARAMETER_WEIGHTS = {
+        # הגדרת משקלי הפרמטרים כמאפיין של המחלקה
+        self.PARAMETER_WEIGHTS = {
             'file_hash': 2.4,
             'file_size': 0.7,
             'file': 1.5,
@@ -129,10 +130,6 @@ class FolderComparer:
             return 0
 
     def get_partial_file_hash(self, filepath):
-        """
-        מחשבת חתימה חלקית לקריאה מהירה – משלבת קטע מההתחלה, מהסוף וכמה קטעים אקראיים.
-        בנוסף, גודל הקובץ מתווסף כחלק מהחתימה.
-        """
         try:
             file_size = os.path.getsize(filepath)
             chunk_size = 4096
@@ -163,9 +160,6 @@ class FolderComparer:
             return None
 
     def get_file_hash(self, filepath):
-        """
-        אם בדיקת האש פעילה – משתמשים ב-hash חלקי, אחרת מחזירים None.
-        """
         if not self.enable_hash:
             return None
         else:
@@ -227,7 +221,8 @@ class FolderComparer:
                 file_hash = self.get_file_hash(filepath)
                 metadata_list.append({
                     'filename': file,
-                    'hash': file_hash,
+                    'file': file,
+                    'file_hash': file_hash,
                     'metadata': file_metadata,
                     'metadata_valid': metadata_valid,
                     'size_mb': self.get_file_size_mb(filepath)
@@ -424,7 +419,6 @@ class FolderComparer:
         self.album_art_cache[folder_path] = None
         return None
 
-    # שימוש ב-caching עבור חישוב דמיון מחרוזות – כך שחישובים חוזרים לא יחושבו מחדש
     @staticmethod
     @lru_cache(maxsize=10000)
     def cached_similar(a: str, b: str) -> float:
@@ -468,14 +462,13 @@ class FolderComparer:
         metadata_scores = {key: count / total_files for key, count in metadata_match_counts.items()}
         return metadata_scores
 
-    # שינוי מרכזי: ביצוע השוואת דמיון רק כאשר מספר קבצי השמע בתיקיות זהה לחלוטין
+    # עדכון: השוואת דמיון בין תיקיות לפי הפרמטרים עם סף מינימלי
     def find_similar_folders(self):
         similar_folders = {}
         for (folder_path, data1), (other_folder_path, data2) in combinations(self.folder_files.items(), 2):
             if len(data1['files']) != len(data2['files']):
                 continue
 
-            # Pre-filter 2: אם בשתי התיקיות קיימת מטא-דאטה לאלבום, ובדמיון בין שמות האלבום נמוך מ-50%
             album1 = data1.get('album') or ""
             album2 = data2.get('album') or ""
             if album1 and album2:
@@ -485,83 +478,87 @@ class FolderComparer:
 
             folder_similarity = {}
 
-            def build_hash_multiset(files):
-                multiset = {}
-                for file_info in files:
-                    h = file_info.get('file_hash')
-                    if h:
-                        multiset[h] = multiset.get(h, 0) + 1
-                return multiset
+            def normalize_filename(fname):
+                return re.sub(r'\s+', ' ', fname).strip().lower()
 
-            multiset1 = build_hash_multiset(data1['files'])
-            multiset2 = build_hash_multiset(data2['files'])
+            files1 = sorted(data1['files'], key=lambda x: normalize_filename(x.get('file', '')))
+            files2 = sorted(data2['files'], key=lambda x: normalize_filename(x.get('file', '')))
+            total_files = len(files1)
 
-            total_files = max(len(data1['files']), len(data2['files']))
-            matching_hashes = 0
-            for h in set(multiset1.keys()) & set(multiset2.keys()):
-                matching_hashes += min(multiset1[h], multiset2[h])
-            file_hash_match_percentage = matching_hashes / total_files if total_files else 0.0
-            folder_similarity['file_hash'] = file_hash_match_percentage
-
-            if file_hash_match_percentage == 1.0:
+            # 1. השוואת file_hash – התאמה מדויקת
+            def compare_file_hashes(files1, files2):
+                score = 0
+                for f1, f2 in zip(files1, files2):
+                    h1 = f1.get('file_hash')
+                    h2 = f2.get('file_hash')
+                    score += 1.0 if h1 and h2 and h1 == h2 else 0.0
+                return score / total_files if total_files > 0 else 0.0
+            folder_similarity['file_hash'] = compare_file_hashes(files1, files2)
+            if folder_similarity['file_hash'] == 1.0:
                 folder_similarity['identical'] = True
                 folder_similarity['weighted_score'] = 100.0
                 logging.info(f"Folders {folder_path} and {other_folder_path} are identical based on file hashes.")
             else:
+                # 2. השוואת folder_name – אם פחות מ-40% אז 0
                 folder_name_similarity = self.similar(os.path.basename(folder_path), os.path.basename(other_folder_path))
-                folder_similarity['folder_name'] = folder_name_similarity
+                folder_similarity['folder_name'] = folder_name_similarity if folder_name_similarity >= 0.4 else 0.0
 
+                # 3. השוואת file_size – התאמה של 95% לפחות
+                def compare_file_sizes(files1, files2):
+                    score = 0
+                    for f1, f2 in zip(files1, files2):
+                        size1 = f1.get('size_mb', 0)
+                        size2 = f2.get('size_mb', 0)
+                        if size1 > 0 and size2 > 0:
+                            ratio = min(size1, size2) / max(size1, size2)
+                            score += 1.0 if ratio >= 0.95 else 0.0
+                        else:
+                            score += 0.0
+                    return score / total_files if total_files > 0 else 0.0
+                folder_similarity['file_size'] = compare_file_sizes(files1, files2)
+
+                # שימוש בהתאמות קיימות של file_similarity ו-title_similarity
                 file_similarity1 = data1.get('file_similarity', 0)
                 title_similarity1 = data1.get('title_similarity', 0)
                 file_similarity2 = data2.get('file_similarity', 0)
                 title_similarity2 = data2.get('title_similarity', 0)
-
                 max_file_similarity = max(file_similarity1, file_similarity2)
                 max_title_similarity = max(title_similarity1, title_similarity2)
-
                 file_adjustment = 1 - (max_file_similarity * self.REDUCTION_FACTOR) if max_file_similarity > self.GENERIC_SIMILARITY_THRESHOLD else 1
                 title_adjustment = 1 - (max_title_similarity * self.REDUCTION_FACTOR) if max_title_similarity > self.GENERIC_SIMILARITY_THRESHOLD else 1
 
-                def normalize_filename(fname):
-                    return re.sub(r'\s+', ' ', fname).strip().lower()
-
-                files1 = sorted(data1['files'], key=lambda x: normalize_filename(x.get('file', '')))
-                files2 = sorted(data2['files'], key=lambda x: normalize_filename(x.get('file', '')))
-
-                def compare_file_sizes(files1, files2):
-                    total_similarity = 0
+                # 4. השוואת file, title, album, artist – סף מינימלי 40%
+                for parameter in ['file', 'title', 'album', 'artist']:
+                    total = 0
                     for f1, f2 in zip(files1, files2):
-                        size1 = f1.get('size_mb', 0)
-                        size2 = f2.get('size_mb', 0)
-                        tolerance = 0.1
-                        if abs(size1 - size2) <= tolerance:
-                            similarity = 1.0
-                        else:
-                            similarity = min(size1, size2) / max(size1, size2) if max(size1, size2) > 0 else 0
-                        total_similarity += similarity
-                    return total_similarity / len(files1) if files1 else 0
-
-                folder_similarity['file_size'] = compare_file_sizes(files1, files2)
-
-                for parameter in ['file', 'title', 'album', 'artist', 'album_art', 'duration']:
-                    total_similarity = 0
-                    for file1, file2 in zip(files1, files2):
-                        if parameter == 'album_art':
-                            similarity_score = 1.0 if data1.get('album_art') and data2.get('album_art') and data1['album_art'] == data2['album_art'] else 0.0
-                        elif parameter == 'duration':
-                            duration_diff = abs(file1['metadata'].get('duration', 0) - file2['metadata'].get('duration', 0))
-                            similarity_score = self.calculate_duration_similarity(duration_diff)
-                        else:
-                            if file1.get(parameter) and file2.get(parameter):
-                                similarity_score = self.similar(str(file1[parameter]), str(file2[parameter]))
-                            else:
-                                similarity_score = 0.0
+                        if f1.get(parameter) and f2.get(parameter):
+                            sim = self.similar(str(f1[parameter]), str(f2[parameter]))
+                            sim = sim if sim >= 0.4 else 0.0
                             if parameter == 'file':
-                                similarity_score *= file_adjustment
+                                sim *= file_adjustment
                             elif parameter == 'title':
-                                similarity_score *= title_adjustment
-                        total_similarity += similarity_score
-                    folder_similarity[parameter] = total_similarity / total_files if total_files else 0.0
+                                sim *= title_adjustment
+                        else:
+                            sim = 0.0
+                        total += sim
+                    folder_similarity[parameter] = total / total_files if total_files > 0 else 0.0
+
+                # 5. השוואת album_art – התאמה מדויקת
+                folder_similarity['album_art'] = 1.0 if data1.get('album_art') and data2.get('album_art') and data1['album_art'] == data2['album_art'] else 0.0
+
+                # 6. השוואת duration – התאמה של 95% לפחות
+                def compare_duration(files1, files2):
+                    score = 0
+                    for f1, f2 in zip(files1, files2):
+                        d1 = f1['metadata'].get('duration', 0)
+                        d2 = f2['metadata'].get('duration', 0)
+                        if d1 > 0 and d2 > 0:
+                            ratio = min(d1, d2) / max(d1, d2)
+                            score += 1.0 if ratio >= 0.95 else 0.0
+                        else:
+                            score += 0.0
+                    return score / total_files if total_files > 0 else 0.0
+                folder_similarity['duration'] = compare_duration(files1, files2)
 
                 additional_metadata_scores = self.compare_additional_metadata(data1['files'], data2['files'])
                 applicable_weights = {k: v for k, v in self.PARAMETER_WEIGHTS.items() if not (k == "file_hash" and not self.enable_hash)}
@@ -571,7 +568,6 @@ class FolderComparer:
                     weighted_score += meta_score * self.ADDITIONAL_METADATA_WEIGHT
                 max_possible_score = sum(applicable_weights.values()) + total_additional_weight
                 folder_similarity['weighted_score'] = (weighted_score / max_possible_score) * 100
-                logging.debug(f"Similarity score between {folder_path} and {other_folder_path}: {folder_similarity['weighted_score']:.2f}%")
 
             similar_folders[(folder_path, other_folder_path)] = folder_similarity
         return similar_folders
@@ -605,7 +601,6 @@ class FolderComparer:
             print()
 
     def scan_music_library(self):
-        results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as executor:
             futures = []
             for base_folder in self.folder_paths:
