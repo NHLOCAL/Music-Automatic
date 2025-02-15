@@ -14,7 +14,7 @@ import random
 from send2trash import send2trash
 from mutagen.easyid3 import EasyID3
 from mutagen import File
-import mutagen  # הוספנו את השורה הזו כדי לתמוך בהפניות ל־mutagen
+import mutagen  # נדרש לטיפול בשגיאות הקשורות ל-mutagen
 from PIL import Image
 from rapidfuzz import fuzz
 from functools import lru_cache  # ליצירת caching לחישובי דמיון
@@ -468,13 +468,13 @@ class FolderComparer:
         metadata_scores = {key: count / total_files for key, count in metadata_match_counts.items()}
         return metadata_scores
 
-    # שימוש ב-pre-filtering על מנת לצמצם את מספר הזוגות הנבדקים
+    # שינוי מרכזי: ביצוע השוואת דמיון רק כאשר מספר קבצי השמע בתיקיות זהה לחלוטין
     def find_similar_folders(self):
         similar_folders = {}
         for (folder_path, data1), (other_folder_path, data2) in combinations(self.folder_files.items(), 2):
-            # Pre-filter 1: אם הפרש במספר הקבצים גדול מ-2, דילוג על הזוג
-            if abs(len(data1['files']) - len(data2['files'])) > 2:
+            if len(data1['files']) != len(data2['files']):
                 continue
+
             # Pre-filter 2: אם בשתי התיקיות קיימת מטא-דאטה לאלבום, ובדמיון בין שמות האלבום נמוך מ-50%
             album1 = data1.get('album') or ""
             album2 = data2.get('album') or ""
@@ -926,7 +926,7 @@ class SelectAndThrow(FolderComparer):
                     print(colors.RED + f"שגיאה בהעברת תיקייה '{folder_to_delete}' לסל המחזור: {e}" + colors.RESET)
                     logging.error(f"Error moving folder '{folder_to_delete}' to trash: {e}", exc_info=True)
             if trashed_folders:
-                print(colors.GREEN + "ההעברה לסל המחזור הושלמה." + colors.RESET)
+                print(colors.GREEN + "העברת התיקיות לסל המחזור הושלמה." + colors.RESET)
                 logging.info("Trash process completed.")
             else:
                 print("לא הועברו תיקיות לסל המחזור.")
