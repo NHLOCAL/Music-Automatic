@@ -310,14 +310,21 @@ class FolderComparer:
                         if self.log_level.upper() == "DEBUG":
                             logging.debug(f"Fixed gibberish in title in file {file_path}.")
                     titles.append(title)
-            except Exception as e:
-                logging.error(f"Error processing {file}: {e}", exc_info=True)
+            except mutagen.id3._util.ID3NoHeaderError: # לוכד את השגיאה הספציפית
+                logging.warning(f"Could not read ID3 tags from file: {file_path}. Skipping EasyID3 processing for this file.")
+                title = None # מגדיר title ל-None כדי למנוע שגיאות בהמשך
+            except Exception as e: # לוכד שגיאות אחרות בקריאת EasyID3
+                logging.error(f"Error processing {file} with EasyID3: {e}", exc_info=True)
+                title = None # מגדיר title ל-None כדי למנוע שגיאות בהמשך
 
             try:
-                audio = EasyID3(file_path)
+                audio = EasyID3(file_path) # מנסה שוב EasyID3 - אפשר לאחד את הניסיונות לקריאה
                 artist = audio.get('artist', [None])[0]
                 album = audio.get('album', [None])[0]
-                title = audio.get('title', [None])[0]
+                # title כבר נקרא למעלה, אין צורך לקרוא שוב אלא אם לא הצלחנו לקרוא אותו קודם
+                if title is None:
+                    title = audio.get('title', [None])[0]
+
 
                 for key, value in [('artist', artist), ('album', album), ('title', title)]:
                     if value and check_jibrish(value):
@@ -345,10 +352,38 @@ class FolderComparer:
                     'extension': os.path.splitext(file)[1].lower(),
                     'size_mb': self.get_file_size_mb(file_path)
                 })
-            except Exception as e:
-                logging.error(f"Error processing {file}: {e}", exc_info=True)
+            except mutagen.id3._util.ID3NoHeaderError: # לוכד את השגיאה שוב, אם חוזרת פה
+                logging.warning(f"Could not read ID3 tags again from file: {file_path}. Skipping file metadata.")
+                file_list.append({ # עדיין מוסיף רשומה, אבל עם מידע חלקי
+                    'file': file,
+                    'artist': None,
+                    'album': None,
+                    'title': None,
+                    'bitrate': None,
+                    'duration': None,
+                    'metadata': {},
+                    'file_hash': None,
+                    'extension': os.path.splitext(file)[1].lower(),
+                    'size_mb': self.get_file_size_mb(file_path)
+                })
 
-        title_similarity = self.check_generic_names(titles) if titles else 0.0
+            except Exception as e: # לוכד שגיאות אחרות בעיבוד כללי של הקובץ
+                logging.error(f"Error processing {file}: {e}", exc_info=True)
+                file_list.append({ # כמו למעלה, מוסיף רשומה עם מידע חלקי
+                    'file': file,
+                    'artist': None,
+                    'album': None,
+                    'title': None,
+                    'bitrate': None,
+                    'duration': None,
+                    'metadata': {},
+                    'file_hash': None,
+                    'extension': os.path.splitext(file)[1].lower(),
+                    'size_mb': self.get_file_size_mb(file_path)
+                })
+
+
+        title_similarity = self.check_generic_names(titles) if titles and len([t for t in titles if t is not None]) > 1 else 0.0 # מוודא שיש לפחות 2 כותרים לא None לפני חישוב דמיון
         file_similarity = self.check_generic_names(files_in_dir)
 
         return {
