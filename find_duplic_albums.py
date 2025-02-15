@@ -170,14 +170,14 @@ class FolderComparer:
     def get_file_hash(self, filepath):
         """
         אם בדיקת האש פעילה – משתמשים באש חלקי (partial hash)
-        אחרת, מחזירים מחרוזת המבוססת על גודל הקובץ.
+        אחרת, מחזירים None.
         """
         if not self.enable_hash:
             try:
-                size = os.path.getsize(filepath)
-                return f"size:{size}"
+                # במקום להחזיר גודל קובץ, נחזיר None כאשר בדיקת האש מבוטלת
+                return None
             except Exception as e:
-                logging.error(f"Error getting file size for hash fallback {filepath}: {e}")
+                logging.error(f"Error in disabled hash mode for {filepath}: {e}")
                 return None
         else:
             return self.get_partial_file_hash(filepath)
@@ -527,14 +527,14 @@ class FolderComparer:
                     folder_similarity[parameter] = total_similarity / total_files if total_files else 0.0
 
                 additional_metadata_scores = self.compare_additional_metadata(data1['files'], data2['files'])
-                folder_similarity['additional_metadata'] = additional_metadata_scores
-
-                weighted_score = sum(folder_similarity.get(param, 0) * self.PARAMETER_WEIGHTS.get(param, 0)
-                                     for param in self.PARAMETER_WEIGHTS)
+                
+                # חישוב ציון משוקלל תוך התעלמות מציון file_hash כאשר בדיקת האש מבוטלת
+                applicable_weights = {k: v for k, v in self.PARAMETER_WEIGHTS.items() if not (k == "file_hash" and not self.enable_hash)}
+                weighted_score = sum(folder_similarity.get(param, 0) * applicable_weights.get(param, 0) for param in applicable_weights)
                 total_additional_weight = len(additional_metadata_scores) * self.ADDITIONAL_METADATA_WEIGHT
                 for meta_score in additional_metadata_scores.values():
                     weighted_score += meta_score * self.ADDITIONAL_METADATA_WEIGHT
-                max_possible_score = sum(self.PARAMETER_WEIGHTS.values()) + total_additional_weight
+                max_possible_score = sum(applicable_weights.values()) + total_additional_weight
                 folder_similarity['weighted_score'] = (weighted_score / max_possible_score) * 100
                 logging.debug(f"Similarity score between {folder_path} and {other_folder_path}: {folder_similarity['weighted_score']:.2f}%")
 
@@ -906,7 +906,7 @@ if __name__ == "__main__":
     parser.add_argument("folders", nargs="+", help="One or more folder paths to scan")
     parser.add_argument("-l", "--log-level", choices=["INFO", "DEBUG"], default="INFO", help="Set logging level")
     parser.add_argument("-b", "--bitrate", choices=["128", "high"], default="128", help="Preferred bitrate option")
-    parser.add_argument("--disable-hash", action="store_true", help="Disable file hash checking and rely on file size for similarity")
+    parser.add_argument("-d", "--disable-hash", action="store_true", help="Disable file hash checking and rely on file size for similarity")
     args = parser.parse_args()
 
     folder_paths = []
