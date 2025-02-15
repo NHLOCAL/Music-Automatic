@@ -430,16 +430,21 @@ class FolderComparer:
         album_art_files = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png'}
         for file in os.listdir(folder_path):
             if file.lower() in album_art_files:
-                try:
-                    img_path = os.path.join(folder_path, file)
+                img_path = os.path.join(folder_path, file)
+                try: # הוספת try-except כאן
                     with Image.open(img_path) as img:
                         img = img.resize((100, 100))
                         img_bytes = img.tobytes()
                         art_hash = hashlib.md5(img_bytes).hexdigest()
                         self.album_art_cache[folder_path] = art_hash
                         return art_hash
-                except Exception as e:
+                except PIL.UnidentifiedImageError as e: # לוכד את השגיאה הספציפית של PIL
+                    logging.warning(f"Error processing image {file} in {folder_path}: cannot identify image file. Skipping this image.")
+                    logging.debug(f"Detailed error: {e}") # הוספת debug log למידע נוסף על השגיאה
+                    continue # מדלג לתמונה הבאה או לתיקייה הבאה
+                except Exception as e: # לוכד שגיאות אחרות בעיבוד תמונה
                     logging.error(f"Error processing image {file} in {folder_path}: {e}", exc_info=True)
+                    continue # מדלג לתמונה הבאה או לתיקייה הבאה
         self.album_art_cache[folder_path] = None
         return None
 
