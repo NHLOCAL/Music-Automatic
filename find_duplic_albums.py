@@ -49,7 +49,7 @@ class FolderComparer:
         self.LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
         self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini'}
         self.SIMILARITY_THRESHOLD = 0.8
-        self.MINIMAL_SIMILARITY = 40.0  # אחוז דמיון מינימלי לתצוגה
+        self.MINIMAL_SIMILARITY = 50.0  # אחוז דמיון מינימלי לתצוגה
         self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
         self.REDUCTION_FACTOR = 0.5  # מקדם הפחתה לציון דמיון
         self.ADDITIONAL_METADATA_WEIGHT = 0.5
