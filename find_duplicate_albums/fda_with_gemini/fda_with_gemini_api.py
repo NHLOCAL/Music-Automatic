@@ -8,7 +8,7 @@ import requests
 from io import BytesIO
 from PIL import Image
 # Correct import to point to the file in the parent directory
-from find_duplic_albums import FolderComparer, SelectQuality, colors, MergeFolders, SelectAndThrow
+from duplicate_detector import FolderComparer, SelectQuality, colors, MergeFolders, SelectAndThrow
 import re # Import the regular expression module
 import logging # Import logging
 import datetime  # Import datetime

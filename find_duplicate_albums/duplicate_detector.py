@@ -3,6 +3,7 @@ import csv
 import json
 import hashlib
 import shutil
+from pathlib import Path
 import re
 import logging
 import datetime
@@ -43,8 +44,9 @@ class FolderComparer:
         self.folder_paths = folder_paths
         self.folder_files = {}
         self.music_data = {}
-        self.DATA_FILE = "music_data.json"
-        self.CSV_FILE = "singer-list.csv"
+        DATA_DIR = Path("data") 
+        self.DATA_FILE = DATA_DIR / "music_data.json"
+        self.CSV_FILE = DATA_DIR / "singer-list.csv"
         self.ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
         self.LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
         self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini'}
