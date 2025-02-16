@@ -1006,11 +1006,16 @@ if __name__ == "__main__":
 
     comparer.view_result()
 
-    user_input = input("\nהאם ברצונך למזג את התיקיות? (y/n): ").strip().lower()
-    if user_input == 'y':
+    user_input_merge = input("\nהאם ברצונך למזג את התיקיות הדומות? (y/n): ").strip().lower()
+    if user_input_merge == 'y':
         merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders, log_level)
         merger.merge()
-        similarity_threshold_delete_input = input("הכנס את אחוז ההתאמה המינימלי למחיקת תיקיות (לדוגמה, 80): ").strip()
+        print("מיזוג התיקיות הושלם.")
+    else:
+        print("מיזוג התיקיות בוטל.")
+
+    similarity_threshold_delete_input = input("הכנס את אחוז ההתאמה המינימלי למחיקת תיקיות דומות (לדוגמה, 80, או השאר ריק לדילוג על מחיקה): ").strip()
+    if similarity_threshold_delete_input:
         try:
             similarity_threshold_delete = float(similarity_threshold_delete_input)
             if not 0 <= similarity_threshold_delete <= 100:
@@ -1022,5 +1027,4 @@ if __name__ == "__main__":
         selecter.delete()
         print("המחיקה הושלמה (ראה דוח מחיקה למעלה).")
     else:
-        print("מיזוג התיקיות בוטל.")
-        print("המחיקה בוטלה.")
+        print("דילוג על שלב המחיקה.")
