@@ -49,18 +49,19 @@ class FolderComparer:
         self.LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
         self.IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini'}
         self.SIMILARITY_THRESHOLD = 0.8
-        self.MINIMAL_SIMILARITY = 50.0  # אחוז דמיון מינימלי לתצוגה
+        self.MINIMAL_SIMILARITY = 40.0  # אחוז דמיון מינימלי לתצוגה
         self.GENERIC_SIMILARITY_THRESHOLD = 0.7  # סף לדמיון גבוה
         self.REDUCTION_FACTOR = 0.5  # מקדם הפחתה לציון דמיון
-        self.ADDITIONAL_METADATA_WEIGHT = 0.5
-        # הגדרת משקלי הפרמטרים כמאפיין של המחלקה
+        self.ADDITIONAL_METADATA_WEIGHT = 0.3  # עדכון: משקל נמוך יותר עבור additional_metadata
+        # הגדרת משקלי הפרמטרים הראשיים כך שסך הכל יהיה 10, עם ציון 0.5 עבור artist ו-albumartist
         self.PARAMETER_WEIGHTS = {
-            'file_hash': 2.4,
+            'file_hash': 2.2,
             'file_size': 0.7,
-            'file': 1.5,
-            'title': 1.5,
-            'album': 1.0,
+            'file': 1.4,
+            'title': 1.4,
+            'album': 0.9,
             'artist': 0.5,
+            'albumartist': 0.5,
             'folder_name': 0.9,
             'album_art': 0.5,
             'duration': 1.0
@@ -257,12 +258,20 @@ class FolderComparer:
                     album = file_meta['metadata']['album'].strip()
                     break
 
+            # הוספת חילוץ של albumartist מתוך המטאדאטה
+            albumartist = None
+            for file_meta in metadata_list:
+                if file_meta['metadata'].get('albumartist'):
+                    albumartist = file_meta['metadata']['albumartist'].strip()
+                    break
+
             folder_data = {
                 'path': root,
                 'folder_name': folder_name,
                 'parent_folder': parent_folder,
                 'artist': artist,
                 'album': album,
+                'albumartist': albumartist,
                 'files': metadata_list,
                 'album_art': album_art_hash
             }
@@ -329,6 +338,7 @@ class FolderComparer:
                     'file': file,
                     'artist': artist,
                     'album': album,
+                    'albumartist': metadata.get('albumartist') if metadata.get('albumartist') else None,
                     'title': title,
                     'bitrate': metadata.get('bitrate'),
                     'duration': metadata.get('duration'),
@@ -343,6 +353,7 @@ class FolderComparer:
                     'file': file,
                     'artist': None,
                     'album': None,
+                    'albumartist': None,
                     'title': None,
                     'bitrate': None,
                     'duration': None,
@@ -357,6 +368,7 @@ class FolderComparer:
                     'file': file,
                     'artist': None,
                     'album': None,
+                    'albumartist': None,
                     'title': None,
                     'bitrate': None,
                     'duration': None,
@@ -484,7 +496,7 @@ class FolderComparer:
         for file_info1, file_info2 in zip(files1, files2):
             metadata1 = file_info1.get('metadata', {})
             metadata2 = file_info2.get('metadata', {})
-            common_keys = set(metadata1.keys()) & set(metadata2.keys()) - {'artist', 'album', 'title', 'bitrate', 'duration'}
+            common_keys = set(metadata1.keys()) & set(metadata2.keys()) - {'artist', 'album', 'title', 'bitrate', 'duration', 'albumartist'}
             for key in common_keys:
                 value1, value2 = metadata1.get(key), metadata2.get(key)
                 if value1 and value2:
@@ -559,8 +571,8 @@ class FolderComparer:
                 file_adjustment = 1 - (max_file_similarity * self.REDUCTION_FACTOR) if max_file_similarity > self.GENERIC_SIMILARITY_THRESHOLD else 1
                 title_adjustment = 1 - (max_title_similarity * self.REDUCTION_FACTOR) if max_title_similarity > self.GENERIC_SIMILARITY_THRESHOLD else 1
 
-                # 4. השוואת file, title, album, artist – סף מינימלי 40%
-                for parameter in ['file', 'title', 'album', 'artist']:
+                # 4. השוואת file, title, album, artist, albumartist – סף מינימלי 40%
+                for parameter in ['file', 'title', 'album', 'artist', 'albumartist']:
                     total = 0
                     for f1, f2 in zip(files1, files2):
                         if f1.get(parameter) and f2.get(parameter):
@@ -593,7 +605,7 @@ class FolderComparer:
                 folder_similarity['duration'] = compare_duration(files1, files2)
 
                 additional_metadata_scores = self.compare_additional_metadata(data1['files'], data2['files'])
-                folder_similarity['additional_metadata'] = additional_metadata_scores  # Added for additional metadata display
+                folder_similarity['additional_metadata'] = additional_metadata_scores  # הוספת הצגה של מטאדאטה נוספת
 
                 applicable_weights = {k: v for k, v in self.PARAMETER_WEIGHTS.items() if not (k == "file_hash" and not self.enable_hash)}
                 weighted_score = sum(folder_similarity.get(param, 0) * applicable_weights.get(param, 0) for param in applicable_weights)
