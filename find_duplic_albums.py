@@ -39,7 +39,7 @@ class colors:
 
 
 class FolderComparer:
-    def __init__(self, folder_paths, preferred_bitrate, log_level, enable_hash=True):
+    def __init__(self, folder_paths, preferred_bitrate, log_level, enable_hash=True, force_rescan=False):
         self.folder_paths = folder_paths
         self.folder_files = {}
         self.music_data = {}
@@ -70,6 +70,7 @@ class FolderComparer:
         self.preferred_bitrate = preferred_bitrate
         self.log_level = log_level
         self.enable_hash = enable_hash  # מאפשר/מבטל בדיקת האש
+        self.force_rescan = force_rescan  # פרמטר חדש להגדרת סריקה מחדש כפויה
         self._setup_logging()
         self.load_music_data()
         self.organized_info = {}
@@ -202,9 +203,12 @@ class FolderComparer:
                 return None
 
             folder_hash = hashlib.md5(root.encode('utf-8')).hexdigest()
-            if folder_hash in self.music_data:
+            if folder_hash in self.music_data and not self.force_rescan:  # הוספת תנאי force_rescan
                 logging.info(f"Skipping already scanned folder: {root}")
                 return None
+            elif folder_hash in self.music_data and self.force_rescan:
+                logging.info(f"Force rescan for folder: {root}")
+
 
             metadata_list = []
             for file in files:
@@ -667,8 +671,8 @@ class FolderComparer:
 
 
 class SelectQuality(FolderComparer):
-    def __init__(self, folder_paths, preferred_bitrate, log_level, enable_hash=True):
-        super().__init__(folder_paths, preferred_bitrate, log_level, enable_hash)
+    def __init__(self, folder_paths, preferred_bitrate, log_level, enable_hash=True, force_rescan=False):
+        super().__init__(folder_paths, preferred_bitrate, log_level, enable_hash, force_rescan)
 
     def compute_folder_quality(self, folder_path, folder_data):
         hebrew_metadata_count = 0
@@ -809,7 +813,8 @@ class SelectQuality(FolderComparer):
 
 
 class MergeFolders(FolderComparer):
-    def __init__(self, organized_info, folder_files, preferred_bitrate, sorted_similar_folders, log_level):
+    def __init__(self, organized_info, folder_files, preferred_bitrate, sorted_similar_folders, log_level, force_rescan=False):
+        super().__init__(folder_paths, preferred_bitrate, log_level, enable_hash=True, force_rescan=force_rescan)
         self.organized_info = organized_info
         self.folder_files = folder_files
         self.preferred_bitrate = preferred_bitrate
@@ -922,7 +927,8 @@ class MergeFolders(FolderComparer):
 
 
 class SelectAndThrow(FolderComparer):
-    def __init__(self, organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level):
+    def __init__(self, organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level, force_rescan=False):
+        super().__init__(folder_paths, preferred_bitrate, log_level, enable_hash=True, force_rescan=force_rescan)
         self.organized_info = organized_info
         self.preferred_bitrate = preferred_bitrate
         self.similarity_threshold_delete = similarity_threshold_delete
@@ -985,6 +991,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--log-level", choices=["INFO", "DEBUG"], default="INFO", help="Set logging level")
     parser.add_argument("-b", "--bitrate", choices=["128", "high"], default="128", help="Preferred bitrate option")
     parser.add_argument("-d", "--disable-hash", action="store_true", help="Disable file hash checking and rely on file size for similarity")
+    parser.add_argument("-r", "--force-rescan", action="store_true", help="Force rescan of all folders, even if already in music_data.json") # הוספת ארגומנט force-rescan
     args = parser.parse_args()
 
     folder_paths = []
@@ -998,8 +1005,9 @@ if __name__ == "__main__":
     log_level = args.log_level
     preferred_bitrate = args.bitrate
     enable_hash = not args.disable_hash
+    force_rescan = args.force_rescan  # קריאת הערך של force_rescan מארגומנטים
 
-    comparer = SelectQuality(folder_paths, preferred_bitrate, log_level, enable_hash)
+    comparer = SelectQuality(folder_paths, preferred_bitrate, log_level, enable_hash, force_rescan) # העברת force_rescan לקונסטרקטור
     comparer.main()
     organized_info = comparer.get_folders_quality()
     sorted_similar_folders = comparer.sorted_similar_folders
@@ -1008,7 +1016,7 @@ if __name__ == "__main__":
 
     user_input_merge = input("\nהאם ברצונך למזג את התיקיות הדומות? (y/n): ").strip().lower()
     if user_input_merge == 'y':
-        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders, log_level)
+        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders, log_level, force_rescan) # העברת force_rescan לקונסטרקטור
         merger.merge()
         print("מיזוג התיקיות הושלם.")
     else:
@@ -1023,7 +1031,7 @@ if __name__ == "__main__":
         except ValueError:
             print("סף התאמה לא תקין. שימוש בברירת מחדל של 85%.")
             similarity_threshold_delete = 85.0
-        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level)
+        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level, force_rescan) # העברת force_rescan לקונסטרקטור
         selecter.delete()
         print("המחיקה הושלמה (ראה דוח מחיקה למעלה).")
     else:
