@@ -623,26 +623,25 @@ class FolderComparer:
             folder_path, other_folder_path = folder_pair
             similarity_score = round(similarities.get('weighted_score', 0), 2)
             logging.info(f"Found similar folders: {folder_path} and {other_folder_path} with similarity score: {similarity_score:.2f}%")
-
-            print(f"Folder: {folder_path}")
-            print(f"Similar folder: {other_folder_path}")
+            logging.info(f"Folder: {folder_path}")
+            logging.info(f"Similar folder: {other_folder_path}")
             if similarities.get('identical'):
-                print("Folders are identical based on file hashes.")
-                print("Total Similarity Score: 100.00%")
+                logging.info("Folders are identical based on file hashes.")
+                logging.info("Total Similarity Score: 100.00%")
             else:
-                if self.log_level.upper() == "DEBUG":
-                    print("Similarity parameter breakdown:")
-                    for parameter, score in similarities.items():
-                        if parameter == 'additional_metadata':
-                            print("  Additional Metadata Matches:")
-                            for meta, meta_score in score.items():
-                                print(f"    {meta.capitalize()}: {round(meta_score, 2)}")
-                        elif parameter not in ['weighted_score', 'identical']:
-                            print(f"  {parameter.capitalize()}: {round(score, 2)}")
-                    print(f"Total Similarity Score: {similarity_score:.2f}%")
-                else:
-                    print(f"Total Similarity Score: {similarity_score:.2f}%")
-            print()
+                debug_lines = []
+                for parameter, score in similarities.items():
+                    if parameter == 'additional_metadata':
+                        additional_lines = ["Additional Metadata Matches:"]
+                        for meta, meta_score in score.items():
+                            additional_lines.append(f"    {meta.capitalize()}: {round(meta_score, 2)}")
+                        debug_lines.append("\n".join(additional_lines))
+                    elif parameter not in ['weighted_score', 'identical']:
+                        debug_lines.append(f"{parameter.capitalize()}: {round(score, 2)}")
+                debug_block = "\n".join(debug_lines)
+                logging.debug(debug_block)
+                logging.info(f"Total Similarity Score: {similarity_score:.2f}%")
+
 
     def scan_music_library(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as executor:
@@ -691,29 +690,31 @@ class FolderComparer:
                 components.append(comp)
         # הצגת התוצאות בקבוצות
         max_folder_path_length = 60
-        print(f'\n{"Grouped Folder Quality Results":^{max_folder_path_length+20}}')
-        print('=' * (max_folder_path_length+20))
+        logging.info("\n" + "Grouped Folder Quality Results".center(max_folder_path_length+20))
+        logging.info("=" * (max_folder_path_length+20))
         for comp in components:
             if len(comp) > 1:
-                print(colors.CYAN + "קבוצה של תיקיות דומות:" + colors.RESET)
+                logging.info(colors.CYAN + "קבוצה של תיקיות דומות:" + colors.RESET)
             else:
-                print(colors.CYAN + "תיקיה בודדת:" + colors.RESET)
+                logging.info(colors.CYAN + "תיקיה בודדת:" + colors.RESET)
             best_folder = None
             best_quality = -1
             for folder in comp:
                 quality = self.folder_quality_scores.get(folder, 0)
-                print(f'{folder:<{max_folder_path_length}} Quality: {quality:.2f}%')
+                logging.info(f'{folder:<{max_folder_path_length}} Quality: {quality:.2f}%')
                 if self.log_level.upper() == "DEBUG" and hasattr(self, 'folder_quality_details'):
                     breakdown = self.folder_quality_details.get(folder, {})
-                    print("  Quality parameter breakdown:")
+                    debug_lines = ["  Quality parameter breakdown:"]
                     for param, score in breakdown.items():
-                        print(f"    {param}: {score:.2f}%")
+                        debug_lines.append(f"    {param}: {score:.2f}%")
+                    debug_message = "\n".join(debug_lines)
+                    logging.debug(debug_message)
                 if quality > best_quality:
                     best_quality = quality
                     best_folder = folder
             if len(comp) > 1:
-                print(colors.GREEN + f"עדיף לשמור את התיקיה: {best_folder} (Quality: {best_quality:.2f}%)" + colors.RESET)
-            print('-' * (max_folder_path_length+20))
+                logging.info(colors.GREEN + f"עדיף לשמור את התיקיה: {best_folder} (Quality: {best_quality:.2f}%)" + colors.RESET)
+            logging.info('-' * (max_folder_path_length+20))
 
     def view_result(self):
         self.view_grouped_results()
