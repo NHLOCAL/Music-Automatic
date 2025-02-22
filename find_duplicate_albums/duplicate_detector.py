@@ -630,15 +630,18 @@ class FolderComparer:
                 print("Folders are identical based on file hashes.")
                 print("Total Similarity Score: 100.00%")
             else:
-                print("Similarity scores:")
-                for parameter, score in similarities.items():
-                    if parameter == 'additional_metadata':
-                        print("- Additional Metadata Matches:")
-                        for meta, meta_score in score.items():
-                            print(f"  - {meta.capitalize()}: {round(meta_score, 2)}")
-                    elif parameter not in ['weighted_score', 'identical']:
-                        print(f"- {parameter.capitalize()}: {round(score, 2)}")
-                print(f"Total Similarity Score: {similarity_score:.2f}%")
+                if self.log_level.upper() == "DEBUG":
+                    print("Similarity parameter breakdown:")
+                    for parameter, score in similarities.items():
+                        if parameter == 'additional_metadata':
+                            print("  Additional Metadata Matches:")
+                            for meta, meta_score in score.items():
+                                print(f"    {meta.capitalize()}: {round(meta_score, 2)}")
+                        elif parameter not in ['weighted_score', 'identical']:
+                            print(f"  {parameter.capitalize()}: {round(score, 2)}")
+                    print(f"Total Similarity Score: {similarity_score:.2f}%")
+                else:
+                    print(f"Total Similarity Score: {similarity_score:.2f}%")
             print()
 
     def scan_music_library(self):
@@ -658,7 +661,7 @@ class FolderComparer:
         self.get_file_lists()
         self.find_similar_folders_main()
 
-    # --- מתודה חדשה להצגת תוצאות איכות בקבוצות ---
+    # --- מתודה להצגת תוצאות איכות בקבוצות ---
     def view_grouped_results(self):
         # בניית גרף: כל צומת היא תיקיה, וקשת מתווספת אם קיים זוג עם weighted_score >= MINIMAL_SIMILARITY
         graph = {}
@@ -700,12 +703,20 @@ class FolderComparer:
             for folder in comp:
                 quality = self.folder_quality_scores.get(folder, 0)
                 print(f'{folder:<{max_folder_path_length}} Quality: {quality:.2f}%')
+                if self.log_level.upper() == "DEBUG" and hasattr(self, 'folder_quality_details'):
+                    breakdown = self.folder_quality_details.get(folder, {})
+                    print("  Quality parameter breakdown:")
+                    for param, score in breakdown.items():
+                        print(f"    {param}: {score:.2f}%")
                 if quality > best_quality:
                     best_quality = quality
                     best_folder = folder
             if len(comp) > 1:
                 print(colors.GREEN + f"עדיף לשמור את התיקיה: {best_folder} (Quality: {best_quality:.2f}%)" + colors.RESET)
             print('-' * (max_folder_path_length+20))
+
+    def view_result(self):
+        self.view_grouped_results()
 
 
 class SelectQuality(FolderComparer):
@@ -815,6 +826,7 @@ class SelectQuality(FolderComparer):
             breakdown2 = folder_quality_details.get(folder_pair[1], {})
             self.organized_info[folder_pair] = ((folder_quality1, breakdown1), (folder_quality2, breakdown2))
         self.folder_quality_scores = folder_quality_scores
+        self.folder_quality_details = folder_quality_details  # שמירת פירוט מלא של הפרמטרים
         return self.organized_info
 
     def contains_hebrew(self, text):
@@ -832,7 +844,6 @@ class SelectQuality(FolderComparer):
         for param, score in breakdown.items():
             print(f'  {param}: {score:.2f}%')
 
-    # אנו לא משתמשים יותר ב-view_result, אלא נציג תצוגה מקובצת:
     def view_result(self):
         self.view_grouped_results()
 
