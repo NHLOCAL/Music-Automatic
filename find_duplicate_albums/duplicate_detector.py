@@ -205,12 +205,11 @@ class FolderComparer:
                 return None
 
             folder_hash = hashlib.md5(root.encode('utf-8')).hexdigest()
-            if folder_hash in self.music_data and not self.force_rescan:  # הוספת תנאי force_rescan
+            if folder_hash in self.music_data and not self.force_rescan:
                 logging.info(f"Skipping already scanned folder: {root}")
                 return None
             elif folder_hash in self.music_data and self.force_rescan:
                 logging.info(f"Force rescan for folder: {root}")
-
 
             metadata_list = []
             for file in files:
@@ -240,8 +239,6 @@ class FolderComparer:
                     'size_mb': self.get_file_size_mb(filepath)
                 })
 
-            # זיהוי תמונת אלבום – ניסיון ראשון על ידי חיפוש קבצי תמונה חיצוניים,
-            # ואם לא נמצא, ניסיון חילוץ תמונה מוטמעת מקבצי המוזיקה.
             album_art_hash = self.extract_album_art(root)
             folder_name = os.path.basename(root)
             parent_folder = os.path.basename(os.path.dirname(root))
@@ -264,7 +261,6 @@ class FolderComparer:
                     album = file_meta['metadata']['album'].strip()
                     break
 
-            # הוספת חילוץ של albumartist מתוך המטאדאטה
             albumartist = None
             for file_meta in metadata_list:
                 if file_meta['metadata'].get('albumartist'):
@@ -423,12 +419,10 @@ class FolderComparer:
             logging.error(f"Error extracting metadata from {filepath}: {e}", exc_info=True)
             return {}
 
-    # עדכון: הוספת תמיכה בזיהוי תמונת אלבום גם מתוך קבצי תמונה חיצוניים וגם מתוך המטאדאטה המוטמעת
     def extract_album_art(self, folder_path):
         if folder_path in self.album_art_cache:
             return self.album_art_cache[folder_path]
 
-        # ניסיון חיפוש קובצי תמונה נפוצים בתיקייה
         album_art_files = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.jpg', 'folder.jpg', 'cover.png'}
         for file in os.listdir(folder_path):
             if file.lower() in album_art_files:
@@ -442,7 +436,6 @@ class FolderComparer:
                         return art_hash
                 except Exception as e:
                     logging.error(f"Error processing image {file} in {folder_path}: {e}", exc_info=True)
-        # אם לא נמצא קובץ תמונה, ניסיון חילוץ תמונה מוטמעת מקבצי מוזיקה
         for file in os.listdir(folder_path):
             if file.lower().endswith(('.mp3', '.flac', '.aac', '.m4a', '.ogg', '.wav')):
                 file_path = os.path.join(folder_path, file)
@@ -536,7 +529,6 @@ class FolderComparer:
             files2 = sorted(data2['files'], key=lambda x: normalize_filename(x.get('file', '')))
             total_files = len(files1)
 
-            # 1. השוואת file_hash – התאמה מדויקת
             def compare_file_hashes(files1, files2):
                 score = 0
                 for f1, f2 in zip(files1, files2):
@@ -550,11 +542,9 @@ class FolderComparer:
                 folder_similarity['weighted_score'] = 100.0
                 logging.info(f"Folders {folder_path} and {other_folder_path} are identical based on file hashes.")
             else:
-                # 2. השוואת folder_name – אם פחות מ-40% אז 0
                 folder_name_similarity = self.similar(os.path.basename(folder_path), os.path.basename(other_folder_path))
                 folder_similarity['folder_name'] = folder_name_similarity if folder_name_similarity >= 0.4 else 0.0
 
-                # 3. השוואת file_size – התאמה של 95% לפחות
                 def compare_file_sizes(files1, files2):
                     score = 0
                     for f1, f2 in zip(files1, files2):
@@ -577,7 +567,6 @@ class FolderComparer:
                 file_adjustment = 1 - (max_file_similarity * self.REDUCTION_FACTOR) if max_file_similarity > self.GENERIC_SIMILARITY_THRESHOLD else 1
                 title_adjustment = 1 - (max_title_similarity * self.REDUCTION_FACTOR) if max_title_similarity > self.GENERIC_SIMILARITY_THRESHOLD else 1
 
-                # 4. השוואת file, title, album, artist, albumartist – סף מינימלי 40%
                 for parameter in ['file', 'title', 'album', 'artist', 'albumartist']:
                     total = 0
                     for f1, f2 in zip(files1, files2):
@@ -593,10 +582,8 @@ class FolderComparer:
                         total += sim
                     folder_similarity[parameter] = total / total_files if total_files > 0 else 0.0
 
-                # 5. השוואת album_art – התאמה מדויקת
                 folder_similarity['album_art'] = 1.0 if data1.get('album_art') and data2.get('album_art') and data1['album_art'] == data2['album_art'] else 0.0
 
-                # 6. השוואת duration – התאמה של 95% לפחות
                 def compare_duration(files1, files2):
                     score = 0
                     for f1, f2 in zip(files1, files2):
@@ -611,7 +598,7 @@ class FolderComparer:
                 folder_similarity['duration'] = compare_duration(files1, files2)
 
                 additional_metadata_scores = self.compare_additional_metadata(data1['files'], data2['files'])
-                folder_similarity['additional_metadata'] = additional_metadata_scores  # הוספת הצגה של מטאדאטה נוספת
+                folder_similarity['additional_metadata'] = additional_metadata_scores
 
                 applicable_weights = {k: v for k, v in self.PARAMETER_WEIGHTS.items() if not (k == "file_hash" and not self.enable_hash)}
                 weighted_score = sum(folder_similarity.get(param, 0) * applicable_weights.get(param, 0) for param in applicable_weights)
@@ -670,6 +657,55 @@ class FolderComparer:
     def main(self):
         self.get_file_lists()
         self.find_similar_folders_main()
+
+    # --- מתודה חדשה להצגת תוצאות איכות בקבוצות ---
+    def view_grouped_results(self):
+        # בניית גרף: כל צומת היא תיקיה, וקשת מתווספת אם קיים זוג עם weighted_score >= MINIMAL_SIMILARITY
+        graph = {}
+        for pair, similarities in self.sorted_similar_folders:
+            folder1, folder2 = pair
+            if similarities.get('weighted_score', 0) >= self.MINIMAL_SIMILARITY:
+                graph.setdefault(folder1, set()).add(folder2)
+                graph.setdefault(folder2, set()).add(folder1)
+        # הוספת תיקיות בודדות שאולי לא מופיעות בגרף
+        for folder in self.folder_quality_scores.keys():
+            if folder not in graph:
+                graph[folder] = set()
+        # מציאת רכיבים קשורים (clusters)
+        seen = set()
+        components = []
+        for node in graph:
+            if node not in seen:
+                stack = [node]
+                comp = set()
+                while stack:
+                    current = stack.pop()
+                    if current in seen:
+                        continue
+                    seen.add(current)
+                    comp.add(current)
+                    stack.extend(graph[current] - seen)
+                components.append(comp)
+        # הצגת התוצאות בקבוצות
+        max_folder_path_length = 60
+        print(f'\n{"Grouped Folder Quality Results":^{max_folder_path_length+20}}')
+        print('=' * (max_folder_path_length+20))
+        for comp in components:
+            if len(comp) > 1:
+                print(colors.CYAN + "קבוצה של תיקיות דומות:" + colors.RESET)
+            else:
+                print(colors.CYAN + "תיקיה בודדת:" + colors.RESET)
+            best_folder = None
+            best_quality = -1
+            for folder in comp:
+                quality = self.folder_quality_scores.get(folder, 0)
+                print(f'{folder:<{max_folder_path_length}} Quality: {quality:.2f}%')
+                if quality > best_quality:
+                    best_quality = quality
+                    best_folder = folder
+            if len(comp) > 1:
+                print(colors.GREEN + f"עדיף לשמור את התיקיה: {best_folder} (Quality: {best_quality:.2f}%)" + colors.RESET)
+            print('-' * (max_folder_path_length+20))
 
 
 class SelectQuality(FolderComparer):
@@ -778,6 +814,7 @@ class SelectQuality(FolderComparer):
             breakdown1 = folder_quality_details.get(folder_pair[0], {})
             breakdown2 = folder_quality_details.get(folder_pair[1], {})
             self.organized_info[folder_pair] = ((folder_quality1, breakdown1), (folder_quality2, breakdown2))
+        self.folder_quality_scores = folder_quality_scores
         return self.organized_info
 
     def contains_hebrew(self, text):
@@ -791,32 +828,18 @@ class SelectQuality(FolderComparer):
         else:
             return 0
 
-    def view_result(self):
-        max_folder_path_length = 60
-        print(f'{"Folder Name":<{max_folder_path_length}} {"Quality Score"}')
-        print('-' * (max_folder_path_length + 20))
-        for folder_pair, qualities in self.organized_info.items():
-            (folder_path1, (folder_quality1, breakdown1)), (folder_path2, (folder_quality2, breakdown2)) = ((folder_pair[0], qualities[0]), (folder_pair[1], qualities[1]))
-            print(f'{folder_path1:<{max_folder_path_length}} {folder_quality1:.2f}%')
-            self.print_quality_breakdown(breakdown1)
-            print(f'{folder_path2:<{max_folder_path_length}} {folder_quality2:.2f}%')
-            self.print_quality_breakdown(breakdown2)
-            if folder_quality1 > folder_quality2:
-                print(colors.GREEN + f"עדיף: {folder_path1}" + colors.RESET)
-            elif folder_quality2 > folder_quality1:
-                print(colors.GREEN + f"עדיף: {folder_path2}" + colors.RESET)
-            else:
-                print(colors.YELLOW + "שתי התיקיות באיכות זהה." + colors.RESET)
-            print('-' * (max_folder_path_length + 20))
-
     def print_quality_breakdown(self, breakdown):
         for param, score in breakdown.items():
             print(f'  {param}: {score:.2f}%')
 
+    # אנו לא משתמשים יותר ב-view_result, אלא נציג תצוגה מקובצת:
+    def view_result(self):
+        self.view_grouped_results()
+
 
 class MergeFolders(FolderComparer):
     def __init__(self, organized_info, folder_files, preferred_bitrate, sorted_similar_folders, log_level, force_rescan=False):
-        super().__init__(folder_paths, preferred_bitrate, log_level, enable_hash=True, force_rescan=force_rescan)
+        super().__init__(folder_files.keys(), preferred_bitrate, log_level, enable_hash=True, force_rescan=force_rescan)
         self.organized_info = organized_info
         self.folder_files = folder_files
         self.preferred_bitrate = preferred_bitrate
@@ -929,45 +952,62 @@ class MergeFolders(FolderComparer):
 
 
 class SelectAndThrow(FolderComparer):
-    def __init__(self, organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level, force_rescan=False):
-        super().__init__(folder_paths, preferred_bitrate, log_level, enable_hash=True, force_rescan=force_rescan)
+    def __init__(self, organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level, folder_quality_scores, force_rescan=False):
+        super().__init__([], preferred_bitrate, log_level, enable_hash=True, force_rescan=force_rescan)
         self.organized_info = organized_info
         self.preferred_bitrate = preferred_bitrate
         self.similarity_threshold_delete = similarity_threshold_delete
         self.sorted_similar_folders = sorted_similar_folders
         self.log_level = log_level
+        self.folder_quality_scores = folder_quality_scores
 
-    def view_result(self):
-        pass
+    def get_connected_components(self, graph):
+        seen = set()
+        components = []
+        for node in graph:
+            if node not in seen:
+                stack = [node]
+                comp = set()
+                while stack:
+                    current = stack.pop()
+                    if current in seen:
+                        continue
+                    seen.add(current)
+                    comp.add(current)
+                    stack.extend(graph[current] - seen)
+                components.append(comp)
+        return components
 
     def delete(self):
+        graph = {}
+        for pair, similarities in self.sorted_similar_folders:
+            if similarities.get('weighted_score', 0) >= self.similarity_threshold_delete:
+                folder1, folder2 = pair
+                if folder1 not in graph:
+                    graph[folder1] = set()
+                if folder2 not in graph:
+                    graph[folder2] = set()
+                graph[folder1].add(folder2)
+                graph[folder2].add(folder1)
+        components = self.get_connected_components(graph)
         folders_to_delete_report = []
-        for folder_pair, similarities in self.sorted_similar_folders:
-            quality_scores = self.organized_info.get(folder_pair)
-            if not quality_scores:
-                continue
-            folder1, folder2 = folder_pair
-            (quality1, _), (quality2, _) = quality_scores
-            similarity_score = similarities.get('weighted_score', 0)
-            if similarity_score >= self.similarity_threshold_delete:
-                if quality1 <= quality2:
-                    folders_to_delete_report.append((folder1, folder2, quality1, quality2, similarity_score))
-                    logging.info(f"Identified folder for potential deletion: {folder1} (Quality: {quality1:.2f}%, Similarity: {similarity_score:.2f}%), Better folder: {folder2} (Quality: {quality2:.2f}%)")
-                else:
-                    folders_to_delete_report.append((folder2, folder1, quality2, quality1, similarity_score))
-                    logging.info(f"Identified folder for potential deletion: {folder2} (Quality: {quality2:.2f}%, Similarity: {similarity_score:.2f}%), Better folder: {folder1} (Quality: {quality1:.2f}%)")
+        for comp in components:
+            if len(comp) > 1:
+                best_folder = max(comp, key=lambda f: self.folder_quality_scores.get(f, 0))
+                for folder in comp:
+                    if folder != best_folder:
+                        folders_to_delete_report.append((folder, best_folder, self.folder_quality_scores.get(folder, 0), self.folder_quality_scores.get(best_folder, 0)))
         if not folders_to_delete_report:
             print("לא נמצאו תיקיות למחיקה לפי רמת הדמיון והאיכות שצוינו.")
             logging.info("No folders found for deletion based on similarity and quality thresholds.")
             return
         print(colors.YELLOW + "\nדוח תיקיות לסקירה והעברה לסל המחזור אפשרית:" + colors.RESET)
-        for folder_to_delete, better_folder, quality_to_delete, better_quality, similarity_score in folders_to_delete_report:
-            print(f"- תיקייה להעברה לסל המחזור: '{folder_to_delete}' (ציון איכות: {quality_to_delete:.2f}%, ציון דמיון: {similarity_score:.2f}%)")
-            print(f"  תיקייה עדיפה: '{better_folder}' (ציון איכות: {better_quality:.2f}%)")
+        for folder_to_delete, better_folder, quality_to_delete, better_quality in folders_to_delete_report:
+            print(f"- תיקייה להעברה לסל המחזור: '{folder_to_delete}' (ציון איכות: {quality_to_delete:.2f}%), תיקייה עדיפה: '{better_folder}' (ציון איכות: {better_quality:.2f}%)")
         confirmation = input(colors.YELLOW + "\nהאם ברצונך להעביר את התיקיות המיותרות שצוינו לעיל לסל המחזור? (y/n): " + colors.RESET).strip().lower()
         if confirmation == 'y':
             trashed_folders = []
-            for folder_to_delete, _, _, _, _ in folders_to_delete_report:
+            for folder_to_delete, _, _, _ in folders_to_delete_report:
                 try:
                     send2trash(folder_to_delete)
                     trashed_folders.append(folder_to_delete)
@@ -993,7 +1033,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--log-level", choices=["INFO", "DEBUG"], default="INFO", help="Set logging level")
     parser.add_argument("-b", "--bitrate", choices=["128", "high"], default="128", help="Preferred bitrate option")
     parser.add_argument("-d", "--disable-hash", action="store_true", help="Disable file hash checking and rely on file size for similarity")
-    parser.add_argument("-r", "--force-rescan", action="store_true", help="Force rescan of all folders, even if already in music_data.json") # הוספת ארגומנט force-rescan
+    parser.add_argument("-r", "--force-rescan", action="store_true", help="Force rescan of all folders, even if already in music_data.json")
     args = parser.parse_args()
 
     folder_paths = []
@@ -1007,18 +1047,20 @@ if __name__ == "__main__":
     log_level = args.log_level
     preferred_bitrate = args.bitrate
     enable_hash = not args.disable_hash
-    force_rescan = args.force_rescan  # קריאת הערך של force_rescan מארגומנטים
+    force_rescan = args.force_rescan
 
-    comparer = SelectQuality(folder_paths, preferred_bitrate, log_level, enable_hash, force_rescan) # העברת force_rescan לקונסטרקטור
+    comparer = SelectQuality(folder_paths, preferred_bitrate, log_level, enable_hash, force_rescan)
     comparer.main()
     organized_info = comparer.get_folders_quality()
     sorted_similar_folders = comparer.sorted_similar_folders
+    folder_quality_scores = comparer.folder_quality_scores
 
+    # הצגת תוצאות איכות בצורה מקובצת
     comparer.view_result()
 
     user_input_merge = input("\nהאם ברצונך למזג את התיקיות הדומות? (y/n): ").strip().lower()
     if user_input_merge == 'y':
-        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders, log_level, force_rescan) # העברת force_rescan לקונסטרקטור
+        merger = MergeFolders(organized_info, comparer.folder_files, preferred_bitrate, sorted_similar_folders, log_level, force_rescan)
         merger.merge()
         print("מיזוג התיקיות הושלם.")
     else:
@@ -1033,7 +1075,7 @@ if __name__ == "__main__":
         except ValueError:
             print("סף התאמה לא תקין. שימוש בברירת מחדל של 85%.")
             similarity_threshold_delete = 85.0
-        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level, force_rescan) # העברת force_rescan לקונסטרקטור
+        selecter = SelectAndThrow(organized_info, preferred_bitrate, similarity_threshold_delete, sorted_similar_folders, log_level, folder_quality_scores, force_rescan)
         selecter.delete()
         print("המחיקה הושלמה (ראה דוח מחיקה למעלה).")
     else:
