@@ -135,8 +135,14 @@ def send_to_gemini_api(album_data_json: dict) -> Tuple[Optional[bool], Optional[
       reason       - הסבר
     """
     conversation.clear()
-    add_user_text("Analyze the following album data to determine if they are duplicates:\n" +
-                  json.dumps(album_data_json, ensure_ascii=False, indent=4))
+    user_message = "Analyze the following album data to determine if they are duplicates:\n" + \
+                  json.dumps(album_data_json, ensure_ascii=False, indent=4)
+    add_user_text(user_message)
+
+    # הדפסת התוכן של הודעת המשתמש (נתוני האלבומים)
+    print("JSON data sent to Gemini API (user message content):")
+    print(user_message)
+
 
     # הוספת תמונות אלבום במידה וקיימות
     for album_key in ['album1', 'album2']:
@@ -254,23 +260,11 @@ class GeminiEnhancedFolderComparer(SelectQuality):
                 print(colors.RED + f"Error: Could not find folder data for paths: {folder_path1}, {folder_path2}" + colors.RESET)
                 continue
 
-            # בניית נתוני אלבום לשני התיקיות
+            # בניית נתוני אלבום לשני התיקיות (עם השיפורים)
             album_data_json = {
-                "album1": {
-                    "folder_path": folder_path1,
-                    "artist": folder_data1.get('artist'),
-                    "album_name": folder_data1.get('album'),
-                    "files": self.folder_files.get(folder_path1, {}).get('files', []),
-                    "album_art_base64": folder_data1.get('album_art')
-                },
-                "album2": {
-                    "folder_path": folder_path2,
-                    "artist": folder_data2.get('artist'),
-                    "album_name": folder_data2.get('album'),
-                    "files": self.folder_files.get(folder_path2, {}).get('files', []),
-                    "album_art_base64": folder_data2.get('album_art')
-                },
-                "similarity_score_script": similarities.get('weighted_score')
+                "album1": self._prepare_album_data(folder_path1, folder_data1),
+                "album2": self._prepare_album_data(folder_path2, folder_data2),
+                "similarity_score_script": int(similarities.get('weighted_score', 0))
             }
 
             print(f"\n--- Gemini API Comparison for folders: {folder_path1} and {folder_path2} ---")
@@ -293,6 +287,48 @@ class GeminiEnhancedFolderComparer(SelectQuality):
             else:
                 print(f"Gemini API Response (Raw):\n{reason}")
                 logging.warning(f"Gemini API raw response (parsing failed):\n{reason}")
+
+    def _prepare_album_data(self, folder_path: str, folder_data: dict) -> dict:
+        """
+        מכין את מילון נתוני האלבום עבור Gemini, תוך החלת השיפורים המבוקשים.
+        """
+        album_data = {
+            "folder_path": folder_path,
+            "artist": folder_data.get('artist'),
+            "album_name": folder_data.get('album'),
+            "files": [],  # ימולא בהמשך
+            "album_art_base64": folder_data.get('album_art')
+        }
+
+        files_data = self.folder_files.get(folder_path, {}).get('files', [])
+        for file_info in files_data:
+            # יצירת מילון חדש עבור כל קובץ, ללא השדות המיותרים
+            cleaned_file_info = {
+                "file": file_info.get("file"),
+                "artist": file_info.get("artist"),
+                "album": file_info.get("album"),
+                "albumartist": file_info.get("albumartist"),
+                "title": file_info.get("title"),
+                "bitrate": file_info.get("bitrate"),
+                "duration": file_info.get("duration"),
+                "file_hash": file_info.get("file_hash"),
+                "size_mb": f"{file_info.get('size_mb', 0):.2f}"  # עיגול ל-2 ספרות אחרי הנקודה
+            }
+
+            # הסרת המידע הכפול מה-metadata
+            metadata = file_info.get("metadata", {})
+            cleaned_metadata = {}
+            for key, value in metadata.items():
+                if key not in cleaned_file_info:  # הוספת שדות metadata רק אם אינם קיימים כבר
+                    cleaned_metadata[key] = value
+
+            if cleaned_metadata:  # הוספת metadata רק אם יש בו תוכן
+                cleaned_file_info["metadata"] = cleaned_metadata
+
+
+            album_data["files"].append(cleaned_file_info)
+
+        return album_data
 
 
 def main() -> None:
