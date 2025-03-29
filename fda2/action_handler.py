@@ -24,8 +24,7 @@ class ActionHandler:
         self.all_folders_data = all_folders_data
         self.file_processor = file_processor # Used for metadata access
 
-    # --- Merging Logic ---
-
+    # --- Merging Logic (remains the same) ---
     def merge_similar_folders(self, comparison_results: List[FolderComparisonResult]):
         """
         Iterates through highly similar folders and merges metadata/art from the
@@ -33,48 +32,47 @@ class ActionHandler:
         """
         logger.info("Starting merge process for highly similar folders...")
         merged_pairs_count = 0
-        for result in comparison_results:
-            if result.weighted_score >= config.MIN_SIMILARITY_FOR_MERGE:
-                folder1_path = result.folder1_path
-                folder2_path = result.folder2_path
+        merge_candidates = [r for r in comparison_results if r.weighted_score >= config.MIN_SIMILARITY_FOR_MERGE]
 
-                folder1_info = self.all_folders_data.get(folder1_path)
-                folder2_info = self.all_folders_data.get(folder2_path)
+        if not merge_candidates:
+             logger.info("No folder pairs met the similarity threshold for merging.")
+             return # Exit early if no candidates
 
-                if not folder1_info or not folder2_info:
-                    logger.warning(f"Skipping merge: Folder data missing for pair {folder1_path.name}, {folder2_path.name}")
-                    continue
+        logger.info(f"Found {len(merge_candidates)} pairs eligible for merge (Score >= {config.MIN_SIMILARITY_FOR_MERGE}%).")
 
-                # Ensure quality scores are calculated
-                if folder1_info.quality_score is None or folder2_info.quality_score is None:
-                     logger.warning(f"Skipping merge: Quality score not calculated for pair {folder1_path.name}, {folder2_path.name}. Run quality analysis first.")
-                     continue
+        for result in merge_candidates: # Iterate only through candidates
+            folder1_path = result.folder1_path
+            folder2_path = result.folder2_path
 
+            folder1_info = self.all_folders_data.get(folder1_path)
+            folder2_info = self.all_folders_data.get(folder2_path)
 
-                # Decide preferred folder (higher quality wins, tie break?)
-                # TODO: Refine tie-breaking logic (e.g., path length, bitrate preference?)
-                if folder1_info.quality_score >= folder2_info.quality_score:
-                    preferred_folder, other_folder = folder1_info, folder2_info
-                else:
-                    preferred_folder, other_folder = folder2_info, folder1_info
+            if not folder1_info or not folder2_info:
+                logger.warning(f"Skipping merge: Folder data missing for pair {folder1_path.name}, {folder2_path.name}")
+                continue
 
-                logger.info(f"Merging: Preferred={preferred_folder.path.name} (Q:{preferred_folder.quality_score:.2f}), Other={other_folder.path.name} (Q:{other_folder.quality_score:.2f})")
+            # Ensure quality scores are calculated
+            if folder1_info.quality_score is None or folder2_info.quality_score is None:
+                 logger.warning(f"Skipping merge: Quality score not calculated for pair {folder1_path.name}, {folder2_path.name}. Run quality analysis first.")
+                 continue
 
-                try:
-                    self._perform_merge(preferred_folder, other_folder)
-                    merged_pairs_count += 1
-                except Exception as e:
-                    logger.error(f"Error during merge between {preferred_folder.path.name} and {other_folder.path.name}: {e}", exc_info=True)
-
+            # Decide preferred folder (higher quality wins, tie break?)
+            if folder1_info.quality_score >= folder2_info.quality_score:
+                preferred_folder, other_folder = folder1_info, folder2_info
             else:
-                 # Stop iterating once scores drop below merge threshold (since list is sorted)
-                 break
+                preferred_folder, other_folder = folder2_info, folder1_info
 
+            logger.info(f"Merging: Preferred={preferred_folder.path.name} (Q:{preferred_folder.quality_score:.2f}), Other={other_folder.path.name} (Q:{other_folder.quality_score:.2f})")
+
+            try:
+                self._perform_merge(preferred_folder, other_folder)
+                merged_pairs_count += 1
+            except Exception as e:
+                logger.error(f"Error during merge between {preferred_folder.path.name} and {other_folder.path.name}: {e}", exc_info=True)
 
         if merged_pairs_count > 0:
             logger.info(f"Merge process complete. Merged metadata for {merged_pairs_count} pairs.")
-        else:
-            logger.info("No folder pairs met the similarity threshold for merging.")
+        # No "else" needed here as the initial check handles the zero case
 
 
     def _perform_merge(self, preferred_folder: FolderInfo, other_folder: FolderInfo):
@@ -176,47 +174,50 @@ class ActionHandler:
         graph: Dict[Path, Set[Path]] = defaultdict(set)
         nodes_in_graph: Set[Path] = set() # Keep track of all folders involved
 
-        for result in comparison_results:
-            if result.weighted_score >= min_similarity_for_delete:
-                f1_path, f2_path = result.folder1_path, result.folder2_path
-                graph[f1_path].add(f2_path)
-                graph[f2_path].add(f1_path)
-                nodes_in_graph.add(f1_path)
-                nodes_in_graph.add(f2_path)
-            else:
-                 # Stop early as results are sorted
-                 break
+        # Only consider results meeting the deletion threshold for building the graph
+        relevant_results = [r for r in comparison_results if r.weighted_score >= min_similarity_for_delete]
+
+        for result in relevant_results:
+            f1_path, f2_path = result.folder1_path, result.folder2_path
+            graph[f1_path].add(f2_path)
+            graph[f2_path].add(f1_path)
+            nodes_in_graph.add(f1_path)
+            nodes_in_graph.add(f2_path)
 
         # Find connected components (clusters of similar folders)
         seen: Set[Path] = set()
-        for node_path in nodes_in_graph:
+        for node_path in list(nodes_in_graph): # Iterate over a copy as `seen` might modify the base? (safer)
             if node_path not in seen:
                 component_paths: Set[Path] = set()
                 stack = [node_path]
+                visited_in_component: Set[Path] = set()
+
                 while stack:
                     current_path = stack.pop()
-                    if current_path not in seen:
-                        seen.add(current_path)
+                    if current_path not in visited_in_component and current_path in nodes_in_graph: # Ensure it's relevant
+                        visited_in_component.add(current_path)
+                        seen.add(current_path) # Mark globally seen
                         component_paths.add(current_path)
                         # Add neighbors that are part of the graph connections
-                        stack.extend(graph.get(current_path, set()) - seen)
+                        stack.extend(graph.get(current_path, set()) - visited_in_component)
 
                 # Process the found component if it has more than one folder
                 if len(component_paths) > 1:
                     component_folders = [self.all_folders_data[p] for p in component_paths if p in self.all_folders_data]
-                    # Filter out if data is missing (shouldn't happen ideally)
-                    component_folders = [f for f in component_folders if f.quality_score is not None]
+                    # Filter out if data is missing (shouldn't happen ideally) or quality score missing
+                    component_folders = [f for f in component_folders if f and f.quality_score is not None]
 
                     if len(component_folders) > 1:
                          # Find the best folder in the component based on quality score
                          # Add tie-breakers if necessary (e.g., path length, specific tags)
+                         # Current tie-breaker: implicitly prefers the one encountered first by max()
                          best_folder = max(component_folders, key=lambda f: f.quality_score)
 
                          # Add all others in the component to the deletion list
                          for folder in component_folders:
                              if folder.path != best_folder.path:
                                  folders_to_delete.append((folder, best_folder))
-                                 logger.debug(f"Marked for deletion: {folder.path.name} (Keep: {best_folder.path.name})")
+                                 logger.debug(f"Marked for deletion: {folder.path.name} (Keep: {best_folder.path.name} based on Q:{best_folder.quality_score:.2f})")
 
 
         logger.info(f"Identified {len(folders_to_delete)} folders for potential deletion.")
@@ -225,48 +226,90 @@ class ActionHandler:
 
     def delete_folders_interactive(self, folders_to_delete_pairs: List[Tuple[FolderInfo, FolderInfo]]):
         """
-        Presents the list of folders to delete and asks for user confirmation
-        before moving them to the system's trash.
+        Presents the list of folders to delete (grouped by the folder being kept)
+        and asks for user confirmation before moving them to the system's trash.
         """
         if not folders_to_delete_pairs:
             print(AnsiColors.GREEN + "No folders marked for deletion based on the criteria." + AnsiColors.RESET)
             logger.info("No folders met deletion criteria.")
             return
 
-        print(AnsiColors.YELLOW + "\n--- Folders Recommended for Deletion (Moved to Trash) ---" + AnsiColors.RESET)
-        # Sort for consistent display
-        folders_to_delete_pairs.sort(key=lambda pair: str(pair[0].path))
+        # --- Group folders by the 'best' folder to keep ---
+        grouped_deletions: Dict[Path, Tuple[FolderInfo, List[FolderInfo]]] = {}
+        total_folders_to_delete = 0
         for folder_to_delete, best_folder in folders_to_delete_pairs:
-            q_del = folder_to_delete.quality_score
-            q_best = best_folder.quality_score
-            print(f"- To Trash: '{AnsiColors.RED}{folder_to_delete.path}{AnsiColors.RESET}' (Q: {q_del:.2f}%)")
-            print(f"  Keep:     '{AnsiColors.GREEN}{best_folder.path}{AnsiColors.RESET}' (Q: {q_best:.2f}%)")
-            # Optionally show similarity score between these two? Requires looking up the original comparison.
+            best_path = best_folder.path
+            if best_path not in grouped_deletions:
+                # Store the best folder info and initialize the list for folders to delete
+                grouped_deletions[best_path] = (best_folder, [])
+            grouped_deletions[best_path][1].append(folder_to_delete)
+            total_folders_to_delete += 1 # Keep track of the total count easily
 
-        print(AnsiColors.YELLOW + "--- End of List ---" + AnsiColors.RESET)
+        print(AnsiColors.YELLOW + "\n--- Folders Recommended for Deletion (Grouped by Kept Folder) ---" + AnsiColors.RESET)
+
+        # Sort groups by the path of the folder being kept for consistent order
+        sorted_best_paths = sorted(grouped_deletions.keys(), key=str)
+        group_num = 1
+        # Collect all FolderInfo objects that will be trashed in one flat list
+        folders_to_actually_trash: List[FolderInfo] = []
+
+        for best_path in sorted_best_paths:
+            best_folder_info, folders_to_trash_list = grouped_deletions[best_path]
+
+            # Ensure quality scores exist for display (handle potential None)
+            q_best = best_folder_info.quality_score if best_folder_info.quality_score is not None else -1.0
+            q_best_str = f"{q_best:.2f}%" if q_best >= 0 else "N/A"
+
+            print(f"\n{AnsiColors.CYAN}Group {group_num}:{AnsiColors.RESET}")
+            print(f"  {AnsiColors.GREEN}Keep:     '{best_folder_info.path}' (Q: {q_best_str}){AnsiColors.RESET}")
+
+            # Sort the folders to be trashed within the group by path
+            folders_to_trash_list.sort(key=lambda f: str(f.path))
+            for folder_to_delete in folders_to_trash_list:
+                q_del = folder_to_delete.quality_score if folder_to_delete.quality_score is not None else -1.0
+                q_del_str = f"{q_del:.2f}%" if q_del >= 0 else "N/A"
+                print(f"  {AnsiColors.RED}To Trash: '{folder_to_delete.path}' (Q: {q_del_str}){AnsiColors.RESET}")
+                folders_to_actually_trash.append(folder_to_delete) # Add to the flat list for trashing action
+
+            group_num += 1
+
+        print(AnsiColors.YELLOW + "--- End of Grouped List ---" + AnsiColors.RESET)
 
         try:
-            confirmation = input(AnsiColors.YELLOW + f"\nMove the {len(folders_to_delete_pairs)} folders listed above to the system trash? (y/n): " + AnsiColors.RESET).strip().lower()
+            # Use the total_folders_to_delete count calculated earlier
+            confirmation = input(AnsiColors.YELLOW + f"\nMove the {total_folders_to_delete} folders listed 'To Trash' above to the system trash? (y/n): " + AnsiColors.RESET).strip().lower()
         except EOFError: # Handle non-interactive environments
              confirmation = 'n'
              print("Non-interactive mode detected, cancelling delete operation.")
 
 
         if confirmation == 'y':
-            logger.warning(f"User confirmed deletion of {len(folders_to_delete_pairs)} folders.")
+            logger.warning(f"User confirmed deletion of {total_folders_to_delete} folders.")
             trashed_count = 0
             failed_count = 0
-            for folder_to_delete, best_folder in folders_to_delete_pairs:
+            # Iterate through the flat list collected earlier
+            for folder_to_delete in folders_to_actually_trash:
+                # Find the 'best_folder' path this was associated with for better logging
+                best_folder_path_associated = "Unknown" # Default if somehow not found
+                for b_path, (b_info, del_list) in grouped_deletions.items():
+                     if folder_to_delete in del_list:
+                          best_folder_path_associated = b_info.path # Get the path of the best folder
+                          break
                 try:
                     # Double check the folder still exists before trashing
-                    if folder_to_delete.path.exists():
+                    if folder_to_delete.path.exists() and folder_to_delete.path.is_dir(): # Extra check is_dir
                          send2trash(str(folder_to_delete.path)) # send2trash needs string path
                          print(f"Moved to trash: '{folder_to_delete.path}'")
-                         logger.warning(f"Moved to trash: {folder_to_delete.path} (preferred was {best_folder.path})")
+                         logger.warning(f"Moved to trash: {folder_to_delete.path} (preferred was {best_folder_path_associated})")
                          trashed_count += 1
-                    else:
+                    elif not folder_to_delete.path.exists():
                          print(f"Skipped missing folder: '{folder_to_delete.path}'")
                          logger.warning(f"Skipped trashing missing folder: {folder_to_delete.path}")
+                    else:
+                         # Path exists but is not a directory (shouldn't happen often here)
+                         print(f"Skipped non-directory path: '{folder_to_delete.path}'")
+                         logger.warning(f"Skipped trashing non-directory path: {folder_to_delete.path}")
+
 
                 except Exception as e:
                     failed_count += 1
@@ -281,4 +324,3 @@ class ActionHandler:
         else:
             print("Deletion cancelled by user.")
             logger.info("Trash process cancelled by user.")
-
