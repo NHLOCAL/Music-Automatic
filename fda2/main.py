@@ -430,91 +430,97 @@ def run_analysis(args):
 
 
 if __name__ == "__main__":
+    # --- Argument Parser Setup ---
     parser = argparse.ArgumentParser(
-        description="Music Duplicate Detector and Quality Analyzer. Finds similar music folders, assesses quality, and optionally uses Gemini API for advanced analysis.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter # Show defaults in help
+        description="Analyzes music folders to find duplicates, assess quality, and optionally leverage Gemini API for deeper comparison.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter # Show default values in help message
     )
 
-    parser.add_argument("folders", nargs="+",
-                        help="One or more root folder paths containing music albums/folders.")
+    # --- Input/Output Arguments ---
+    parser.add_argument("folders", nargs="+", metavar="FOLDER",
+                        help="One or more root folder paths to scan for music.")
     parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         default=config.DEFAULT_LOG_LEVEL,
-                        help="Set the logging level.")
-    parser.add_argument("-b", "--bitrate", choices=["128", "high"], default="128",
-                        help="Preferred bitrate target for quality assessment ('128' targets 128kbps, 'high' prefers >=320kbps).")
-    parser.add_argument("-d", "--disable-hash", action="store_true",
-                        help="Disable file hashing (faster scan, less accurate identity check).")
-    parser.add_argument("-r", "--force-rescan", action="store_true",
-                        help="Force rescan of all folders, ignoring cache.")
+                        help="Set the logging level (affects console and file output).")
 
-    # --- Gemini Arguments ---
-    gemini_group = parser.add_argument_group('Gemini Analysis Options')
-    gemini_group.add_argument("--gemini-analysis", action="store_true",
-                              help=f"Enable Gemini API analysis for folder pairs (requires {config.GEMINI_API_KEY_ENV_VAR} env var and necessary libraries like 'requests', 'Pillow').")
-    gemini_group.add_argument("--gemini-range", type=str, default=config.DEFAULT_GEMINI_SIMILARITY_RANGE,
-                              help="Similarity range ('min-max' percentage, e.g., '50-90') for sending pairs to Gemini.")
-    # --- End Gemini Arguments ---
+    # --- Scanning & Analysis Options ---
+    scan_group = parser.add_argument_group('Scanning and Analysis Options')
+    scan_group.add_argument("-b", "--bitrate", choices=["128", "high"], default="128",
+                            help="Preferred bitrate target for quality assessment ('128' targets ~128kbps, 'high' prefers >=320kbps).")
+    scan_group.add_argument("-d", "--disable-hash", action="store_true",
+                            help="Disable file hashing (provides faster scan but less accurate identity check).")
+    scan_group.add_argument("-r", "--force-rescan", action="store_true",
+                            help="Force rescan of all folders, ignoring the existing cache.")
 
-    # Add arguments for merge/delete thresholds directly?
-    # parser.add_argument("--merge-threshold", type=float, default=config.MIN_SIMILARITY_FOR_MERGE, help="Similarity threshold to offer merging.")
-    # parser.add_argument("--delete-threshold", type=float, default=config.DEFAULT_MIN_SIMILARITY_FOR_DELETE, help="Default similarity threshold to offer deletion.")
+    # --- Gemini Analysis Options ---
+    gemini_group = parser.add_argument_group('Gemini Analysis Options (Optional)')
+    gemini_group.add_argument("-g", "--gemini-analysis", action="store_true", # הוספת קיצור -g
+                              help=f"Enable Gemini API analysis for selected folder pairs. Requires the '{config.GEMINI_API_KEY_ENV_VAR}' environment variable and necessary libraries ('requests', 'Pillow').")
+    gemini_group.add_argument("-gr", "--gemini-range", type=str, default=config.DEFAULT_GEMINI_SIMILARITY_RANGE, # הוספת קיצור -gr
+                              metavar="MIN-MAX",
+                              help="Similarity range ('min-max' percentage, e.g., '50-90') for sending pairs to Gemini API.")
 
-    args = parser.parse_args() # Use standard parse_args unless specific need for unknown args
+    # --- Action Thresholds (Example - Currently handled interactively) ---
+    # action_group = parser.add_argument_group('Action Thresholds')
+    # action_group.add_argument("--merge-threshold", type=float, default=config.MIN_SIMILARITY_FOR_MERGE, metavar="PERCENT",
+    #                           help="Similarity threshold (percentage) to offer merging metadata.")
+    # action_group.add_argument("--delete-threshold", type=float, default=config.DEFAULT_MIN_SIMILARITY_FOR_DELETE, metavar="PERCENT",
+    #                           help="Default similarity threshold (percentage) to offer deletion.")
 
-    # --- Initial Logging Setup (before full run_analysis setup) ---
-    # Setup basic logging config early to catch issues during argument parsing or init
-    # We will refine this inside run_analysis based on args.log_level
+
+    args = parser.parse_args()
+
+    # --- Initial Logging Setup ---
     log_level_initial = getattr(logging, args.log_level.upper(), logging.INFO)
     logging.basicConfig(level=log_level_initial, format=config.LOG_FORMAT, handlers=[logging.StreamHandler()])
     logger = logging.getLogger(__name__) # Get logger for initial messages
 
-    # Validate input folders *before* starting the main analysis
+    # --- Validate Input Folders ---
     valid_folders = []
     invalid_paths = []
+    if not args.folders:
+         parser.error("No input folders specified.") # Use parser.error for better message
+
     for folder_str in args.folders:
         p = Path(folder_str)
         try:
-             if p.is_dir():
-                 # Optionally resolve to absolute path for consistency
-                 valid_folders.append(p.resolve())
-             else:
-                 invalid_paths.append(folder_str)
+            if p.is_dir():
+                valid_folders.append(p.resolve())
+            else:
+                invalid_paths.append(folder_str)
         except OSError as e:
-             logger.error(f"Error accessing path '{folder_str}': {e}")
-             invalid_paths.append(f"{folder_str} (Error: {e})")
-        except Exception as e: # Catch other potential errors like invalid chars
-             logger.error(f"Invalid path specified '{folder_str}': {e}")
-             invalid_paths.append(f"{folder_str} (Invalid Path)")
-
+            logger.error(f"Error accessing path '{folder_str}': {e}")
+            invalid_paths.append(f"{folder_str} (Error: {e})")
+        except Exception as e: # Catch other potential errors
+            logger.error(f"Invalid path specified '{folder_str}': {e}")
+            invalid_paths.append(f"{folder_str} (Invalid Path)")
 
     if invalid_paths:
         print(f"{utils.AnsiColors.RED}Error: The following input paths are invalid or inaccessible:{utils.AnsiColors.RESET}")
         for invalid in invalid_paths:
-             print(f"- {invalid}")
+            print(f"- {invalid}")
         if not valid_folders:
-             print("No valid folders provided. Exiting.")
-             sys.exit(1) # Exit if *all* paths were invalid
+            print("No valid folders provided. Exiting.")
+            sys.exit(1)
         else:
-             print("Proceeding with the valid paths...")
+            print("Proceeding with the valid paths...")
 
+    args.folders = [str(p) for p in valid_folders] # Store validated paths as strings for consistency if needed
 
-    # Replace args.folders with only the validated Path objects
-    args.folders = [str(p) for p in valid_folders] # Convert back to strings if needed by downstream funcs, though Path objects are better
-
-    # Check Gemini availability vs. request *after* parsing args
+    # --- Check Gemini Availability vs. Request ---
     if args.gemini_analysis and not GEMINI_AVAILABLE:
         print(f"{utils.AnsiColors.YELLOW}Warning: Gemini analysis requested (--gemini-analysis) but the API key ({config.GEMINI_API_KEY_ENV_VAR}) is missing or required libraries ('requests', 'Pillow') are not installed properly. Gemini analysis will be skipped.{utils.AnsiColors.RESET}")
         logger.warning(f"Gemini analysis requested but disabled (API Key: {bool(GEMINI_API_KEY)}, Module Import: {GeminiAnalyzer is not None}).")
-        args.gemini_analysis = False # Ensure it's disabled if unavailable
+        args.gemini_analysis = False
 
-    # Start the main process
+    # --- Start Main Process ---
     try:
         run_analysis(args)
     except KeyboardInterrupt:
-         print("\nAnalysis interrupted by user.")
-         logger.warning("Analysis interrupted by user (KeyboardInterrupt).")
-         sys.exit(1)
+        print("\nAnalysis interrupted by user.")
+        logger.warning("Analysis interrupted by user (KeyboardInterrupt).")
+        sys.exit(1)
     except Exception as e:
-         logger.error(f"An unexpected error occurred during analysis: {e}", exc_info=True)
-         print(f"\n{utils.AnsiColors.RED}An unexpected error occurred. Please check the logs in the 'logs' directory for details.{utils.AnsiColors.RESET}")
-         sys.exit(1)
+        logger.error(f"An unexpected error occurred during analysis: {e}", exc_info=True)
+        print(f"\n{utils.AnsiColors.RED}An unexpected error occurred. Please check the logs in the 'logs' directory for details.{utils.AnsiColors.RESET}")
+        sys.exit(1)
