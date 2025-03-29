@@ -1,4 +1,3 @@
-# main.py (or duplicate_detector_refactored.py)
 import argparse
 from collections import defaultdict
 import logging
@@ -16,9 +15,8 @@ from comparison_engine import ComparisonEngine
 from quality_analyzer import QualityAnalyzer
 from action_handler import ActionHandler
 
-# Setup initial logger (before command line args override level)
-logger = utils.setup_logging(config.DEFAULT_LOG_LEVEL, config.LOGS_DIR)
-
+# --- הסרת הגדרת הלוגינג הראשונית ---
+# logger = utils.setup_logging(config.DEFAULT_LOG_LEVEL, config.LOGS_DIR)
 
 # --- Presentation Logic ---
 def display_comparison_results(results: List[FolderComparisonResult], all_folders: Dict[Path, FolderInfo]):
@@ -137,8 +135,13 @@ def display_quality_results_grouped(all_folders: Dict[Path, FolderInfo], compari
 # --- Main Execution Logic ---
 def run_analysis(args):
     """Orchestrates the entire analysis process."""
-    # Re-setup logging with level from args
-    utils.setup_logging(args.log_level, config.LOGS_DIR)
+    # Re-setup logging with level from args (moved inside run_analysis)
+    if not hasattr(run_analysis, 'logger_initialized'): # Use a flag to initialize logger only once if needed
+        utils.setup_logging(args.log_level, config.LOGS_DIR)
+        run_analysis.logger_initialized = True
+    global logger # Make sure we are using the module-level logger
+    logger = logging.getLogger(__name__) # Get the logger instance
+
     logger.info("Starting Music Duplicate Detector Analysis")
     logger.info(f"Arguments: {args}")
 
@@ -253,7 +256,13 @@ if __name__ == "__main__":
     #                     help=f"Minimum similarity percentage to offer deletion. Default: {config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}")
 
 
-    args = parser.parse_args()
+    args, unknown_args = parser.parse_known_args() # <--- שימוש ב-parse_known_args
+
+    # --- הגדרה מותנית של לוגינג ---
+    if '-h' not in unknown_args and '--help' not in unknown_args: # <--- בדיקה אם פרמטר עזרה לא הופעל
+        logger = utils.setup_logging(args.log_level, config.LOGS_DIR)
+    else:
+        logger = logging.getLogger(__name__) # עדיין צריך logger ריק כדי למנוע שגיאות בהמשך הקוד
 
     # Validate input folders before starting
     valid_folders = []
