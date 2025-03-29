@@ -60,3 +60,8 @@ class FolderComparisonResult:
     weighted_score: float = 0.0
     # Flag if folders are considered identical based on file hashes
     is_identical_by_hash: bool = False
+    # --- Gemini Analysis Results (Optional) ---
+    gemini_is_duplicate: Optional[bool] = None
+    gemini_confidence: Optional[float] = None
+    gemini_reason: Optional[str] = None
+    gemini_error: Optional[str] = None # To store API or parsing errors
