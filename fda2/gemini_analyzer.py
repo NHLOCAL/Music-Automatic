@@ -1,8 +1,8 @@
-# gemini_analyzer.py
-import os
-import sys
-import json
 import base64
+import os
+from google import genai
+from google.generativeai import types
+import json
 import re
 import logging
 import requests
@@ -42,9 +42,9 @@ except Exception as e:
 
 
 # קבלת מפתח API עבור Gemini מהסביבה
-API_KEY = os.environ.get("GEMINI_API_KEY")
+API_KEY = os.environ.get(config.GEMINI_API_KEY_ENV_VAR)
 if not API_KEY:
-    logger.warning("GEMINI_API_KEY environment variable not set. Gemini analysis will be disabled.")
+    logger.warning(f"{config.GEMINI_API_KEY_ENV_VAR} environment variable not set. Gemini analysis will be disabled.")
     API_KEY = None
 
 MODEL_NAME = config.GEMINI_MODEL_NAME
@@ -54,7 +54,11 @@ class GeminiAnalyzer:
 
     def __init__(self):
         if not API_KEY:
-            raise ValueError("Gemini API Key not found in environment variables.")
+            raise ValueError(f"Gemini API Key not found in environment variables: {config.GEMINI_API_KEY_ENV_VAR}")
+        self.client = genai.Client( # שימוש ב-genai.Client במקום genai.GenerativeModel
+            api_key=API_KEY,
+        )
+        self.model = MODEL_NAME # שמירת שם המודל
         self.conversation = []
         logger.info(f"Gemini Analyzer initialized for model: {MODEL_NAME}")
 
@@ -132,7 +136,7 @@ class GeminiAnalyzer:
         MAX_FILES_TO_SEND = 15 # לדוגמה
         for i, file_info in enumerate(folder_info.files):
             if i >= MAX_FILES_TO_SEND:
-                album_data["files"].append({"filename": f"... and {len(folder_info.files) - MAX_FILES_TO_SEND} more files"})
+                album_data["files"].append({"filename": f"... ועוד {len(folder_info.files) - MAX_FILES_TO_SEND} קבצים"})
                 break
 
             # יצירת מילון נקי עבור כל קובץ
@@ -141,14 +145,9 @@ class GeminiAnalyzer:
                 "title": file_info.title,
                 "artist": file_info.artist,
                 "album": file_info.album, # חשוב להשוואה פרטנית
-                # "albumartist": file_info.albumartist, # פחות קריטי אם יש אמן ואלבום
                 "bitrate": file_info.bitrate,
                 "duration_seconds": int(file_info.duration) if file_info.duration else None,
                 "size_mb": round(file_info.size_mb, 2) if file_info.size_mb else None,
-                # "file_hash": file_info.file_hash, # פחות רלוונטי ל-AI
-                "extension": file_info.extension,
-                "is_lossless": file_info.is_lossless,
-                # נוסיף תגים חשובים אחרים אם קיימים, למשל track number
                 "track_number": file_info.all_tags.get('tracknumber'),
                 "disc_number": file_info.all_tags.get('discnumber'),
             }
@@ -160,83 +159,98 @@ class GeminiAnalyzer:
 
     def _add_user_text(self, message: str):
         """Adds a text message to the conversation history."""
-        self.conversation.append({
-            "role": "user",
-            "parts": [{"text": message}]
-        })
+        self.conversation.append(
+            genai.types.Content(
+                role="user",
+                parts=[genai.types.Part.from_text(text=message)]
+            )
+        )
 
     def _add_user_image(self, base64_str: str, mime_type: str = "image/jpeg"):
         """Adds an image from Base64 string to the conversation history."""
         if base64_str:
             # נבדוק את סוג ה-mime לפי הסיומת אם אפשר
             # (לצורך הדוגמה נשאיר jpeg, אך אפשר לשפר)
-            self.conversation.append({
-                "role": "user",
-                "parts": [{
-                    "inline_data": {
-                        "mime_type": mime_type,
-                        "data": base64_str
-                    }
-                }]
-            })
+            self.conversation.append(
+                genai.types.Content(
+                    role="user",
+                    parts=[genai.types.Part.from_inline_data(
+                        inline_data=genai.types.Blob(
+                            mime_type=mime_type,
+                            data=base64.b64decode(base64_str)
+                        )
+                    )]
+                )
+            )
 
     def _send_and_receive(self) -> str:
         """Sends the conversation to the Gemini API and returns the text response."""
-        payload = {
-            "systemInstruction": {
-                "role": "model", # לפי הדוקומנטציה החדשה זה צריך להיות model או system
-                "parts": [{"text": SYSTEM_INST}]
-            },
-            "contents": self.conversation
-        }
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
-        params = {"key": API_KEY}
-        headers = {"Content-Type": "application/json"}
+        generate_content_config = genai.types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=genai.types.Schema(
+                type = genai.types.Type.OBJECT,
+                required = ["is_duplicate", "confidence", "reason"],
+                properties = {
+                    "is_duplicate": genai.types.Schema(
+                        type = genai.types.Type.BOOLEAN,
+                        description = "Boolean indicating if the item is a duplicate",
+                    ),
+                    "confidence": genai.types.Schema(
+                        type = genai.types.Type.INTEGER,
+                        description = "Confidence score between 0 and 100",
+                    ),
+                    "reason": genai.types.Schema(
+                        type = genai.types.Type.STRING,
+                        description = "Short explanation in Hebrew",
+                    ),
+                },
+            ),
+            system_instruction=[
+                genai.types.Part.from_text(text=SYSTEM_INST),
+            ],
+        )
 
         max_retries = 2
         for attempt in range(max_retries):
             try:
-                response = requests.post(url, params=params, headers=headers, json=payload, timeout=45) # הגדלת timeout
-                response.raise_for_status() # יזרוק שגיאה עבור 4xx/5xx
-                resp_json = response.json()
-                # print(f"DEBUG: Gemini Raw Response JSON: {json.dumps(resp_json, indent=2)}") # הדפסת תשובה גולמית לדיבוג
+                response_stream = self.client.models.generate_content_stream(
+                    model=self.model,
+                    contents=self.conversation,
+                    config=generate_content_config,
+                )
 
-                # בדיקה אם התשובה חסומה
-                if not resp_json.get("candidates") and resp_json.get("promptFeedback"):
-                    block_reason = resp_json["promptFeedback"].get("blockReason")
-                    safety_ratings = resp_json["promptFeedback"].get("safetyRatings")
-                    error_msg = f"Gemini request blocked. Reason: {block_reason}. Ratings: {safety_ratings}"
-                    logger.error(error_msg)
-                    return f"API_ERROR: {error_msg}"
+                full_response_text = ""
+                for chunk in response_stream: # עכשיו עוברים על הצ'אנקים בזרם
+                    if chunk.text: # Ensure chunk.text exists before appending
+                        full_response_text += chunk.text
+
+                    # בדיקה אם התשובה חסומה - עכשיו בודקים בכל צ'אנק
+                    if not chunk.candidates and chunk.prompt_feedback: # השתמש ב-chunk במקום response_stream
+                        block_reason = chunk.prompt_feedback.block_reason # השתמש ב-chunk
+                        safety_ratings = chunk.prompt_feedback.safety_ratings # השתמש ב-chunk
+                        error_msg = f"Gemini request blocked. Reason: {block_reason}. Ratings: {safety_ratings}"
+                        logger.error(error_msg)
+                        return f"API_ERROR: {error_msg}"
+
+                    if chunk.candidates: # השתמש ב-chunk
+                        candidate = chunk.candidates[0] # השתמש ב-chunk
+                        if candidate.finish_reason == "SAFETY":
+                            safety_ratings = candidate.safety_ratings
+                            error_msg = f"Gemini response candidate blocked due to SAFETY. Ratings: {safety_ratings}"
+                            logger.error(error_msg)
+                            return f"API_ERROR: {error_msg}"
 
 
-                candidates = resp_json.get("candidates", [])
-                if candidates:
-                    # בדיקה אם התוכן של המועמד הראשון חסום
-                    candidate = candidates[0]
-                    if candidate.get("finishReason") == "SAFETY":
-                         safety_ratings = candidate.get("safetyRatings")
-                         error_msg = f"Gemini response candidate blocked due to SAFETY. Ratings: {safety_ratings}"
-                         logger.error(error_msg)
-                         return f"API_ERROR: {error_msg}"
-
-                    model_content = candidate.get("content", {})
-                    model_parts = model_content.get("parts", [])
-                    if model_parts:
-                        model_text = model_parts[0].get("text", "").strip()
-                        # הוספת תשובת המודל להיסטוריה רק אם תקינה
-                        self.conversation.append({
-                            "role": "model",
-                            "parts": [{"text": model_text}]
-                        })
-                        return model_text
-                    else:
-                        logger.warning("No 'parts' found in Gemini response candidate.")
-                        return "NO_ANSWER_PARTS"
-                else:
-                    logger.warning("No 'candidates' received from Gemini API.")
-                    return "NO_CANDIDATES"
+                model_text = full_response_text.strip() # הטקסט המלא כבר הורכב מהצ'אנקים
+                # הוספת תשובת המודל להיסטוריה רק אם תקינה
+                self.conversation.append(
+                    genai.types.Content(
+                        role="model",
+                        parts=[genai.types.Part.from_text(text=model_text)]
+                    )
+                )
+                return model_text
 
             except requests.exceptions.Timeout:
                  logger.warning(f"Gemini API request timed out (Attempt {attempt + 1}/{max_retries}). Retrying if possible...")
@@ -244,9 +258,6 @@ class GeminiAnalyzer:
                      return "API_ERROR: Request timed out after multiple retries."
             except requests.exceptions.RequestException as e:
                 logger.error(f"Error communicating with Gemini API (Attempt {attempt + 1}/{max_retries}): {e}", exc_info=False)
-                # בדיקה אם השגיאה היא 429 (Too Many Requests)
-                if hasattr(e, 'response') and e.response is not None and e.response.status_code == 429:
-                    return "API_ERROR: Too Many Requests (Rate Limit Exceeded)"
                 if attempt == max_retries - 1:
                     return f"API_ERROR: {e}" # החזרת השגיאה האחרונה
             except Exception as e:
@@ -294,11 +305,33 @@ class GeminiAnalyzer:
 
         # הוספת תמונות אם קיימות וקודדו בהצלחה
         if album1_data.get("album_art_base64"):
-            self._add_user_image(album1_data["album_art_base64"])
-            self._add_user_text("[Album 1 Art Above]") # Context for the image
+            # העלאת תמונה כאובייקט קובץ ל-API
+            image_bytes_1 = base64.b64decode(album1_data["album_art_base64"])
+            temp_file_1 = self.client.files.upload(file_data=BytesIO(image_bytes_1), mime_type="image/jpeg") # יצירת קובץ זמני בזיכרון
+            self.conversation.append(genai.types.Content(
+                role="user",
+                parts=[
+                    genai.types.Part.from_uri(
+                        file_uri=temp_file_1.uri,
+                        mime_type=temp_file_1.mime_type,
+                    ),
+                    genai.types.Part.from_text(text="[Album 1 Art Above]") # Context for the image
+                ]
+            ))
         if album2_data.get("album_art_base64"):
-            self._add_user_image(album2_data["album_art_base64"])
-            self._add_user_text("[Album 2 Art Above]") # Context for the image
+            # העלאת תמונה כאובייקט קובץ ל-API
+            image_bytes_2 = base64.b64decode(album2_data["album_art_base64"])
+            temp_file_2 = self.client.files.upload(file_data=BytesIO(image_bytes_2), mime_type="image/jpeg") # יצירת קובץ זמני בזיכרון
+            self.conversation.append(genai.types.Content(
+                role="user",
+                parts=[
+                    genai.types.Part.from_uri(
+                        file_uri=temp_file_2.uri,
+                        mime_type=temp_file_2.mime_type,
+                    ),
+                    genai.types.Part.from_text(text="[Album 2 Art Above]") # Context for the image
+                ]
+            ))
 
 
         response_text = self._send_and_receive()
