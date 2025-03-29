@@ -92,4 +92,4 @@ GEMINI_API_KEY_ENV_VAR = "GEMINI_API_KEY" # שם משתנה הסביבה
 GEMINI_SYSTEM_INST_FILE = Path("gemini_system_instruction.txt") # נתיב לקובץ ההוראות
 GEMINI_MODEL_NAME = "gemini-2.0-flash-lite" # שימוש במודל עדכני יותר, או gemini-pro
 DEFAULT_GEMINI_SIMILARITY_RANGE = "50-90" # טווח ברירת מחדל לניתוח Gemini (ציון דמיון באחוזים)
-GEMINI_API_DELAY_SECONDS = 1.0 # הוספה: עיכוב בשניות בין קריאות ל-API כדי למנוע חסימה
+GEMINI_API_DELAY_SECONDS = 0.5 # הוספה: עיכוב בשניות בין קריאות ל-API כדי למנוע חסימה
