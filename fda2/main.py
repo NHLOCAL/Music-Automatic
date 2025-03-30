@@ -10,7 +10,7 @@ import sys
 # Import necessary components from other modules
 import config
 import utils
-from models import FolderInfo, FolderComparisonResult # Ensure FolderComparisonResult is imported
+from models import FolderInfo, FolderComparisonResult
 from data_store import DataStore
 from file_processor import FileProcessor
 from folder_scanner import FolderScanner
