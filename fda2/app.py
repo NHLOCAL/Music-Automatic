@@ -105,7 +105,7 @@ def step1_submit(folder_paths_str: str, force_rescan, disable_hash, bitrate_pref
     if hasattr(utils, 'setup_logging'): utils.setup_logging(log_level, config.LOGS_DIR); logger.info(f"Log level set: {log_level}")
 
     run_config = {"folders": valid_folder_paths, "force_rescan": force_rescan, "disable_hash": disable_hash, "bitrate": bitrate_pref,
-                  "gemini_analysis": enable_gemini and GEMINI_AVAILABLE and _select_representatives is not None,
+                  "gemini_analysis": enable_gemini,
                   "gemini_range": gemini_range, "log_level": log_level}
 
     return {step1_block: gr.update(visible=False), step2_block: gr.update(visible=True), step3_block: gr.update(visible=False),
@@ -141,43 +141,40 @@ def run_analysis_process(run_config: Optional[Dict]) -> Generator[Tuple[str, Opt
         yield (f"השוואה הסתיימה ({num_pairs} זוגות מעל רף).", None)
 
         if run_config['gemini_analysis']:
-            if not GEMINI_AVAILABLE or _select_representatives is None:
-                 yield ("אזהרה: Gemini לא זמין/לא מוגדר כראוי.", None)
-            else:
-                gemini_desc = "מתחיל ניתוח Gemini..."; yield (gemini_desc, None)
-                try:
-                    if GeminiAnalyzer:
-                        gemini_analyzer = GeminiAnalyzer()
-                        min_sim, max_sim = map(float, run_config['gemini_range'].split('-'))
-                        representative_map = _select_representatives(all_scanned_folders, comparison_results, config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE)
-                        pairs_to_analyze, skipped_rep, skipped_dup = [], 0, 0; processed_representative_pairs = set()
-                        candidate_results = [r for r in comparison_results if min_sim <= r.weighted_score <= max_sim and not r.is_identical_by_hash]
-                        for result in candidate_results:
-                             f1_p, f2_p = result.folder1_path, result.folder2_path
-                             if f1_p not in representative_map or f2_p not in representative_map: continue
-                             rep1, rep2 = representative_map[f1_p], representative_map[f2_p]
-                             if rep1 == rep2: skipped_rep += 1; continue
-                             canonical_rep_pair = tuple(sorted((str(rep1), str(rep2))))
-                             if canonical_rep_pair in processed_representative_pairs: skipped_dup += 1; continue
-                             pairs_to_analyze.append(result); processed_representative_pairs.add(canonical_rep_pair)
+            gemini_desc = "מתחיל ניתוח Gemini..."; yield (gemini_desc, None)
+            try:
+                if GeminiAnalyzer:
+                    gemini_analyzer = GeminiAnalyzer()
+                    min_sim, max_sim = map(float, run_config['gemini_range'].split('-'))
+                    representative_map = _select_representatives(all_scanned_folders, comparison_results, config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE)
+                    pairs_to_analyze, skipped_rep, skipped_dup = [], 0, 0; processed_representative_pairs = set()
+                    candidate_results = [r for r in comparison_results if min_sim <= r.weighted_score <= max_sim and not r.is_identical_by_hash]
+                    for result in candidate_results:
+                         f1_p, f2_p = result.folder1_path, result.folder2_path
+                         if f1_p not in representative_map or f2_p not in representative_map: continue
+                         rep1, rep2 = representative_map[f1_p], representative_map[f2_p]
+                         if rep1 == rep2: skipped_rep += 1; continue
+                         canonical_rep_pair = tuple(sorted((str(rep1), str(rep2))))
+                         if canonical_rep_pair in processed_representative_pairs: skipped_dup += 1; continue
+                         pairs_to_analyze.append(result); processed_representative_pairs.add(canonical_rep_pair)
 
-                        num_gemini_pairs = len(pairs_to_analyze)
-                        logger.info(f"Gemini will analyze {num_gemini_pairs} pairs (skipped {skipped_rep} same-rep, {skipped_dup} duplicate-rep).")
-                        yield(f"נמצאו {num_gemini_pairs} זוגות ל-Gemini...", None)
-                        pairs_to_analyze.sort(key=lambda x: x.weighted_score, reverse=True)
-                        import time
-                        for i, result in enumerate(pairs_to_analyze):
-                            f1, f2 = all_scanned_folders.get(result.folder1_path), all_scanned_folders.get(result.folder2_path)
-                            if not f1 or not f2: continue
-                            yield (f"Gemini: מעבד {i+1}/{num_gemini_pairs}...", None)
-                            verdict, conf, reason_or_error = gemini_analyzer.analyze_pair(f1, f2, result.weighted_score)
-                            is_error = reason_or_error and any(e in reason_or_error for e in ["API_ERROR", "PARSE_ERROR", "TIMEOUT", "UNEXPECTED"])
-                            is_invalid = verdict is None and not is_error
-                            if is_error or is_invalid: result.gemini_error = reason_or_error; result.gemini_verdict = None; result.gemini_confidence = None; result.gemini_reason = None
-                            else: result.gemini_verdict = verdict; result.gemini_confidence = conf; result.gemini_reason = reason_or_error; result.gemini_error = None
-                            time.sleep(config.GEMINI_API_DELAY_SECONDS)
-                    yield ("ניתוח Gemini הושלם.", None)
-                except Exception as gemini_err: logger.error(f"Gemini failed: {gemini_err}", exc_info=True); yield (f"שגיאה ב-Gemini: {gemini_err}", None)
+                    num_gemini_pairs = len(pairs_to_analyze)
+                    logger.info(f"Gemini will analyze {num_gemini_pairs} pairs (skipped {skipped_rep} same-rep, {skipped_dup} duplicate-rep).")
+                    yield(f"נמצאו {num_gemini_pairs} זוגות ל-Gemini...", None)
+                    pairs_to_analyze.sort(key=lambda x: x.weighted_score, reverse=True)
+                    import time
+                    for i, result in enumerate(pairs_to_analyze):
+                        f1, f2 = all_scanned_folders.get(result.folder1_path), all_scanned_folders.get(result.folder2_path)
+                        if not f1 or not f2: continue
+                        yield (f"Gemini: מעבד {i+1}/{num_gemini_pairs}...", None)
+                        verdict, conf, reason_or_error = gemini_analyzer.analyze_pair(f1, f2, result.weighted_score)
+                        is_error = reason_or_error and any(e in reason_or_error for e in ["API_ERROR", "PARSE_ERROR", "TIMEOUT", "UNEXPECTED"])
+                        is_invalid = verdict is None and not is_error
+                        if is_error or is_invalid: result.gemini_error = reason_or_error; result.gemini_verdict = None; result.gemini_confidence = None; result.gemini_reason = None
+                        else: result.gemini_verdict = verdict; result.gemini_confidence = conf; result.gemini_reason = reason_or_error; result.gemini_error = None
+                        time.sleep(config.GEMINI_API_DELAY_SECONDS)
+                yield ("ניתוח Gemini הושלם.", None)
+            except Exception as gemini_err: logger.error(f"Gemini failed: {gemini_err}", exc_info=True); yield (f"שגיאה ב-Gemini: {gemini_err}", None)
 
         logger.info("Analysis process finished successfully.")
         def folder_info_to_dict(fi: FolderInfo): d=fi.__dict__.copy(); d['path']=str(d['path']); d['files']=[file_info_to_dict(f) for f in d.get('files',[])]; d['unique_artists']=sorted(list(d.get('unique_artists',set()))); d['unique_albums']=sorted(list(d.get('unique_albums',set()))); return d
@@ -407,11 +404,11 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue=gr.themes.colors.blue, secondary
         step1_folder_input = gr.Textbox(label="הזן נתיב מלא לתיקיות שורש (מופרדים בפסיק/נקודה-פסיק)", placeholder="לדוגמה: C:\\Music, D:\\Temp", interactive=True, elem_id="folder_input")
         with gr.Row(): step1_force_rescan=gr.Checkbox(label="אלץ סריקה מחדש",value=False); step1_disable_hash=gr.Checkbox(label="השבת Hash",value=False)
         with gr.Row(): step1_bitrate_pref=gr.Dropdown(["128","high"],label="Bitrate מועדף",value="128"); step1_log_level=gr.Dropdown(["DEBUG","INFO","WARNING","ERROR"],label="רמת לוג",value="INFO")
-        with gr.Accordion("הגדרות Gemini (אופציונלי)",open=False):
-             gemini_ok = GEMINI_AVAILABLE and _select_representatives is not None; lbl=f"אפשר Gemini {'(זמין)' if gemini_ok else '(לא זמין)'}"
-             step1_enable_gemini=gr.Checkbox(label=lbl,value=False,interactive=gemini_ok)
-             step1_gemini_range=gr.Textbox(label="טווח ל-Gemini (%)",value=config.DEFAULT_GEMINI_SIMILARITY_RANGE,visible=False)
-             step1_enable_gemini.change(lambda x:gr.update(visible=x),inputs=step1_enable_gemini,outputs=step1_gemini_range)
+        with gr.Accordion("הגדרות Gemini (אופציונלי)", open=False):
+            lbl = "אפשר Gemini (זמין בכל מקרה)"
+            step1_enable_gemini = gr.Checkbox(label=lbl, value=False, interactive=True)
+            step1_gemini_range = gr.Textbox(label="טווח ל-Gemini (%)", value=config.DEFAULT_GEMINI_SIMILARITY_RANGE, visible=False)
+            step1_enable_gemini.change(lambda x: gr.update(visible=x), inputs=step1_enable_gemini, outputs=step1_gemini_range)
         step1_button = gr.Button("הבא: התחל ניתוח", variant="primary")
 
     with gr.Column(visible=False) as step2_block: # שלב 2
