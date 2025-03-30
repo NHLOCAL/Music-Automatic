@@ -29,17 +29,14 @@ logger = logging.getLogger(__name__)
 
 # קביעת קובץ הוראות מערכת וקריאתו
 SYSTEM_INST_FILE = config.GEMINI_SYSTEM_INST_FILE
-SYSTEM_INST = "You are a helpful AI assistant specializing in music album comparison. Analyze the provided metadata and album art (if available) for two albums. Determine if they are likely duplicates, considering variations in quality, track listing, editions, etc. Respond ONLY with a JSON object containing 'is_duplicate' (boolean), 'confidence' (float 0.0-100.0), and 'reason' (string)."
+SYSTEM_INST = None  # Removed hardcoded instruction
 try:
-    if SYSTEM_INST_FILE.is_file():
-        with open(SYSTEM_INST_FILE, 'r', encoding='utf-8') as f:
-            SYSTEM_INST = f.read()
-        logger.info(f"Gemini system instruction loaded from {SYSTEM_INST_FILE}")
-    else:
-         logger.warning(f"Gemini system instruction file not found at {SYSTEM_INST_FILE}. Using default instructions.")
+    with open(SYSTEM_INST_FILE, 'r', encoding='utf-8') as f:
+        SYSTEM_INST = f.read()
+    logger.info(f"Gemini system instruction loaded from {SYSTEM_INST_FILE}")
 except Exception as e:
-    logger.error(f"Error reading Gemini system instruction file {SYSTEM_INST_FILE}: {e}. Using default instructions.")
-
+    logger.error(f"Error reading Gemini system instruction file {SYSTEM_INST_FILE}: {e}.")
+    raise
 
 # קבלת מפתח API עבור Gemini מהסביבה
 API_KEY = os.environ.get(config.GEMINI_API_KEY_ENV_VAR)
@@ -190,14 +187,16 @@ class GeminiAnalyzer:
             response_mime_type="application/json",
             response_schema=genai.types.Schema(
                 type = genai.types.Type.OBJECT,
-                required = ["is_duplicate", "confidence", "reason"],
+                required = ["verdict", "confidence", "reason"], # <--- השתנה ל-verdict
                 properties = {
-                    "is_duplicate": genai.types.Schema(
-                        type = genai.types.Type.BOOLEAN,
-                        description = "Boolean indicating if the item is a duplicate",
+                    "verdict": genai.types.Schema( # <--- השתנה ל-verdict
+                        type = genai.types.Type.STRING,
+                        description = "The verdict: 'duplicate', 'different', or 'uncertain'",
+                        # Optional: Add enum if supported by the SDK version
+                        # enum = ['duplicate', 'different', 'uncertain']
                     ),
                     "confidence": genai.types.Schema(
-                        type = genai.types.Type.INTEGER,
+                        type = genai.types.Type.NUMBER, # Using NUMBER allows float/int
                         description = "Confidence score between 0 and 100",
                     ),
                     "reason": genai.types.Schema(
@@ -206,11 +205,11 @@ class GeminiAnalyzer:
                     ),
                 },
             ),
+            # system_instruction should match the new instructions
             system_instruction=[
                 genai.types.Part.from_text(text=SYSTEM_INST),
             ],
         )
-
         max_retries = 2
         for attempt in range(max_retries):
             try:
@@ -268,13 +267,13 @@ class GeminiAnalyzer:
         return "API_ERROR: Max retries exceeded without success." # הגעה לכאן לא אמורה לקרות
 
 
-    def analyze_pair(self, folder_info1: FolderInfo, folder_info2: FolderInfo, script_similarity_score: float) -> Tuple[Optional[bool], Optional[float], str]:
+    def analyze_pair(self, folder_info1: FolderInfo, folder_info2: FolderInfo, script_similarity_score: float) -> Tuple[Optional[str], Optional[float], str]: # <--- Changed return type hint
         """
         Analyzes a pair of folders using the Gemini API.
 
         Returns:
             Tuple containing:
-            - is_duplicate (Optional[bool]): True if Gemini thinks they are duplicates, False otherwise, None on error.
+            - verdict (Optional[str]): 'duplicate', 'different', 'uncertain', or None on error.
             - confidence (Optional[float]): Confidence score (0-100), None on error.
             - reason (str): Explanation from Gemini or error message.
         """
@@ -338,38 +337,45 @@ class GeminiAnalyzer:
 
         # נסה לפענח את התשובה כ-JSON
         try:
-            # נסיר תווים מיותרים או markdown מסביב ל-JSON
             match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if match:
                 json_text = match.group(0)
                 response_json = json.loads(json_text)
-                is_duplicate = response_json.get("is_duplicate")
+                verdict = response_json.get("verdict") # <--- Get 'verdict'
                 confidence = response_json.get("confidence")
                 reason = response_json.get("reason", "No reason provided by Gemini.")
 
-                # ולידציה בסיסית של הנתונים
-                if not isinstance(is_duplicate, bool):
-                     logger.warning(f"Gemini response 'is_duplicate' is not boolean: {is_duplicate}")
-                     is_duplicate = None # סמן כשגיאה
-                     reason += " (Invalid 'is_duplicate' type in response)"
+                # --- Validation ---
+                allowed_verdicts = {'duplicate', 'different', 'uncertain'}
+                if verdict not in allowed_verdicts:
+                    logger.warning(f"Gemini response 'verdict' is invalid: '{verdict}'. Expected one of {allowed_verdicts}")
+                    reason += f" (Invalid verdict '{verdict}' received from API)"
+                    verdict = None # Mark as error / inconclusive
+
                 if confidence is not None:
-                     try:
-                         confidence = float(confidence)
-                         if not (0.0 <= confidence <= 100.0):
-                              logger.warning(f"Gemini response 'confidence' out of range: {confidence}")
-                              # נשאיר את הערך אך נוסיף אזהרה לסיבה
-                              reason += f" (Confidence value {confidence} out of range [0-100])"
-                     except ValueError:
-                          logger.warning(f"Gemini response 'confidence' is not a float: {confidence}")
-                          confidence = None # סמן כשגיאה
-                          reason += " (Invalid 'confidence' type in response)"
+                    try:
+                        confidence = float(confidence)
+                        if not (0.0 <= confidence <= 100.0):
+                            logger.warning(f"Gemini response 'confidence' out of range: {confidence}")
+                            reason += f" (Confidence value {confidence} out of range [0-100])"
+                            # Keep the value but added warning
+                    except ValueError:
+                        logger.warning(f"Gemini response 'confidence' is not a number: {confidence}")
+                        confidence = None
+                        reason += " (Invalid 'confidence' type in response)"
+                # --- End Validation ---
 
-
-                logger.info(f"Gemini verdict for ({folder_info1.path.name}, {folder_info2.path.name}): Duplicate={is_duplicate}, Confidence={confidence}, Reason='{reason[:100]}...'")
-                return is_duplicate, confidence, reason
+                logger.info(f"Gemini verdict for ({folder_info1.path.name}, {folder_info2.path.name}): Verdict={verdict}, Confidence={confidence}, Reason='{reason[:100]}...'")
+                return verdict, confidence, reason
             else:
-                 logger.warning(f"Could not extract valid JSON from Gemini response for ({folder_info1.path.name}, {folder_info2.path.name}). Response: {response_text}")
-                 return None, None, f"JSON_PARSE_ERROR: Could not extract JSON. Raw response: {response_text}"
+                # ... (handle JSON extraction error) ...
+                return None, None, f"JSON_PARSE_ERROR: Could not extract JSON. Raw response: {response_text}"
+        except json.JSONDecodeError as e:
+            # ... (handle JSON parsing error) ...
+            return None, None, f"JSON_PARSE_ERROR: {e}. Raw response: {response_text}"
+        except Exception as e:
+            # ... (handle unexpected error) ...
+            return None, None, f"UNEXPECTED_PARSE_ERROR: {e}. Raw response: {response_text}"
 
         except json.JSONDecodeError as e:
             logger.warning(f"Could not parse Gemini JSON response for ({folder_info1.path.name}, {folder_info2.path.name}). JSONDecodeError: {e}. Response: {response_text}")
