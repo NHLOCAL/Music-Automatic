@@ -20,9 +20,10 @@ from mutagen.id3 import ID3, APIC, ID3NoHeaderError, _util as mutagen_util
 from mutagen.mp3 import MP3, HeaderNotFoundError as MP3HeaderNotFoundError
 from mutagen.flac import FLAC
 
-import config
-from utils import fix_jibrish_text, get_file_size_mb, contains_hebrew
-from models import FileInfo
+from .. import config
+from ..utils import fix_jibrish_text, get_file_size_mb, contains_hebrew
+from ..models import FileInfo
+
 
 logger = logging.getLogger(__name__)
 

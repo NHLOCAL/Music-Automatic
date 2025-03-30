@@ -6,11 +6,15 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Set
 from send2trash import send2trash # Keep using send2trash for safety
 
-import config
-from models import FolderInfo, FileInfo, FolderComparisonResult
-from utils import AnsiColors
-# Need FileProcessor potentially for metadata merging, though maybe simpler logic is ok
-from file_processor import FileProcessor # Or just use mutagen directly here
+# ייבואים יחסיים: .. עולה רמה אחת למעלה ל- music_dup_lib
+from .. import config
+from ..models import FolderInfo, FileInfo, FolderComparisonResult
+from ..utils import AnsiColors
+
+# ייבוא יחסי: . מייבא מאותה תיקייה (core)
+from .file_processor import FileProcessor
+
+# ייבואים חיצוניים
 from mutagen import File as MutagenFile
 from mutagen.easyid3 import EasyID3
 

@@ -8,7 +8,7 @@ from rapidfuzz import fuzz
 from functools import lru_cache
 from jibrish_to_hebrew import fix_jibrish, check_jibrish
 
-import config # Import the configuration
+from . import config # Import the configuration
 
 # --- ANSI Color Codes ---
 class AnsiColors:

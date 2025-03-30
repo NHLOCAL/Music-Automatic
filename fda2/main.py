@@ -7,21 +7,24 @@ from typing import List, Dict, Tuple, Set, Optional
 import time
 import sys
 
-# Import necessary components from other modules
-import config
-import utils
-from models import FolderInfo, FolderComparisonResult
-from data_store import DataStore
-from file_processor import FileProcessor
-from folder_scanner import FolderScanner
-from comparison_engine import ComparisonEngine
-from quality_analyzer import QualityAnalyzer
-from action_handler import ActionHandler
+# Import necessary components using absolute paths from the package root
+from music_dup_lib import config # config נמצא ישירות תחת החבילה
+from music_dup_lib import utils  # utils נמצא ישירות תחת החבילה
+from music_dup_lib.models import FolderInfo, FolderComparisonResult # models נמצא ישירות תחת החבילה
+from music_dup_lib.core.data_store import DataStore # נמצא תחת core
+from music_dup_lib.core.file_processor import FileProcessor # נמצא תחת core
+from music_dup_lib.core.folder_scanner import FolderScanner # נמצא תחת core
+from music_dup_lib.core.comparison_engine import ComparisonEngine # נמצא תחת core
+from music_dup_lib.core.quality_analyzer import QualityAnalyzer # נמצא תחת core
+from music_dup_lib.core.action_handler import ActionHandler # נמצא תחת core
 
-# Import Gemini analyzer and handle availability
+# Import Gemini analyzer (handle availability)
 try:
-    from gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
+    # Gemini נמצא תחת external
+    from music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
     GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
+    # חשוב: עדכן את הנתיב ש-Gemini מחפש בו את המפתח אם הוא עדיין ב-config
+    # למשל: logging.warning(f"Gemini API Key ({config.GEMINI_API_KEY_ENV_VAR})...")
     if not GEMINI_AVAILABLE:
         logging.warning(f"Gemini API Key ({config.GEMINI_API_KEY_ENV_VAR}) not found or 'requests'/'Pillow'/'google-generativeai' missing. Gemini analysis will be disabled.")
 except ImportError as e:

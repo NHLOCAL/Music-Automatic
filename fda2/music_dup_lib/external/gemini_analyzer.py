@@ -21,22 +21,33 @@ except ImportError:
     logging.warning("Pillow library not found. Gemini album art analysis will be skipped.")
 
 # ייבוא מהפרויקט הראשי
-import config
-from models import FolderInfo, FileInfo, FolderComparisonResult
-from utils import AnsiColors
+from .. import config
+from ..models import FolderInfo, FileInfo, FolderComparisonResult
+from ..utils import AnsiColors
 
 logger = logging.getLogger(__name__)
 
 # קביעת קובץ הוראות מערכת וקריאתו
-SYSTEM_INST_FILE = config.GEMINI_SYSTEM_INST_FILE
-SYSTEM_INST = None  # Removed hardcoded instruction
+SYSTEM_INST = None
 try:
-    with open(SYSTEM_INST_FILE, 'r', encoding='utf-8') as f:
+    # קבל את הנתיב לתיקייה הנוכחית (external)
+    current_dir = Path(__file__).parent
+    # צרף את שם הקובץ מהקונפיגורציה
+    instruction_file_path = current_dir / config.GEMINI_SYSTEM_INST_FILE # השתמש בשם החדש מהקונפיג
+
+    with open(instruction_file_path, 'r', encoding='utf-8') as f:
         SYSTEM_INST = f.read()
-    logger.info(f"Gemini system instruction loaded from {SYSTEM_INST_FILE}")
+    # שנה את הודעת הלוג כדי להציג את הנתיב המלא שנבדק
+    logger.info(f"Gemini system instruction loaded from {instruction_file_path}")
+except FileNotFoundError:
+     # הדפס הודעת שגיאה ברורה יותר עם הנתיב המלא
+     logger.error(f"Error reading Gemini system instruction file. File not found at: {instruction_file_path}", exc_info=True)
+     # אפשר להחליט אם להמשיך עם הוראה דיפולטיבית או לצאת
+     SYSTEM_INST = "Error: Could not load system instructions. Please ensure the file exists." # לדוגמה
 except Exception as e:
-    logger.error(f"Error reading Gemini system instruction file {SYSTEM_INST_FILE}: {e}.")
-    raise
+    # תפוס שגיאות אחרות בקריאת הקובץ
+    logger.error(f"Error reading Gemini system instruction file at {instruction_file_path}: {e}", exc_info=True)
+    SYSTEM_INST = "Error: Could not load system instructions due to an unexpected error."
 
 # קבלת מפתח API עבור Gemini מהסביבה
 API_KEY = os.environ.get(config.GEMINI_API_KEY_ENV_VAR)

@@ -6,11 +6,14 @@ import re
 from typing import Any, List, Dict, Optional, Tuple
 import concurrent.futures
 
-import config
-from models import FileInfo, FolderInfo
-from file_processor import FileProcessor
-from data_store import DataStore # To check cache
-from utils import cached_string_similarity, contains_hebrew # For generic name checks
+from .. import config
+from ..models import FileInfo, FolderInfo
+from ..utils import cached_string_similarity, contains_hebrew
+
+# ייבואים יחסיים: . מייבא מאותה תיקייה (core)
+from .file_processor import FileProcessor
+from .data_store import DataStore
+
 from itertools import combinations
 
 logger = logging.getLogger(__name__)

@@ -6,9 +6,9 @@ from itertools import combinations
 from collections import defaultdict
 import re # For normalization
 
-import config
-from models import FolderInfo, FileInfo, FolderComparisonResult
-from utils import cached_string_similarity, normalize_filename_for_sort
+from .. import config
+from ..models import FolderInfo, FileInfo, FolderComparisonResult
+from ..utils import cached_string_similarity, normalize_filename_for_sort
 
 logger = logging.getLogger(__name__)
 

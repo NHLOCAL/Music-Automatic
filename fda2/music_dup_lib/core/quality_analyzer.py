@@ -2,9 +2,10 @@
 import logging
 from typing import Tuple, Dict
 
-import config
-from models import FolderInfo
-from utils import contains_hebrew # Already calculated in FolderInfo, but keep check logic here too
+# ייבואים יחסיים: .. עולה רמה אחת למעלה ל- music_dup_lib
+from .. import config
+from ..models import FolderInfo
+from ..utils import contains_hebrew # Already calculated in FolderInfo, but keep check logic here too
 
 logger = logging.getLogger(__name__)
 
