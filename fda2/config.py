@@ -93,3 +93,4 @@ GEMINI_SYSTEM_INST_FILE = Path("gemini_system_instruction.txt") # נתיב לק�
 GEMINI_MODEL_NAME = "gemini-2.0-flash-lite" # שימוש במודל עדכני יותר, או gemini-pro
 DEFAULT_GEMINI_SIMILARITY_RANGE = "50-90" # טווח ברירת מחדל לניתוח Gemini (ציון דמיון באחוזים)
 GEMINI_API_DELAY_SECONDS = 0.5 # הוספה: עיכוב בשניות בין קריאות ל-API כדי למנוע חסימה
+GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE = 95.0

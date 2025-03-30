@@ -185,19 +185,104 @@ def display_quality_results_grouped(all_folders: Dict[Path, FolderInfo], compari
     print(utils.AnsiColors.CYAN + "\n--- End of Quality Assessment ---" + utils.AnsiColors.RESET)
 
 
-# --- Gemini Analysis Function ---
+# --- פונקציית עזר לבחירת נציגים ---
+def _select_representatives(
+    all_folders: Dict[Path, FolderInfo],
+    comparison_results: List[FolderComparisonResult],
+    similarity_threshold: float
+) -> Dict[Path, Path]:
+    """
+    Identifies clusters of highly similar folders and selects a representative for each cluster.
+
+    Args:
+        all_folders: Dictionary mapping folder paths to FolderInfo objects.
+        comparison_results: List of comparison results between folder pairs.
+        similarity_threshold: The similarity score above which folders are considered
+                               part of the same high-similarity cluster.
+
+    Returns:
+        A dictionary mapping each folder path (Path) to its representative's path (Path).
+        Folders not part of any cluster map to themselves.
+    """
+    logger.info(f"Selecting representatives for clusters with similarity >= {similarity_threshold}%...")
+    representative_map: Dict[Path, Path] = {path: path for path in all_folders} # Initialize: everything maps to itself
+    graph: Dict[Path, Set[Path]] = defaultdict(set)
+    nodes_in_graph: Set[Path] = set()
+
+    # Build graph only from highly similar pairs
+    relevant_results = [r for r in comparison_results if r.weighted_score >= similarity_threshold]
+    if not relevant_results:
+        logger.info("No pairs met the high similarity threshold for representative selection.")
+        return representative_map # Return initial map where everything maps to itself
+
+    for result in relevant_results:
+        f1_path, f2_path = result.folder1_path, result.folder2_path
+        if f1_path in all_folders and f2_path in all_folders: # Ensure both folders still exist in our data
+            graph[f1_path].add(f2_path)
+            graph[f2_path].add(f1_path)
+            nodes_in_graph.add(f1_path)
+            nodes_in_graph.add(f2_path)
+        else:
+             logger.warning(f"Skipping edge for representative selection: Folder data missing for pair {f1_path.name}, {f2_path.name}")
+
+
+    # Find connected components (clusters)
+    seen: Set[Path] = set()
+    clusters_found = 0
+    for node_path in list(nodes_in_graph): # Iterate over relevant nodes
+        if node_path not in seen and node_path in all_folders: # Check existence again
+            component_paths: Set[Path] = set()
+            stack = [node_path]
+            visited_in_component: Set[Path] = set()
+
+            while stack:
+                current_path = stack.pop()
+                if current_path not in visited_in_component and current_path in nodes_in_graph and current_path in all_folders:
+                    visited_in_component.add(current_path)
+                    seen.add(current_path)
+                    component_paths.add(current_path)
+                    # Add neighbors that are part of the graph connections
+                    stack.extend(graph.get(current_path, set()) - visited_in_component)
+
+            # Process the found component if it has more than one folder
+            if len(component_paths) > 1:
+                component_folders = [all_folders[p] for p in component_paths if p in all_folders]
+                # Filter out folders missing quality scores for reliable representative selection
+                component_folders = [f for f in component_folders if f and f.quality_score is not None]
+
+                if len(component_folders) > 1: # Need at least two valid folders to form a cluster for this purpose
+                    clusters_found += 1
+                    # Find the best folder (representative) based on quality score
+                    best_folder = max(component_folders, key=lambda f: f.quality_score)
+                    representative_path = best_folder.path
+                    logger.debug(f"Cluster found. Representative: {representative_path.name} (Q:{best_folder.quality_score:.2f}) for folders: {[f.path.name for f in component_folders]}")
+
+                    # Map all folders in this component to the representative
+                    for folder_path in component_paths:
+                         if folder_path in all_folders: # Ensure we only map existing folders
+                            representative_map[folder_path] = representative_path
+                elif component_folders: # Only one valid folder left, doesn't form a cluster needing a representative change
+                     logger.debug(f"Component starting at {node_path.name} reduced to one valid folder after quality score check, not changing representative.")
+
+
+    logger.info(f"Representative selection complete. Found {clusters_found} clusters.")
+    return representative_map
+
+
+# --- Gemini Analysis Function (MODIFIED) ---
 def run_gemini_analysis(
     comparison_results: List[FolderComparisonResult],
     all_folders: Dict[Path, FolderInfo],
     gemini_range_str: str
 ) -> None:
-    """Runs Gemini analysis on folder pairs within the specified similarity range."""
-    global logger
+    """Runs Gemini analysis on folder pairs within the specified similarity range, optimizing for high-similarity duplicates."""
+    global logger # Make sure logger is accessible
 
     if not GEMINI_AVAILABLE or not GeminiAnalyzer:
         logger.warning("Gemini analysis skipped (API Key missing, module/dependencies unavailable, or explicitly disabled).")
         return
 
+    # --- Parse Gemini Range ---
     try:
         min_sim_str, max_sim_str = gemini_range_str.split('-')
         min_sim = float(min_sim_str)
@@ -209,20 +294,72 @@ def run_gemini_analysis(
         print(f"{utils.AnsiColors.RED}Error: Invalid Gemini similarity range '{gemini_range_str}'. Skipping Gemini analysis.{utils.AnsiColors.RESET}")
         return
 
-    logger.info(f"Starting Gemini analysis for pairs with similarity between {min_sim}% and {max_sim}%...")
-    pairs_to_analyze = [
+    # --- Select Representatives for High-Similarity Clusters ---
+    representative_map = _select_representatives(
+        all_folders,
+        comparison_results,
+        config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE # Use the new config value
+    )
+
+    logger.info(f"Filtering pairs for Gemini analysis (Range: {min_sim}%-{max_sim}%, Rep Threshold: {config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE}%)...")
+
+    # --- Filter Pairs Based on Range AND Representatives ---
+    pairs_to_analyze: List[FolderComparisonResult] = []
+    processed_representative_pairs: Set[Tuple[str, str]] = set() # Track processed pairs of representatives
+
+    # Filter initial list by score range and non-identical hash
+    candidate_results = [
         result for result in comparison_results
         if min_sim <= result.weighted_score <= max_sim and not result.is_identical_by_hash
     ]
 
+    skipped_count_rep = 0
+    skipped_count_dup_rep = 0
+    for result in candidate_results:
+        f1_path = result.folder1_path
+        f2_path = result.folder2_path
+
+        # Ensure folders exist in map (should always be true if data is consistent)
+        if f1_path not in representative_map or f2_path not in representative_map:
+             logger.warning(f"Skipping pair ({f1_path.name}, {f2_path.name}) for Gemini: Folder path not found in representative map.")
+             continue
+
+        rep1 = representative_map[f1_path]
+        rep2 = representative_map[f2_path]
+
+        # Skip Condition 1: If representatives are the same, these folders belong to the same high-similarity cluster.
+        if rep1 == rep2:
+            skipped_count_rep += 1
+            logger.debug(f"Skipping Gemini (Same Rep): {f1_path.name} ({rep1.name}) <-> {f2_path.name} ({rep2.name})")
+            continue
+
+        # Skip Condition 2: Check if this *pair of representatives* has already been processed.
+        # Use canonical representation (sorted string paths)
+        canonical_rep_pair = tuple(sorted((str(rep1), str(rep2))))
+        if canonical_rep_pair in processed_representative_pairs:
+            skipped_count_dup_rep += 1
+            logger.debug(f"Skipping Gemini (Duplicate Rep Pair): {f1_path.name} ({rep1.name}) <-> {f2_path.name} ({rep2.name})")
+            continue
+
+        # If not skipped, add the original result to the list and mark representative pair as processed.
+        pairs_to_analyze.append(result)
+        processed_representative_pairs.add(canonical_rep_pair)
+        logger.debug(f"Adding pair for Gemini: {f1_path.name} <-> {f2_path.name} (Reps: {rep1.name} <-> {rep2.name})")
+
+
     if not pairs_to_analyze:
-        logger.info("No folder pairs found within the specified range for Gemini analysis.")
-        print("\nNo folder pairs found within the specified range for Gemini analysis.")
+        logger.info(f"No folder pairs remaining for Gemini analysis after filtering (Range: {min_sim}-{max_sim}%, Rep Threshold: {config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE}%). Skipped {skipped_count_rep} same-rep pairs, {skipped_count_dup_rep} duplicate-rep pairs.")
+        print(f"\nNo folder pairs found within the specified range ({min_sim}-{max_sim}%) for Gemini analysis after optimization.")
         return
 
+    # Sort the final list to analyze by score
     pairs_to_analyze.sort(key=lambda x: x.weighted_score, reverse=True)
-    print(f"\n{utils.AnsiColors.CYAN}--- Running Gemini Analysis ({len(pairs_to_analyze)} pairs between {min_sim}-{max_sim}%) ---{utils.AnsiColors.RESET}")
+    total_candidates = len(candidate_results)
+    final_count = len(pairs_to_analyze)
+    logger.info(f"Gemini analysis will run on {final_count} pairs (filtered from {total_candidates}). Skipped {skipped_count_rep} same-rep pairs, {skipped_count_dup_rep} duplicate-rep pairs.")
+    print(f"\n{utils.AnsiColors.CYAN}--- Running Optimized Gemini Analysis ({final_count} pairs between {min_sim}-{max_sim}%, reduced from {total_candidates}) ---{utils.AnsiColors.RESET}")
 
+    # --- Initialize Gemini Analyzer ---
     try:
         gemini_analyzer = GeminiAnalyzer()
     except ValueError as e:
@@ -230,13 +367,14 @@ def run_gemini_analysis(
         print(f"{utils.AnsiColors.RED}Error: Failed to initialize Gemini Analyzer. Check API Key ({config.GEMINI_API_KEY_ENV_VAR}).{utils.AnsiColors.RESET}")
         return
     except Exception as e:
-         logger.error(f"Unexpected error initializing Gemini Analyzer: {e}", exc_info=True)
-         print(f"{utils.AnsiColors.RED}Error: Unexpected error initializing Gemini Analyzer.{utils.AnsiColors.RESET}")
-         return
+        logger.error(f"Unexpected error initializing Gemini Analyzer: {e}", exc_info=True)
+        print(f"{utils.AnsiColors.RED}Error: Unexpected error initializing Gemini Analyzer.{utils.AnsiColors.RESET}")
+        return
 
+    # --- Run Analysis on Filtered Pairs ---
     analysis_count = 0
     start_time = time.time()
-    for i, result in enumerate(pairs_to_analyze):
+    for i, result in enumerate(pairs_to_analyze): # Iterate over the filtered list
         f1 = all_folders.get(result.folder1_path)
         f2 = all_folders.get(result.folder2_path)
         if not f1 or not f2:
@@ -247,36 +385,35 @@ def run_gemini_analysis(
         print(f"{progress} Analyzing pair: '{f1.path.name}' <-> '{f2.path.name}' (Score: {result.weighted_score:.2f}%)", end='\r')
         logger.info(f"{progress} Sending pair to Gemini: {f1.path.name} <-> {f2.path.name}")
 
-        # UPDATED: Call analyze_pair which now returns verdict string
+        # Call analyze_pair (logic remains the same here)
         verdict, conf, reason_or_error = gemini_analyzer.analyze_pair(f1, f2, result.weighted_score)
 
         print(" " * 120, end='\r') # Clear progress line
 
-        # Store results in the FolderComparisonResult object
-        # Check if the third return value indicates an error or if verdict is None after validation
+        # Store results (logic remains the same here)
         is_error = reason_or_error and ("API_ERROR" in reason_or_error or "PARSE_ERROR" in reason_or_error or "TIMEOUT" in reason_or_error or "UNEXPECTED" in reason_or_error)
-        is_invalid_response = verdict is None and not is_error # Handle cases where verdict is None due to invalid value, not API error
+        is_invalid_response = verdict is None and not is_error
 
         if is_error or is_invalid_response:
-            result.gemini_error = reason_or_error # Store the error message or reason for invalid verdict
-            result.gemini_verdict = None # Ensure verdict is None
+            result.gemini_error = reason_or_error
+            result.gemini_verdict = None
             result.gemini_confidence = None
-            result.gemini_reason = None # Clear reason if it was part of an invalid response structure
+            result.gemini_reason = None
             log_message = f"Gemini analysis failed or returned invalid verdict for pair ({f1.path.name}, {f2.path.name}): {reason_or_error}"
             logger.warning(log_message)
             print(f"{progress} {utils.AnsiColors.RED}Error/Invalid Verdict analyzing pair: '{f1.path.name}' <-> '{f2.path.name}'. See logs.{utils.AnsiColors.RESET}")
         else:
-            result.gemini_verdict = verdict # Store the validated string verdict
+            result.gemini_verdict = verdict
             result.gemini_confidence = conf
-            result.gemini_reason = reason_or_error # Store the valid reason
-            result.gemini_error = None # Clear error field on success
+            result.gemini_reason = reason_or_error
+            result.gemini_error = None
 
-            verdict_display = verdict if verdict else "Inconclusive" # Should not be None here, but good practice
+            verdict_display = verdict if verdict else "Inconclusive"
             conf_str = f"{conf:.1f}%" if conf is not None else "N/A"
             print(f"{progress} Analyzed pair: '{f1.path.name}' <-> '{f2.path.name}'. Verdict: {verdict_display} ({conf_str})")
 
         analysis_count += 1
-        time.sleep(config.GEMINI_API_DELAY_SECONDS)
+        time.sleep(config.GEMINI_API_DELAY_SECONDS) # Keep delay between actual API calls
 
     end_time = time.time()
     duration = end_time - start_time
