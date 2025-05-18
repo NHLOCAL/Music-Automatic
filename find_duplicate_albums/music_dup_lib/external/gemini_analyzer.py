@@ -1,7 +1,6 @@
 import base64
 import os
 from google import genai
-from google.generativeai import types
 import json
 import re
 import logging
