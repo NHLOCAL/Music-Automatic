@@ -1,4 +1,3 @@
-# webui_app.py (עם תיקון Attribute Error)
 import gradio as gr
 import sys
 import os
@@ -7,15 +6,15 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Generator, Set, Any
 from collections import defaultdict
 import json
-import re # Ensure re is imported
+import re
 
-# הוספת נתיב הספרייה לפייתון
+
 script_dir = Path(__file__).parent
 lib_path = script_dir / 'music_dup_lib'
 sys.path.insert(0, str(script_dir.parent))
 sys.path.insert(0, str(script_dir))
 
-# ייבוא רכיבי הליבה
+
 try:
     from music_dup_lib import config, utils
     from music_dup_lib.models import FolderInfo, FileInfo, FolderComparisonResult
@@ -27,8 +26,8 @@ try:
     from music_dup_lib.core.action_handler import ActionHandler
     try:
         from music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
-        # Assuming _select_representatives is moved to utils:
-        from music_dup_lib.utils import _select_representatives
+
+        from music_dup_lib.utils import _select_representatives # Assuming this is still in utils for app.py context
         GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
     except ImportError:
         GeminiAnalyzer = None; GEMINI_AVAILABLE = False; GEMINI_API_KEY = None; _select_representatives = None
@@ -39,7 +38,7 @@ except AttributeError as ae:
      print(f"Attribute error during import: {ae}. Check function locations (e.g., _select_representatives).")
      sys.exit(1)
 
-# --- הגדרת לוגינג ---
+
 log_dir = Path("logs"); log_dir.mkdir(exist_ok=True)
 log_file = log_dir / "webui_app.log"
 if not logging.getLogger().hasHandlers():
@@ -49,14 +48,14 @@ logger = logging.getLogger(__name__)
 if hasattr(utils, 'setup_logging'): utils.setup_logging("INFO", config.LOGS_DIR)
 else: logger.warning("utils.setup_logging function not found.")
 
-# --- Helper function for Markdown escaping ---
+
 def escape_markdown_chars(text: str) -> str:
-    """Escapes common Markdown special characters in a string."""
+
     if not isinstance(text, str): return str(text)
     escape_chars = r"([\\`*_\[\]{}()#+-.!])"
     return re.sub(escape_chars, r"\\\1", text)
 
-# --- Helper functions for state object reconstruction ---
+
 def _file_info_from_dict(data: Dict[str, Any]) -> FileInfo:
     d = data.copy(); d['filepath'] = Path(d['filepath'])
     d.setdefault('all_tags', {}); d.setdefault('metadata_complete', False)
@@ -79,8 +78,29 @@ def _comparison_result_from_dict(data: Dict[str, Any]) -> FolderComparisonResult
     d.setdefault('gemini_reason', None); d.setdefault('gemini_error', None)
     return FolderComparisonResult(**d)
 
-# --- פונקציות עזר ל-UI (שלבי ה-Wizard) ---
-def step1_submit(folder_paths_str: str, force_rescan, disable_hash, bitrate_pref, enable_gemini, gemini_range, log_level):
+
+def update_preferred_root_dropdown(folder_paths_str: str):
+    if not folder_paths_str or not folder_paths_str.strip():
+        return gr.update(choices=["אין תיקיות קלט"], value="אין תיקיות קלט", interactive=False)
+    
+    path_candidates = [p.strip() for p in folder_paths_str.replace(';', ',').split(',') if p.strip()]
+    valid_folder_paths = []
+    for path_str in path_candidates:
+        try:
+            p = Path(path_str)
+            if p.exists() and p.is_dir():
+                valid_folder_paths.append(str(p.resolve()))
+        except Exception:
+            pass # Ignore invalid paths for dropdown population
+    
+    choices = ["ללא העדפה"] + sorted(list(set(valid_folder_paths)))
+    if not valid_folder_paths:
+        return gr.update(choices=["אין תיקיות קלט תקינות"], value="אין תיקיות קלט תקינות", interactive=False)
+    
+    return gr.update(choices=choices, value="ללא העדפה", interactive=True)
+
+
+def step1_submit(folder_paths_str: str, preferred_root_selection: str, force_rescan, disable_hash, bitrate_pref, enable_gemini, gemini_range, log_level):
     logger.info("Step 1 submitted")
     if not folder_paths_str or not folder_paths_str.strip(): raise gr.Error("חובה להזין לפחות נתיב תיקיית שורש אחת.")
     path_candidates = [p.strip() for p in folder_paths_str.replace(';', ',').split(',') if p.strip()]
@@ -101,12 +121,21 @@ def step1_submit(folder_paths_str: str, force_rescan, disable_hash, bitrate_pref
         else: gr.Warning("התעלמו מחלק מהנתיבים שהוזנו כי אינם תקינים."); logger.warning(f"Invalid paths ignored: {invalid_paths}")
     if not valid_folder_paths: raise gr.Error("לא נמצאו נתיבי תיקיות תקינים.")
 
-    logger.info(f"Valid folders: {valid_folder_paths}, Options: ForceRescan={force_rescan}, DisableHash={disable_hash}, Bitrate={bitrate_pref}, Gemini={enable_gemini}, Range={gemini_range}, LogLevel={log_level}")
+    final_preferred_root = None
+    if preferred_root_selection and preferred_root_selection != "ללא העדפה" and preferred_root_selection in valid_folder_paths:
+        final_preferred_root = preferred_root_selection
+        logger.info(f"Preferred root folder selected: {final_preferred_root}")
+    elif preferred_root_selection and preferred_root_selection != "ללא העדפה":
+        logger.warning(f"Selected preferred root '{preferred_root_selection}' is not among valid input folders or is invalid. No preference will be applied.")
+
+
+    logger.info(f"Valid folders: {valid_folder_paths}, Options: ForceRescan={force_rescan}, DisableHash={disable_hash}, Bitrate={bitrate_pref}, Gemini={enable_gemini}, Range={gemini_range}, LogLevel={log_level}, PreferredRoot={final_preferred_root}")
     if hasattr(utils, 'setup_logging'): utils.setup_logging(log_level, config.LOGS_DIR); logger.info(f"Log level set: {log_level}")
 
     run_config = {"folders": valid_folder_paths, "force_rescan": force_rescan, "disable_hash": disable_hash, "bitrate": bitrate_pref,
                   "gemini_analysis": enable_gemini,
-                  "gemini_range": gemini_range, "log_level": log_level}
+                  "gemini_range": gemini_range, "log_level": log_level,
+                  "preferred_root": final_preferred_root}
 
     return {step1_block: gr.update(visible=False), step2_block: gr.update(visible=True), step3_block: gr.update(visible=False),
             step4_block: gr.update(visible=False), step5_block: gr.update(visible=False), step6_block: gr.update(visible=False),
@@ -123,6 +152,9 @@ def run_analysis_process(run_config: Optional[Dict]) -> Generator[Tuple[str, Opt
         folder_scanner = FolderScanner(file_processor, data_store, force_rescan=run_config['force_rescan'])
         comparison_engine = ComparisonEngine(enable_hashing=enable_hashing)
         quality_analyzer = QualityAnalyzer(preferred_bitrate=run_config['bitrate'])
+        
+        # preferred_root for ActionHandler will be passed later if needed
+        # action_handler initialized in steps that use it
 
         scan_desc = "סורק תיקיות..."; yield (scan_desc, None)
         all_scanned_folders: Dict[Path, FolderInfo] = folder_scanner.scan_folders(root_paths)
@@ -140,7 +172,7 @@ def run_analysis_process(run_config: Optional[Dict]) -> Generator[Tuple[str, Opt
         num_pairs = len([r for r in comparison_results if r.weighted_score >= config.MINIMAL_DISPLAY_SIMILARITY])
         yield (f"השוואה הסתיימה ({num_pairs} זוגות מעל רף).", None)
 
-        if run_config['gemini_analysis']:
+        if run_config.get('gemini_analysis', False) and _select_representatives is not None: # Check _select_representatives
             gemini_desc = "מתחיל ניתוח Gemini..."; yield (gemini_desc, None)
             try:
                 if GeminiAnalyzer:
@@ -269,7 +301,7 @@ def format_quality_results(analysis_results: Optional[Dict]) -> str:
                         q, q_str = folder.quality_score, f"{folder.quality_score:.2f}%"
                         clr = "green" if i==0 else "orange" if q>50 else "red"
                         marker = "👑 **(הטובה ביותר)**" if i==0 else ""
-                        # !!! Use helper function !!!
+
                         safe_name = escape_markdown_chars(folder.path.name)
                         markdown_output += f"*   {marker} <span style='color:{clr}; font-weight:bold;'>{q_str}</span> - '{safe_name}'\n"
                         if folder.quality_breakdown:
@@ -290,7 +322,7 @@ def format_quality_results(analysis_results: Optional[Dict]) -> str:
                     q = folder.quality_score if folder.quality_score is not None else -1.0
                     q_str = f"{q:.2f}%" if q>=0 else "N/A "
                     clr = "green" if q>75 else "orange" if q>50 else "red" if q>=0 else "grey"
-                    # !!! Use helper function !!!
+
                     safe_name = escape_markdown_chars(folder.path.name)
                     markdown_output += f"*   <span style='color:{clr};'>{q_str}</span> - '{safe_name}'\n"
                     if folder.quality_breakdown:
@@ -299,10 +331,11 @@ def format_quality_results(analysis_results: Optional[Dict]) -> str:
     except Exception as format_err: logger.error(f"Quality format error: {format_err}", exc_info=True); markdown_output += f"\n**שגיאה בעיצוב:** {format_err}"
     return markdown_output
 
-def step4_next(analysis_results: Optional[Dict]):
+def step4_next(analysis_results: Optional[Dict], run_config: Optional[Dict]):
     logger.info("Moving from step 4 to step 5")
     to_delete_markdown = "טוען רשימת מחיקה..."
-    if not analysis_results or not isinstance(analysis_results, dict): to_delete_markdown = "שגיאה: נתוני ניתוח חסרים."
+    if not analysis_results or not isinstance(analysis_results, dict) or not run_config:
+        to_delete_markdown = "שגיאה: נתוני ניתוח או תצורה חסרים."
     else:
         try:
             all_folders_dict, comp_list = analysis_results.get('all_folders',{}), analysis_results.get('comparison_results',[])
@@ -310,12 +343,19 @@ def step4_next(analysis_results: Optional[Dict]):
             all_folders_info = {Path(p): _folder_info_from_dict(d) for p, d in all_folders_dict.items()}
             comp_results = [_comparison_result_from_dict(r) for r in comp_list if isinstance(r,dict)]
             default_threshold = config.DEFAULT_MIN_SIMILARITY_FOR_DELETE
-            file_processor = FileProcessor(enable_hashing=True)
-            action_handler = ActionHandler(all_folders_info, file_processor)
+            file_processor = FileProcessor(enable_hashing=True) # Hashing should be consistent with earlier steps
+            
+            preferred_root_str = run_config.get("preferred_root")
+            preferred_root_path_obj = Path(preferred_root_str) if preferred_root_str else None
+            
+            action_handler = ActionHandler(all_folders_info, file_processor, preferred_root_path=preferred_root_path_obj)
             folders_to_del_pairs = action_handler.identify_folders_to_delete(comp_results, default_threshold)
 
             if folders_to_del_pairs:
                  to_delete_markdown = f"**מועמדים למחיקה (סף תצוגה: {default_threshold}%):**\n\n"
+                 if preferred_root_path_obj:
+                     to_delete_markdown += f"*תיקייה ראשית מועדפת לשמירה: `{escape_markdown_chars(str(preferred_root_path_obj))}`*\n\n"
+
                  grouped: Dict[Path, List[FolderInfo]] = defaultdict(list)
                  for del_f, keep_f in folders_to_del_pairs: grouped[keep_f.path].append(del_f)
                  sorted_keep_paths = sorted(grouped.keys(), key=str)
@@ -323,33 +363,40 @@ def step4_next(analysis_results: Optional[Dict]):
                       if keep_path not in all_folders_info: continue
                       keep_info = all_folders_info[keep_path]; keep_q = keep_info.quality_score
                       keep_q_str = f"{keep_q:.2f}%" if keep_q is not None else "N/A"
-                      # !!! Use helper function !!!
+
                       safe_keep_name = escape_markdown_chars(keep_info.path.name)
                       to_delete_markdown += f"*   **<span style='color:green;'>ישמר:</span>** '{safe_keep_name}' (איכות: {keep_q_str})\n"
                       trash_list = sorted(grouped[keep_path], key=lambda f: str(f.path))
                       for del_folder in trash_list:
                            del_q = del_folder.quality_score; del_q_str = f"{del_q:.2f}%" if del_q is not None else "N/A"
-                           # !!! Use helper function !!!
+
                            safe_del_name = escape_markdown_chars(del_folder.path.name)
                            to_delete_markdown += f"    *   **<span style='color:red;'>למחיקה:</span>** '{safe_del_name}' (איכות: {del_q_str})\n"
                       to_delete_markdown += "\n"
-                 to_delete_markdown += "***\n*שים לב: הרשימה להמחשה. המחיקה תתבצע לפי הסף מהסליידר.*"
+                 to_delete_markdown += "***\n*שים לב: הרשימה להמחשה. המחיקה תתבצע לפי הסף מהסליידר והעדפת תיקיית השורש (אם נבחרה).* "
             else: to_delete_markdown = f"לא נמצאו מועמדים למחיקה (סף תצוגה: {default_threshold}%)."
         except Exception as prep_err: logger.error(f"Step 5 prep error: {prep_err}", exc_info=True); to_delete_markdown = f"שגיאה בהכנת רשימה: {prep_err}"
 
     return {step4_block: gr.update(visible=False), step5_block: gr.update(visible=True), step5_to_delete_display: to_delete_markdown}
 
-def step5_perform_actions(analysis_results: Optional[Dict], delete_threshold: float, confirm_delete: bool) -> Generator[Tuple[str, Optional[Dict]], None, None]:
+def step5_perform_actions(analysis_results: Optional[Dict], run_config: Optional[Dict], delete_threshold: float, confirm_delete: bool) -> Generator[Tuple[str, Optional[Dict]], None, None]:
     logger.info(f"Step 5: Threshold={delete_threshold}, Confirmed={confirm_delete}"); status = ["מתחיל ביצוע..."]
     if not confirm_delete: error="חובה לאשר מחיקה."; logger.error(error); status.append(error); yield ("\n".join(status), {"error": error, "final_message": error}); return
-    if not analysis_results or not isinstance(analysis_results, dict): error="נתוני ניתוח חסרים."; logger.error(error); status.append(error); yield ("\n".join(status), {"error": error, "final_message": error}); return
+    if not analysis_results or not isinstance(analysis_results, dict) or not run_config:
+        error="נתוני ניתוח או תצורה חסרים."; logger.error(error); status.append(error); yield ("\n".join(status), {"error": error, "final_message": error}); return
     yield ("\n".join(status), None)
     try:
         all_folders_dict, comp_list = analysis_results.get('all_folders',{}), analysis_results.get('comparison_results',[])
         if not isinstance(all_folders_dict,dict) or not isinstance(comp_list,list): raise ValueError("Bad state structure.")
         all_folders_info = {Path(p): _folder_info_from_dict(d) for p, d in all_folders_dict.items()}
         comp_results = [_comparison_result_from_dict(r) for r in comp_list if isinstance(r,dict)]
-        file_processor = FileProcessor(enable_hashing=True); action_handler = ActionHandler(all_folders_info, file_processor)
+        
+        preferred_root_str = run_config.get("preferred_root")
+        preferred_root_path_obj = Path(preferred_root_str) if preferred_root_str else None
+        logger.info(f"ActionHandler initialized with preferred_root: {preferred_root_path_obj}")
+
+        file_processor = FileProcessor(enable_hashing=True) # Consistent hashing
+        action_handler = ActionHandler(all_folders_info, file_processor, preferred_root_path=preferred_root_path_obj)
 
         status.append(f"מזהה תיקיות למחיקה (סף: {delete_threshold}%)..."); yield ("\n".join(status), None)
         folders_to_del_pairs = action_handler.identify_folders_to_delete(comp_results, delete_threshold)
@@ -389,19 +436,23 @@ def restart_app():
              step1_folder_input: gr.update(value=""), step1_force_rescan: gr.update(value=False), step1_disable_hash: gr.update(value=False),
              step1_bitrate_pref: gr.update(value=defs["bitrate"]), step1_log_level: gr.update(value=defs["log"]),
              step1_enable_gemini: gr.update(value=False), step1_gemini_range: gr.update(value=defs["gemini_range"], visible=False),
+             step1_preferred_root_dd: gr.update(choices=["טען תיקיות קלט"], value="טען תיקיות קלט", interactive=False),
              status_textbox: gr.update(value=""), step3_pairs_table: gr.update(value=None), step4_quality_display: gr.update(value=""),
              step5_delete_threshold: gr.update(value=defs["del_thresh"]), step5_to_delete_display: gr.update(value=""),
              step5_confirm_checkbox: gr.update(value=False), step5_action_button: gr.update(interactive=False),
              step6_final_message: gr.update(value=""), step5_status_area: gr.update(value="", visible=False) }
 
-# --- בניית ממשק ה-Gradio ---
+
 with gr.Blocks(theme=gr.themes.Soft(primary_hue=gr.themes.colors.blue, secondary_hue=gr.themes.colors.sky), title="Music Duplicate Detector") as demo:
     gr.Markdown("# איתור כפילויות מוזיקה - ממשק Web")
     run_config_state = gr.State(None); analysis_results_state = gr.State(None)
 
-    with gr.Column(visible=True) as step1_block: # שלב 1
+    with gr.Column(visible=True) as step1_block:
         gr.Markdown("## שלב 1: הגדרות וקלט")
         step1_folder_input = gr.Textbox(label="הזן נתיב מלא לתיקיות שורש (מופרדים בפסיק/נקודה-פסיק)", placeholder="לדוגמה: C:\\Music, D:\\Temp", interactive=True, elem_id="folder_input")
+        step1_preferred_root_dd = gr.Dropdown(label="תיקיית שורש מועדפת (לשמירה במקרה של כפילות)", choices=["טען תיקיות קלט"], value="טען תיקיות קלט", interactive=False)
+        step1_folder_input.change(update_preferred_root_dropdown, inputs=step1_folder_input, outputs=step1_preferred_root_dd)
+
         with gr.Row(): step1_force_rescan=gr.Checkbox(label="אלץ סריקה מחדש",value=False); step1_disable_hash=gr.Checkbox(label="השבת Hash",value=False)
         with gr.Row(): step1_bitrate_pref=gr.Dropdown(["128","high"],label="Bitrate מועדף",value="128"); step1_log_level=gr.Dropdown(["DEBUG","INFO","WARNING","ERROR"],label="רמת לוג",value="INFO")
         with gr.Accordion("הגדרות Gemini (אופציונלי)", open=False):
@@ -411,46 +462,53 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue=gr.themes.colors.blue, secondary
             step1_enable_gemini.change(lambda x: gr.update(visible=x), inputs=step1_enable_gemini, outputs=step1_gemini_range)
         step1_button = gr.Button("הבא: התחל ניתוח", variant="primary")
 
-    with gr.Column(visible=False) as step2_block: # שלב 2
+    with gr.Column(visible=False) as step2_block:
         gr.Markdown("## שלב 2: ניתוח בתהליך..."); status_textbox=gr.Textbox(label="סטטוס",interactive=False,lines=8,show_copy_button=True)
-    with gr.Column(visible=False) as step3_block: # שלב 3
+    with gr.Column(visible=False) as step3_block:
         gr.Markdown("## שלב 3: סקירת זוגות דומים"); gr.Markdown("ממוין לפי ציון דמיון יורד.")
         step3_pairs_table=gr.DataFrame(headers=["תיקיה 1","איכות 1","תיקיה 2","איכות 2","דמיון","Gemini"], datatype=["str"]*6, row_count=(10,"dynamic"), col_count=(6,"fixed"), interactive=False, wrap=True)
         step3_next_button=gr.Button("הבא: סקירת איכות",variant="secondary")
-    with gr.Column(visible=False) as step4_block: # שלב 4
+    with gr.Column(visible=False) as step4_block:
         gr.Markdown("## שלב 4: סקירת איכות וקבוצות"); step4_quality_display=gr.Markdown("טוען סקירת איכות...")
         step4_next_button=gr.Button("הבא: אישור מחיקה",variant="secondary")
-    with gr.Column(visible=False) as step5_block: # שלב 5
-        gr.Markdown("## שלב 5: אישור והעברה לאשפה"); gr.Markdown("בחר סף דמיון למחיקה. תיקיות עם דמיון >= סף ואיכות נמוכה יותר יועברו לאשפה.")
+    with gr.Column(visible=False) as step5_block:
+        gr.Markdown("## שלב 5: אישור והעברה לאשפה"); gr.Markdown("בחר סף דמיון למחיקה. תיקיות עם דמיון >= סף ואיכות נמוכה יותר (או כאלו שאינן בתיקיית השורש המועדפת) יועברו לאשפה.")
         step5_delete_threshold=gr.Slider(config.MINIMAL_DISPLAY_SIMILARITY, 100, value=config.DEFAULT_MIN_SIMILARITY_FOR_DELETE, step=1, label="סף דמיון למחיקה (%)")
         gr.Markdown("---"); step5_to_delete_display=gr.Markdown("טוען רשימת מחיקה..."); gr.Markdown("---")
-        step5_confirm_checkbox=gr.Checkbox(label="⚠️ אשר העברה לאשפה של התיקיות לפי הסף הנבחר.",value=False)
+        step5_confirm_checkbox=gr.Checkbox(label="⚠️ אשר העברה לאשפה של התיקיות לפי הסף הנבחר והעדפת תיקיית השורש.",value=False)
         step5_action_button=gr.Button("אשר והעבר לאשפה!",variant="stop",interactive=False)
         step5_confirm_checkbox.change(lambda x:gr.update(interactive=x),inputs=step5_confirm_checkbox,outputs=step5_action_button)
         step5_status_area=gr.Textbox(label="סטטוס פעולות",interactive=False,lines=5,visible=False)
-    with gr.Column(visible=False) as step6_block: # שלב 6
+    with gr.Column(visible=False) as step6_block:
         gr.Markdown("## שלב 6: סיום"); step6_final_message=gr.Markdown("הפעולות הושלמו.")
         step6_log_path=gr.Textbox(label="קובץ לוג:",value=str(log_file.resolve()),interactive=False,show_copy_button=True)
         step6_restart_button=gr.Button("התחל מחדש",variant="primary")
 
-    # --- Event Handlers ---
+
     step1_btn_out = [step1_block, step2_block, step3_block, step4_block, step5_block, step6_block, status_textbox, run_config_state, analysis_results_state]
-    step1_button.click(step1_submit, inputs=[step1_folder_input, step1_force_rescan, step1_disable_hash, step1_bitrate_pref, step1_enable_gemini, step1_gemini_range, step1_log_level], outputs=step1_btn_out)\
+    step1_button.click(step1_submit,
+                       inputs=[step1_folder_input, step1_preferred_root_dd, step1_force_rescan, step1_disable_hash, step1_bitrate_pref, step1_enable_gemini, step1_gemini_range, step1_log_level],
+                       outputs=step1_btn_out)\
         .then(run_analysis_process, inputs=[run_config_state], outputs=[status_textbox, analysis_results_state], show_progress="full")\
         .then(analysis_complete_update, inputs=[analysis_results_state], outputs=[step2_block, step3_block, step3_pairs_table, analysis_results_state])
+
     step3_next_button.click(step3_next, None, [step3_block, step4_block])\
         .then(format_quality_results, [analysis_results_state], [step4_quality_display])
-    step4_next_button.click(step4_next, [analysis_results_state], [step4_block, step5_block, step5_to_delete_display])
+
+    step4_next_button.click(step4_next, [analysis_results_state, run_config_state], [step4_block, step5_block, step5_to_delete_display])
+
     step5_action_button.click(lambda: gr.update(visible=True,value="מתחיל פעולות..."), outputs=step5_status_area)\
-        .then(step5_perform_actions, inputs=[analysis_results_state, step5_delete_threshold, step5_confirm_checkbox], outputs=[step5_status_area, analysis_results_state], show_progress="full")\
+        .then(step5_perform_actions, inputs=[analysis_results_state, run_config_state, step5_delete_threshold, step5_confirm_checkbox], outputs=[step5_status_area, analysis_results_state], show_progress="full")\
         .then(action_complete_update, [analysis_results_state], [step5_block, step6_block, step6_final_message, step5_status_area])
+
     restart_outputs = [step1_block, step2_block, step3_block, step4_block, step5_block, step6_block, run_config_state, analysis_results_state,
                        step1_folder_input, step1_force_rescan, step1_disable_hash, step1_bitrate_pref, step1_log_level, step1_enable_gemini, step1_gemini_range,
+                       step1_preferred_root_dd,
                        status_textbox, step3_pairs_table, step4_quality_display, step5_delete_threshold, step5_to_delete_display, step5_confirm_checkbox,
                        step5_action_button, step6_final_message, step5_status_area]
     step6_restart_button.click(restart_app, None, restart_outputs)
 
-# --- הרצת האפליקציה ---
+
 if __name__ == "__main__":
     logger.info("Launching Gradio Web UI...")
     try:

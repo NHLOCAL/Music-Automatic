@@ -1,4 +1,3 @@
-# main.py
 import argparse
 from collections import defaultdict
 import logging
@@ -7,24 +6,24 @@ from typing import List, Dict, Tuple, Set, Optional
 import time
 import sys
 
-# Import necessary components using absolute paths from the package root
-from music_dup_lib import config # config נמצא ישירות תחת החבילה
-from music_dup_lib import utils  # utils נמצא ישירות תחת החבילה
-from music_dup_lib.models import FolderInfo, FolderComparisonResult # models נמצא ישירות תחת החבילה
-from music_dup_lib.core.data_store import DataStore # נמצא תחת core
-from music_dup_lib.core.file_processor import FileProcessor # נמצא תחת core
-from music_dup_lib.core.folder_scanner import FolderScanner # נמצא תחת core
-from music_dup_lib.core.comparison_engine import ComparisonEngine # נמצא תחת core
-from music_dup_lib.core.quality_analyzer import QualityAnalyzer # נמצא תחת core
-from music_dup_lib.core.action_handler import ActionHandler # נמצא תחת core
 
-# Import Gemini analyzer (handle availability)
+from music_dup_lib import config
+from music_dup_lib import utils
+from music_dup_lib.models import FolderInfo, FolderComparisonResult
+from music_dup_lib.core.data_store import DataStore
+from music_dup_lib.core.file_processor import FileProcessor
+from music_dup_lib.core.folder_scanner import FolderScanner
+from music_dup_lib.core.comparison_engine import ComparisonEngine
+from music_dup_lib.core.quality_analyzer import QualityAnalyzer
+from music_dup_lib.core.action_handler import ActionHandler
+
+
 try:
-    # Gemini נמצא תחת external
+
     from music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
     GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
-    # חשוב: עדכן את הנתיב ש-Gemini מחפש בו את המפתח אם הוא עדיין ב-config
-    # למשל: logging.warning(f"Gemini API Key ({config.GEMINI_API_KEY_ENV_VAR})...")
+
+
     if not GEMINI_AVAILABLE:
         logging.warning(f"Gemini API Key ({config.GEMINI_API_KEY_ENV_VAR}) not found or 'requests'/'Pillow'/'google-generativeai' missing. Gemini analysis will be disabled.")
 except ImportError as e:
@@ -34,9 +33,9 @@ except ImportError as e:
     GEMINI_API_KEY = None
 
 
-# --- Presentation Logic ---
+
 def display_comparison_results(results: List[FolderComparisonResult], all_folders: Dict[Path, FolderInfo]):
-    """Prints the comparison results to the console, including Gemini analysis if available."""
+
     if not results:
         print(utils.AnsiColors.GREEN + "\nNo significantly similar folders found." + utils.AnsiColors.RESET)
         return
@@ -44,7 +43,7 @@ def display_comparison_results(results: List[FolderComparisonResult], all_folder
     print(utils.AnsiColors.CYAN + "\n--- Similarity Comparison Results ---" + utils.AnsiColors.RESET)
     print(f"(Showing pairs with similarity >= {config.MINIMAL_DISPLAY_SIMILARITY}%)\n")
 
-    results.sort(key=lambda x: x.weighted_score, reverse=True) # Ensure sorted display
+    results.sort(key=lambda x: x.weighted_score, reverse=True)
 
     for result in results:
         f1_path = result.folder1_path
@@ -61,9 +60,9 @@ def display_comparison_results(results: List[FolderComparisonResult], all_folder
         if result.is_identical_by_hash:
             print(f"  {utils.AnsiColors.MAGENTA}(Identical by file hashes){utils.AnsiColors.RESET}")
 
-        # --- Display Gemini Results (UPDATED for verdict string) ---
+
         if result.gemini_error:
-            # Display specific error types differently? Optional.
+
             err_prefix = utils.AnsiColors.RED + "Gemini Error:" + utils.AnsiColors.RESET
             if "API_ERROR: Prompt Blocked" in result.gemini_error:
                  err_prefix = utils.AnsiColors.YELLOW + "Gemini Blocked:" + utils.AnsiColors.RESET
@@ -72,29 +71,29 @@ def display_comparison_results(results: List[FolderComparisonResult], all_folder
 
             print(f"  {err_prefix} {result.gemini_error[:150]}{'...' if len(result.gemini_error) > 150 else ''}")
 
-        elif result.gemini_verdict is not None: # Check the new verdict field
+        elif result.gemini_verdict is not None:
             verdict = result.gemini_verdict
-            verdict_text = "Unknown Verdict" # Default text
-            verdict_color = utils.AnsiColors.RED # Default color for unknown
+            verdict_text = "Unknown Verdict"
+            verdict_color = utils.AnsiColors.RED
 
             if verdict == 'duplicate':
                 verdict_text = "Likely Duplicate"
                 verdict_color = utils.AnsiColors.GREEN
             elif verdict == 'different':
                 verdict_text = "Likely Different"
-                verdict_color = utils.AnsiColors.YELLOW # Keep yellow for different? Or make it red/less prominent?
+                verdict_color = utils.AnsiColors.YELLOW
             elif verdict == 'uncertain':
                 verdict_text = "Uncertain"
-                verdict_color = utils.AnsiColors.MAGENTA # Magenta or Cyan for uncertain
+                verdict_color = utils.AnsiColors.MAGENTA
 
             conf_str = f"{result.gemini_confidence:.1f}%" if result.gemini_confidence is not None else "N/A"
             print(f"  {utils.AnsiColors.CYAN}Gemini Verdict:{utils.AnsiColors.RESET} {verdict_color}{verdict_text}{utils.AnsiColors.RESET} (Confidence: {conf_str})")
             if result.gemini_reason:
                 reason_preview = result.gemini_reason.replace('\n', ' ').strip()
                 print(f"  {utils.AnsiColors.CYAN}Gemini Reason:{utils.AnsiColors.RESET} {reason_preview[:200]}{'...' if len(reason_preview) > 200 else ''}")
-        # --- End Gemini Display ---
 
-        # Debug: Show detailed scores if log level is DEBUG
+
+
         if logging.getLogger().isEnabledFor(logging.DEBUG) and result.similarity_scores:
             details = []
             for k, v in sorted(result.similarity_scores.items()):
@@ -109,9 +108,9 @@ def display_comparison_results(results: List[FolderComparisonResult], all_folder
 
         print("-" * 20)
 
-# --- (display_quality_results_grouped remains the same) ---
+
 def display_quality_results_grouped(all_folders: Dict[Path, FolderInfo], comparison_results: List[FolderComparisonResult]):
-    """Displays folder quality, grouped by similarity clusters."""
+
     print(utils.AnsiColors.CYAN + "\n--- Folder Quality Assessment (Grouped by Similarity) ---" + utils.AnsiColors.RESET)
 
     graph: Dict[Path, Set[Path]] = defaultdict(set)
@@ -188,39 +187,27 @@ def display_quality_results_grouped(all_folders: Dict[Path, FolderInfo], compari
     print(utils.AnsiColors.CYAN + "\n--- End of Quality Assessment ---" + utils.AnsiColors.RESET)
 
 
-# --- פונקציית עזר לבחירת נציגים ---
+
 def _select_representatives(
     all_folders: Dict[Path, FolderInfo],
     comparison_results: List[FolderComparisonResult],
     similarity_threshold: float
 ) -> Dict[Path, Path]:
-    """
-    Identifies clusters of highly similar folders and selects a representative for each cluster.
 
-    Args:
-        all_folders: Dictionary mapping folder paths to FolderInfo objects.
-        comparison_results: List of comparison results between folder pairs.
-        similarity_threshold: The similarity score above which folders are considered
-                               part of the same high-similarity cluster.
-
-    Returns:
-        A dictionary mapping each folder path (Path) to its representative's path (Path).
-        Folders not part of any cluster map to themselves.
-    """
     logger.info(f"Selecting representatives for clusters with similarity >= {similarity_threshold}%...")
-    representative_map: Dict[Path, Path] = {path: path for path in all_folders} # Initialize: everything maps to itself
+    representative_map: Dict[Path, Path] = {path: path for path in all_folders}
     graph: Dict[Path, Set[Path]] = defaultdict(set)
     nodes_in_graph: Set[Path] = set()
 
-    # Build graph only from highly similar pairs
+
     relevant_results = [r for r in comparison_results if r.weighted_score >= similarity_threshold]
     if not relevant_results:
         logger.info("No pairs met the high similarity threshold for representative selection.")
-        return representative_map # Return initial map where everything maps to itself
+        return representative_map
 
     for result in relevant_results:
         f1_path, f2_path = result.folder1_path, result.folder2_path
-        if f1_path in all_folders and f2_path in all_folders: # Ensure both folders still exist in our data
+        if f1_path in all_folders and f2_path in all_folders:
             graph[f1_path].add(f2_path)
             graph[f2_path].add(f1_path)
             nodes_in_graph.add(f1_path)
@@ -229,11 +216,11 @@ def _select_representatives(
              logger.warning(f"Skipping edge for representative selection: Folder data missing for pair {f1_path.name}, {f2_path.name}")
 
 
-    # Find connected components (clusters)
+
     seen: Set[Path] = set()
     clusters_found = 0
-    for node_path in list(nodes_in_graph): # Iterate over relevant nodes
-        if node_path not in seen and node_path in all_folders: # Check existence again
+    for node_path in list(nodes_in_graph):
+        if node_path not in seen and node_path in all_folders:
             component_paths: Set[Path] = set()
             stack = [node_path]
             visited_in_component: Set[Path] = set()
@@ -244,27 +231,27 @@ def _select_representatives(
                     visited_in_component.add(current_path)
                     seen.add(current_path)
                     component_paths.add(current_path)
-                    # Add neighbors that are part of the graph connections
+
                     stack.extend(graph.get(current_path, set()) - visited_in_component)
 
-            # Process the found component if it has more than one folder
+
             if len(component_paths) > 1:
                 component_folders = [all_folders[p] for p in component_paths if p in all_folders]
-                # Filter out folders missing quality scores for reliable representative selection
+
                 component_folders = [f for f in component_folders if f and f.quality_score is not None]
 
-                if len(component_folders) > 1: # Need at least two valid folders to form a cluster for this purpose
+                if len(component_folders) > 1:
                     clusters_found += 1
-                    # Find the best folder (representative) based on quality score
+
                     best_folder = max(component_folders, key=lambda f: f.quality_score)
                     representative_path = best_folder.path
                     logger.debug(f"Cluster found. Representative: {representative_path.name} (Q:{best_folder.quality_score:.2f}) for folders: {[f.path.name for f in component_folders]}")
 
-                    # Map all folders in this component to the representative
+
                     for folder_path in component_paths:
-                         if folder_path in all_folders: # Ensure we only map existing folders
+                         if folder_path in all_folders:
                             representative_map[folder_path] = representative_path
-                elif component_folders: # Only one valid folder left, doesn't form a cluster needing a representative change
+                elif component_folders:
                      logger.debug(f"Component starting at {node_path.name} reduced to one valid folder after quality score check, not changing representative.")
 
 
@@ -278,7 +265,7 @@ def run_gemini_analysis(
     all_folders: Dict[Path, FolderInfo],
     gemini_range_str: str
 ) -> None:
-    """Runs Gemini analysis on folder pairs within the specified similarity range, optimizing for high-similarity duplicates."""
+
     global logger # Make sure logger is accessible
 
     if not GEMINI_AVAILABLE or not GeminiAnalyzer:
@@ -427,7 +414,7 @@ def run_gemini_analysis(
 
 # --- Main Execution Logic ---
 def run_analysis(args):
-    """Orchestrates the entire analysis process."""
+
     global logger
     if not getattr(run_analysis, 'logger_initialized', False):
         utils.setup_logging(args.log_level, config.LOGS_DIR)
@@ -489,7 +476,8 @@ def run_analysis(args):
     display_quality_results_grouped(all_scanned_folders, comparison_results)
 
     # --- Step 5: Initialize Action Handler ---
-    action_handler = ActionHandler(all_scanned_folders, file_processor)
+    preferred_root_path_obj = Path(args.preferred_root) if args.preferred_root else None
+    action_handler = ActionHandler(all_scanned_folders, file_processor, preferred_root_path=preferred_root_path_obj)
 
 
     # --- Step 6: User Actions (Merge) ---
@@ -542,6 +530,8 @@ def run_analysis(args):
     if min_similarity_for_delete is not None:
         folders_to_delete_pairs = action_handler.identify_folders_to_delete(comparison_results, min_similarity_for_delete)
         if folders_to_delete_pairs:
+            if args.preferred_root:
+                 print(f"{utils.AnsiColors.CYAN}Note: Preferred root folder for keeping files is '{args.preferred_root}'. This overrides quality score in some cases.{utils.AnsiColors.RESET}")
             action_handler.delete_folders_interactive(folders_to_delete_pairs)
         else:
              print(f"No folders identified for deletion with similarity >= {min_similarity_for_delete}%.")
@@ -568,6 +558,9 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         default=config.DEFAULT_LOG_LEVEL,
                         help="Set the logging level.")
+    parser.add_argument("-p", "--preferred-root", type=str, default=None, metavar="PREF_ROOT_PATH",
+                        help="Optional. Path to a root folder that should be preferred for keeping files in case of duplicates. Must be one of the input FOLDERs.")
+
 
     scan_group = parser.add_argument_group('Scanning and Analysis Options')
     scan_group.add_argument("-b", "--bitrate", choices=["128", "high"], default="128",
@@ -626,6 +619,20 @@ if __name__ == "__main__":
     # Store validated, resolved paths as strings for consistency within args
     args.folders = [str(p) for p in valid_folders]
 
+    # --- Validate Preferred Root ---
+    if args.preferred_root:
+        pref_root_path = Path(args.preferred_root).resolve()
+        if not pref_root_path.is_dir():
+            print(f"{utils.AnsiColors.RED}Error: Preferred root path '{args.preferred_root}' is not a valid directory.{utils.AnsiColors.RESET}")
+            sys.exit(1)
+        if str(pref_root_path) not in args.folders:
+            print(f"{utils.AnsiColors.RED}Error: Preferred root path '{args.preferred_root}' must be one of the input FOLDERs.{utils.AnsiColors.RESET}")
+            print(f"Input folders provided: {args.folders}")
+            sys.exit(1)
+        args.preferred_root = str(pref_root_path) # Store resolved path
+        logger.info(f"Preferred root for keeping files set to: {args.preferred_root}")
+
+
     # --- Check Gemini Availability vs. Request ---
     if args.gemini_analysis and not GEMINI_AVAILABLE:
         print(f"{utils.AnsiColors.YELLOW}Warning: Gemini analysis requested (--gemini-analysis) but the API key ({config.GEMINI_API_KEY_ENV_VAR}) is missing or required libraries ('google-generativeai', 'requests', 'Pillow') are not installed properly. Gemini analysis will be skipped.{utils.AnsiColors.RESET}")
@@ -633,9 +640,9 @@ if __name__ == "__main__":
         args.gemini_analysis = False # Ensure it's disabled if not available
 
 
-    # --- Start Main Process ---
+
     try:
-        # run_analysis will set up file logging
+
         run_analysis(args)
     except KeyboardInterrupt:
         print("\nAnalysis interrupted by user.")
