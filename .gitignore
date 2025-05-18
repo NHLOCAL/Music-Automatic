@@ -154,3 +154,4 @@ cython_debug/
 # pesonal
 o1_project/RecycleBin
 music_data.json
+**/logs/**
