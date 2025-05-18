@@ -6,13 +6,16 @@ TASK: Determine if the albums are duplicates based on all provided information.
 OUTPUT: Respond ONLY with this valid JSON structure:
 {
   "verdict": "<VERDICT_STRING>",
-  "confidence": <NUMBER_0_100>,
+  "confidence": <SIMILARITY_SCORE_0_100>,
   "reason": "<HEBREW_REASON_STRING>"
 }
 
 Replace placeholders:
-- <VERDICT_STRING>: Must be one of 'duplicate', 'different', 'uncertain'.
-- <NUMBER_0_100>: Your confidence score (0-100).
+- <VERDICT_STRING>: Must be one of 'duplicate', 'different', or 'uncertain'.
+- <SIMILARITY_SCORE_0_100>: Your **estimated similarity score** for the two albums (0-100).
+  - If 'duplicate' and high certainty: Score should be close to 100 (e.g., 85-100).
+  - If 'different' and high certainty: Score should be close to 0 (e.g., 0-30).
+  - If 'uncertain': Score should be around 40-70, reflecting the level of ambiguity.
 - <HEBREW_REASON_STRING>: Brief explanation in Hebrew.
 
 Verdict Guidelines:

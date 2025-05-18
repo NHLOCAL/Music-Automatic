@@ -21,14 +21,14 @@ from google import genai
 from google.genai import types
 from google.genai.types import UploadFileConfig
 
-# ייבוא מהפרויקט הראשי
+
 from .. import config
 from ..models import FolderInfo, FileInfo, FolderComparisonResult
 from ..utils import AnsiColors
 
 logger = logging.getLogger(__name__)
 
-# קריאת קובץ הוראות מערכת
+
 SYSTEM_INST = None
 try:
     current_dir = Path(__file__).parent
@@ -51,7 +51,7 @@ if not API_KEY:
 MODEL_NAME = config.GEMINI_MODEL_NAME
 
 class GeminiAnalyzer:
-    """Handles interaction with the Gemini API for album similarity analysis."""
+
 
     def __init__(self):
         if not API_KEY:
@@ -162,7 +162,7 @@ class GeminiAnalyzer:
                 "required": ["verdict", "confidence", "reason"],
                 "properties": {
                     "verdict": {"type": "STRING", "description": "The verdict: 'duplicate', 'different', or 'uncertain'"},
-                    "confidence": {"type": "NUMBER", "description": "Confidence score between 0 and 100"},
+                    "confidence": {"type": "NUMBER", "description": "Your estimated similarity score for the two albums (0-100). See system instruction for details."},
                     "reason": {"type": "STRING", "description": "Short explanation in Hebrew"}
                 }
             },
@@ -202,6 +202,7 @@ class GeminiAnalyzer:
 
         return "API_ERROR: Max retries exceeded without success."
 
+
     def analyze_pair(self, folder_info1: FolderInfo, folder_info2: FolderInfo, script_similarity_score: float
                     ) -> Tuple[Optional[str], Optional[float], str]:
         self.conversation.clear()
@@ -228,7 +229,7 @@ class GeminiAnalyzer:
 
         self._add_user_text(user_msg)
 
-        # העלאת תמונות באמצעות API מעודכ
+
         if album1.get("album_art_base64"):
             art_bytes = base64.b64decode(album1["album_art_base64"])
             file1 = self.client.files.upload(
@@ -258,27 +259,37 @@ class GeminiAnalyzer:
             if match:
                 resp_json = json.loads(match.group(0))
                 verdict = resp_json.get("verdict")
-                confidence = resp_json.get("confidence")
+                # This is now expected to be the "similarity score" (0-100) directly from the model,
+                # based on the updated system instruction.
+                similarity_score_from_model_val = resp_json.get("confidence")
                 reason = resp_json.get("reason", "No reason provided by Gemini.")
 
-                allowed = {'duplicate','different','uncertain'}
-                if verdict not in allowed:
-                    logger.warning(f"Invalid verdict: {verdict}")
-                    reason += f" (Invalid verdict '{verdict}')"
-                    verdict = None
+                allowed_verdicts = {'duplicate','different','uncertain'}
+                if verdict not in allowed_verdicts:
+                    logger.warning(f"Invalid verdict from Gemini: {verdict}")
+                    reason += f" (Invalid verdict '{verdict}' received from API)"
+                    verdict = None # Treat as uncertain or error
 
-                if confidence is not None:
+                parsed_similarity_score_from_model: Optional[float] = None
+                if similarity_score_from_model_val is not None:
                     try:
-                        confidence = float(confidence)
-                        if not (0.0 <= confidence <= 100.0):
-                            logger.warning(f"Confidence out of range: {confidence}")
+                        parsed_similarity_score_from_model = float(similarity_score_from_model_val)
+                        if not (0.0 <= parsed_similarity_score_from_model <= 100.0):
+                            logger.warning(f"Similarity score from Gemini out of range (0-100): {parsed_similarity_score_from_model}")
+                            reason += f" (Similarity score '{parsed_similarity_score_from_model}' out of range)"
+                            parsed_similarity_score_from_model = None # Invalidate if out of range
                     except ValueError:
-                        logger.warning(f"Confidence not a number: {confidence}")
-                        confidence = None
-                        reason += " (Invalid confidence type)"
+                        logger.warning(f"Similarity score from Gemini not a number: {similarity_score_from_model_val}")
+                        reason += f" (Similarity score '{similarity_score_from_model_val}' not a number)"
+                        parsed_similarity_score_from_model = None
 
-                logger.info(f"Gemini verdict: {verdict}, confidence: {confidence}, reason: {reason}")
-                return verdict, confidence, reason
+                if verdict is None and parsed_similarity_score_from_model is None :
+                     logger.warning(f"Gemini response had issues with verdict or similarity score. Verdict: {verdict}, Similarity Score from Model: {similarity_score_from_model_val}. Final similarity score will be None.")
+                     return None, None, reason
+
+                logger.info(f"Gemini result: verdict={verdict}, similarity_score_from_model={parsed_similarity_score_from_model}, reason={reason}")
+                # Return the score directly as received and validated
+                return verdict, parsed_similarity_score_from_model, reason
             else:
                 return None, None, f"JSON_PARSE_ERROR: Could not extract JSON. Raw: {response_text}"
         except json.JSONDecodeError as e:
