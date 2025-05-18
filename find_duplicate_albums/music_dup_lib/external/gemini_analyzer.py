@@ -19,6 +19,7 @@ except ImportError:
 
 from google import genai
 from google.genai import types
+from google.genai.types import UploadFileConfig
 
 # ייבוא מהפרויקט הראשי
 from .. import config
@@ -154,7 +155,6 @@ class GeminiAnalyzer:
             )
 
     def _send_and_receive(self) -> str:
-        # מתקין את תצורת הבקשה ב‑JSON פשוט
         config_obj = types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema={
@@ -178,7 +178,7 @@ class GeminiAnalyzer:
                     config=config_obj
                 )
                 full_response = ""
-                for chunk in stream:  # :contentReference[oaicite:2]{index=2}
+                for chunk in stream:
                     if hasattr(chunk, "text") and chunk.text:
                         full_response += chunk.text
 
@@ -228,9 +228,13 @@ class GeminiAnalyzer:
 
         self._add_user_text(user_msg)
 
+        # העלאת תמונות באמצעות API מעודכ
         if album1.get("album_art_base64"):
             art_bytes = base64.b64decode(album1["album_art_base64"])
-            file1 = self.client.files.upload(file_data=BytesIO(art_bytes), mime_type="image/jpeg")
+            file1 = self.client.files.upload(
+                file=BytesIO(art_bytes),
+                config=UploadFileConfig(mime_type="image/jpeg")
+            )
             self.conversation.append(types.UserContent(parts=[
                 types.Part.from_uri(file_uri=file1.uri, mime_type=file1.mime_type),
                 types.Part.from_text(text="[Album 1 Art Above]")
@@ -238,7 +242,10 @@ class GeminiAnalyzer:
 
         if album2.get("album_art_base64"):
             art_bytes = base64.b64decode(album2["album_art_base64"])
-            file2 = self.client.files.upload(file_data=BytesIO(art_bytes), mime_type="image/jpeg")
+            file2 = self.client.files.upload(
+                file=BytesIO(art_bytes),
+                config=UploadFileConfig(mime_type="image/jpeg")
+            )
             self.conversation.append(types.UserContent(parts=[
                 types.Part.from_uri(file_uri=file2.uri, mime_type=file2.mime_type),
                 types.Part.from_text(text="[Album 2 Art Above]")
@@ -265,7 +272,6 @@ class GeminiAnalyzer:
                         confidence = float(confidence)
                         if not (0.0 <= confidence <= 100.0):
                             logger.warning(f"Confidence out of range: {confidence}")
-                            reason += f" (Confidence {confidence} out of [0-100])"
                     except ValueError:
                         logger.warning(f"Confidence not a number: {confidence}")
                         confidence = None
