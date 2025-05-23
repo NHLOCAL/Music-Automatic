@@ -1,4 +1,3 @@
-# data_store.py
 import datetime
 import json
 import logging
@@ -12,22 +11,22 @@ from ..models import FolderComparisonResult
 logger = logging.getLogger(__name__)
 
 class DataStore:
-    """Handles loading and saving persistent data including music metadata and comparison results."""
 
-    def __init__(self, 
+
+    def __init__(self,
                  music_cache_file: Path = config.MUSIC_DATA_CACHE_FILE,
                  comparison_cache_file: Path = config.COMPARISON_RESULTS_CACHE_FILE):
         self.music_cache_file = music_cache_file
         self.comparison_cache_file = comparison_cache_file
 
     def load_data(self) -> Dict[str, Any]:
-        """Loads the music data cache from the JSON file."""
+
         if self.music_cache_file.exists():
             logger.info(f"Loading music data cache from: {self.music_cache_file}")
             try:
                 with open(self.music_cache_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # Basic validation: ensure it's a dictionary
+
                     if isinstance(data, dict):
                         logger.info(f"Successfully loaded data for {len(data)} folders from music cache.")
                         return data
@@ -46,7 +45,7 @@ class DataStore:
             return {}
 
     def save_data(self, data: Dict[str, Any]):
-        """Saves the music data cache to the JSON file."""
+
         logger.info(f"Saving music data cache for {len(data)} folders to: {self.music_cache_file}")
         try:
             # Ensure parent directory exists
@@ -63,7 +62,7 @@ class DataStore:
             logger.error(f"Unexpected error saving music cache file {self.music_cache_file}: {e}", exc_info=True)
 
     def _backup_corrupted_file(self, file_path: Path):
-        """Creates a backup of a potentially corrupted file."""
+
         if file_path.exists():
             backup_path = file_path.with_suffix(f".corrupted_{datetime.datetime.now():%Y%m%d%H%M%S}{file_path.suffix}")
             try:
@@ -73,7 +72,7 @@ class DataStore:
                 logger.error(f"Could not back up corrupted file {file_path}: {e}")
 
     def load_comparison_results(self) -> List[FolderComparisonResult]:
-        """Loads the comparison results cache from the JSON file."""
+
         if not self.comparison_cache_file.exists():
             logger.info("Comparison results cache file not found. Returning empty list.")
             return []
@@ -82,7 +81,7 @@ class DataStore:
         try:
             with open(self.comparison_cache_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            
+
             if not isinstance(data, list):
                 logger.error(f"Comparison cache file {self.comparison_cache_file} does not contain a valid JSON list. Ignoring cache.")
                 self._backup_corrupted_file(self.comparison_cache_file)
@@ -91,6 +90,10 @@ class DataStore:
             results = []
             for item in data:
                 try:
+                    gemini_similarity_val = item.get("gemini_similarity_score")
+                    if gemini_similarity_val is None: # Backward compatibility
+                        gemini_similarity_val = item.get("gemini_confidence")
+
                     result = FolderComparisonResult(
                         folder1_path=Path(item["folder1_path"]), # Assuming folder1_path is always present
                         folder2_path=Path(item["folder2_path"]), # Assuming folder2_path is always present
@@ -98,7 +101,7 @@ class DataStore:
                         weighted_score=item.get("weighted_score", 0.0),
                         is_identical_by_hash=item.get("is_identical_by_hash", False),
                         gemini_verdict=item.get("gemini_verdict"),
-                        gemini_confidence=item.get("gemini_confidence"),
+                        gemini_similarity_score=gemini_similarity_val,
                         gemini_reason=item.get("gemini_reason"),
                         gemini_error=item.get("gemini_error")
                     )
@@ -120,9 +123,9 @@ class DataStore:
             return []
 
     def save_comparison_results(self, results: List[FolderComparisonResult]):
-        """Saves the comparison results to the JSON file."""
+
         logger.info(f"Saving {len(results)} comparison results to: {self.comparison_cache_file}")
-        
+
         data_to_save = []
         for result in results:
             item = {
@@ -132,7 +135,7 @@ class DataStore:
                 "weighted_score": result.weighted_score,
                 "is_identical_by_hash": result.is_identical_by_hash,
                 "gemini_verdict": result.gemini_verdict,
-                "gemini_confidence": result.gemini_confidence,
+                "gemini_similarity_score": result.gemini_similarity_score,
                 "gemini_reason": result.gemini_reason,
                 "gemini_error": result.gemini_error,
             }
@@ -149,4 +152,3 @@ class DataStore:
             logger.error(f"OS error saving comparison cache file {self.comparison_cache_file}: {e}")
         except Exception as e:
             logger.error(f"Unexpected error saving comparison cache file {self.comparison_cache_file}: {e}", exc_info=True)
-

@@ -86,8 +86,8 @@ def display_comparison_results(results: List[FolderComparisonResult], all_folder
                 verdict_text = "Uncertain"
                 verdict_color = utils.AnsiColors.MAGENTA
 
-            conf_str = f"{result.gemini_confidence:.1f}%" if result.gemini_confidence is not None else "N/A"
-            print(f"  {utils.AnsiColors.CYAN}Gemini Verdict:{utils.AnsiColors.RESET} {verdict_color}{verdict_text}{utils.AnsiColors.RESET} (Confidence: {conf_str})")
+            similarity_str = f"{result.gemini_similarity_score:.1f}%" if result.gemini_similarity_score is not None else "N/A"
+            print(f"  {utils.AnsiColors.CYAN}Gemini Verdict:{utils.AnsiColors.RESET} {verdict_color}{verdict_text}{utils.AnsiColors.RESET} (Similarity: {similarity_str})")
             if result.gemini_reason:
                 reason_preview = result.gemini_reason.replace('\n', ' ').strip()
                 print(f"  {utils.AnsiColors.CYAN}Gemini Reason:{utils.AnsiColors.RESET} {reason_preview[:200]}{'...' if len(reason_preview) > 200 else ''}")
@@ -259,21 +259,21 @@ def _select_representatives(
     return representative_map
 
 
-# --- Gemini Analysis Function (MODIFIED) ---
+
 def run_gemini_analysis(
     comparison_results: List[FolderComparisonResult],
     all_folders: Dict[Path, FolderInfo],
     gemini_range_str: str,
-    cached_results_map: Dict[FrozenSet[str], FolderComparisonResult] # Added
+    cached_results_map: Dict[FrozenSet[str], FolderComparisonResult]
 ) -> None:
 
-    global logger # Make sure logger is accessible
+    global logger
 
     if not GEMINI_AVAILABLE or not GeminiAnalyzer:
         logger.warning("Gemini analysis skipped (API Key missing, module/dependencies unavailable, or explicitly disabled).")
         return
 
-    # --- Parse Gemini Range ---
+
     try:
         min_sim_str, max_sim_str = gemini_range_str.split('-')
         min_sim = float(min_sim_str)
@@ -285,20 +285,20 @@ def run_gemini_analysis(
         print(f"{utils.AnsiColors.RED}Error: Invalid Gemini similarity range '{gemini_range_str}'. Skipping Gemini analysis.{utils.AnsiColors.RESET}")
         return
 
-    # --- Select Representatives for High-Similarity Clusters ---
+
     representative_map = _select_representatives(
         all_folders,
         comparison_results,
-        config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE # Use the new config value
+        config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE
     )
 
     logger.info(f"Filtering pairs for Gemini analysis (Range: {min_sim}%-{max_sim}%, Rep Threshold: {config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE}%)...")
 
-    # --- Filter Pairs Based on Range AND Representatives ---
-    pairs_to_analyze: List[FolderComparisonResult] = []
-    processed_representative_pairs: Set[Tuple[str, str]] = set() # Track processed pairs of representatives
 
-    # Filter initial list by score range and non-identical hash
+    pairs_to_analyze: List[FolderComparisonResult] = []
+    processed_representative_pairs: Set[Tuple[str, str]] = set()
+
+
     candidate_results = [
         result for result in comparison_results
         if min_sim <= result.weighted_score <= max_sim and not result.is_identical_by_hash
@@ -310,7 +310,7 @@ def run_gemini_analysis(
         f1_path = result.folder1_path
         f2_path = result.folder2_path
 
-        # Ensure folders exist in map (should always be true if data is consistent)
+
         if f1_path not in representative_map or f2_path not in representative_map:
              logger.warning(f"Skipping pair ({f1_path.name}, {f2_path.name}) for Gemini: Folder path not found in representative map.")
              continue
@@ -318,30 +318,30 @@ def run_gemini_analysis(
         rep1 = representative_map[f1_path]
         rep2 = representative_map[f2_path]
 
-        # Skip Condition 1: If representatives are the same, these folders belong to the same high-similarity cluster.
+
         if rep1 == rep2:
             skipped_count_rep += 1
             logger.debug(f"Skipping Gemini (Same Rep): {f1_path.name} ({rep1.name}) <-> {f2_path.name} ({rep2.name})")
             continue
 
-        # Skip Condition 2: Check if this *pair of representatives* has already been processed.
-        # Use canonical representation (sorted string paths)
-        # Convert rep1 and rep2 Path objects to strings
+
+
+
         rep1_str = str(rep1)
         rep2_str = str(rep2)
-        
-        # Create a list of these two strings, sorted alphabetically
+
+
         sorted_list_of_two_strings = sorted((rep1_str, rep2_str))
-        
-        # Explicitly construct a 2-tuple from the sorted list and type hint it.
-        # This makes the fixed size (2) of the tuple clear to Pylance.
+
+
+
         canonical_rep_pair: Tuple[str, str] = (sorted_list_of_two_strings[0], sorted_list_of_two_strings[1])
         if canonical_rep_pair in processed_representative_pairs:
             skipped_count_dup_rep += 1
             logger.debug(f"Skipping Gemini (Duplicate Rep Pair): {f1_path.name} ({rep1.name}) <-> {f2_path.name} ({rep2.name})")
             continue
 
-        # If not skipped, add the original result to the list and mark representative pair as processed.
+
         pairs_to_analyze.append(result)
         processed_representative_pairs.add(canonical_rep_pair)
         logger.debug(f"Adding pair for Gemini: {f1_path.name} <-> {f2_path.name} (Reps: {rep1.name} <-> {rep2.name})")
@@ -352,14 +352,14 @@ def run_gemini_analysis(
         print(f"\nNo folder pairs found within the specified range ({min_sim}-{max_sim}%) for Gemini analysis after optimization.")
         return
 
-    # Sort the final list to analyze by score
+
     pairs_to_analyze.sort(key=lambda x: x.weighted_score, reverse=True)
     total_candidates = len(candidate_results)
     final_count = len(pairs_to_analyze)
     logger.info(f"Gemini analysis will run on {final_count} pairs (filtered from {total_candidates}). Skipped {skipped_count_rep} same-rep pairs, {skipped_count_dup_rep} duplicate-rep pairs.")
     print(f"\n{utils.AnsiColors.CYAN}--- Running Optimized Gemini Analysis ({final_count} pairs between {min_sim}-{max_sim}%, reduced from {total_candidates}) ---{utils.AnsiColors.RESET}")
 
-    # --- Initialize Gemini Analyzer ---
+
     try:
         gemini_analyzer = GeminiAnalyzer()
     except ValueError as e:
@@ -371,11 +371,11 @@ def run_gemini_analysis(
         print(f"{utils.AnsiColors.RED}Error: Unexpected error initializing Gemini Analyzer.{utils.AnsiColors.RESET}")
         return
 
-    # --- Run Analysis on Filtered Pairs ---
+
     analysis_count = 0
-    cached_hits_count = 0 # To count how many times cache was used
+    cached_hits_count = 0
     start_time = time.time()
-    for i, result in enumerate(pairs_to_analyze): # Iterate over the filtered list
+    for i, result in enumerate(pairs_to_analyze):
         f1 = all_folders.get(result.folder1_path)
         f2 = all_folders.get(result.folder2_path)
         if not f1 or not f2:
@@ -384,57 +384,57 @@ def run_gemini_analysis(
 
         progress = f"({i+1}/{len(pairs_to_analyze)})"
 
-        # --- Check Cache ---
+
         cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
         if cached_results_map and cache_key in cached_results_map:
             cached_result = cached_results_map[cache_key]
             if cached_result.gemini_verdict is not None and cached_result.gemini_error is None:
                 result.gemini_verdict = cached_result.gemini_verdict
-                result.gemini_confidence = cached_result.gemini_confidence
+                result.gemini_similarity_score = cached_result.gemini_similarity_score
                 result.gemini_reason = cached_result.gemini_reason
-                result.gemini_error = None  # Clear any error if using good cache
+                result.gemini_error = None
 
                 logger.info(f"{progress} Using cached Gemini result for pair ({f1.path.name}, {f2.path.name}). Verdict: {result.gemini_verdict}")
                 print(f"{progress} Using cached Gemini result for pair: '{f1.path.name}' <-> '{f2.path.name}'. Verdict: {result.gemini_verdict}")
                 cached_hits_count += 1
-                analysis_count += 1 # Count as analyzed, even if from cache for progress display
-                # time.sleep is at the end of the loop, continue will bypass it.
-                continue 
+                analysis_count += 1
+
+                continue
             else:
                 logger.debug(f"Cached Gemini result for pair ({f1.path.name}, {f2.path.name}) was invalid (verdict: {cached_result.gemini_verdict}, error: {cached_result.gemini_error}). Will re-analyze.")
-        
+
         print(f"{progress} Analyzing pair: '{f1.path.name}' <-> '{f2.path.name}' (Score: {result.weighted_score:.2f}%) with Gemini API", end='\r')
         logger.info(f"{progress} Sending pair to Gemini API: {f1.path.name} <-> {f2.path.name}")
 
-        # Call analyze_pair
-        verdict, conf, reason_or_error = gemini_analyzer.analyze_pair(f1, f2, result.weighted_score)
 
-        print(" " * 120, end='\r') # Clear progress line
+        verdict, gemini_sim_score, reason_or_error = gemini_analyzer.analyze_pair(f1, f2, result.weighted_score)
 
-        # Store results
+        print(" " * 120, end='\r')
+
+
         is_error = reason_or_error and ("API_ERROR" in reason_or_error or "PARSE_ERROR" in reason_or_error or "TIMEOUT" in reason_or_error or "UNEXPECTED" in reason_or_error)
         is_invalid_response = verdict is None and not is_error
 
         if is_error or is_invalid_response:
             result.gemini_error = reason_or_error
             result.gemini_verdict = None
-            result.gemini_confidence = None
+            result.gemini_similarity_score = None
             result.gemini_reason = None
             log_message = f"Gemini analysis failed or returned invalid verdict for pair ({f1.path.name}, {f2.path.name}): {reason_or_error}"
             logger.warning(log_message)
             print(f"{progress} {utils.AnsiColors.RED}Error/Invalid Verdict analyzing pair: '{f1.path.name}' <-> '{f2.path.name}'. See logs.{utils.AnsiColors.RESET}")
         else:
             result.gemini_verdict = verdict
-            result.gemini_confidence = conf
+            result.gemini_similarity_score = gemini_sim_score
             result.gemini_reason = reason_or_error
             result.gemini_error = None
 
             verdict_display = verdict if verdict else "Inconclusive"
-            conf_str = f"{conf:.1f}%" if conf is not None else "N/A"
-            print(f"{progress} Analyzed pair: '{f1.path.name}' <-> '{f2.path.name}'. Verdict: {verdict_display} ({conf_str})")
+            gemini_sim_score_str = f"{gemini_sim_score:.1f}%" if gemini_sim_score is not None else "N/A"
+            print(f"{progress} Analyzed pair: '{f1.path.name}' <-> '{f2.path.name}'. Verdict: {verdict_display} (Similarity: {gemini_sim_score_str})")
 
         analysis_count += 1
-        time.sleep(config.GEMINI_API_DELAY_SECONDS) # Keep delay between actual API calls
+        time.sleep(config.GEMINI_API_DELAY_SECONDS)
 
     end_time = time.time()
     duration = end_time - start_time
@@ -444,7 +444,7 @@ def run_gemini_analysis(
     logger.info(f"Gemini analysis finished. Processed {analysis_count} pairs in {duration:.2f} seconds. Used cache for {cached_hits_count} pairs, made {api_calls_made} API calls.")
 
 
-# --- Main Execution Logic ---
+
 def run_analysis(args):
 
     global logger
@@ -456,7 +456,7 @@ def run_analysis(args):
     logger.info("Starting Music Duplicate Detector Analysis")
     logger.info(f"Run arguments: {vars(args)}")
 
-    # --- Initialization ---
+
     data_store = DataStore(
         music_cache_file=config.MUSIC_DATA_CACHE_FILE,
         comparison_cache_file=config.COMPARISON_RESULTS_CACHE_FILE
@@ -468,23 +468,23 @@ def run_analysis(args):
     quality_analyzer = QualityAnalyzer(preferred_bitrate=args.bitrate)
 
 
-    # --- Step 1: Scan Folders & Process Files ---
+
     start_scan_time = time.time()
     root_paths = [Path(p) for p in args.folders]
     all_scanned_folders: Dict[Path, FolderInfo] = folder_scanner.scan_folders(root_paths)
     scan_duration = time.time() - start_scan_time
     logger.info(f"Folder scanning finished in {scan_duration:.2f} seconds.")
 
-    # --- Load Cached Comparison Results (unless --force-rescan is used) ---
+
     cached_comparison_results_map: Dict[FrozenSet[str], FolderComparisonResult] = {}
     if args.force_rescan:
         logger.info("`--force-rescan` is set. Skipping load of cached comparison results to ensure fresh Gemini analysis if needed.")
         print("`--force-rescan` is set. Cached comparison results will be ignored, and Gemini analysis will be re-fetched for relevant pairs.")
     else:
         loaded_comparison_results_list = data_store.load_comparison_results()
-        if loaded_comparison_results_list: # Check if list is not empty
+        if loaded_comparison_results_list:
             for result in loaded_comparison_results_list:
-                # Ensure paths are strings for frozenset compatibility
+
                 cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
                 cached_comparison_results_map[cache_key] = result
             logger.info(f"Loaded {len(cached_comparison_results_map)} cached comparison results into map.")
@@ -497,7 +497,7 @@ def run_analysis(args):
         return
 
 
-    # --- Step 2: Calculate Quality Scores ---
+
     start_quality_time = time.time()
     logger.info("Calculating quality scores for all processed folders...")
     processed_count = 0
@@ -507,26 +507,26 @@ def run_analysis(args):
     quality_duration = time.time() - start_quality_time
     logger.info(f"Quality score calculation complete for {processed_count} folders in {quality_duration:.2f} seconds.")
 
-    # --- Step 3: Compare Folders for Similarity ---
+
     start_compare_time = time.time()
     comparison_results: List[FolderComparisonResult] = comparison_engine.find_similar_folders(all_scanned_folders)
     compare_duration = time.time() - start_compare_time
     logger.info(f"Folder comparison finished in {compare_duration:.2f} seconds. Found {len(comparison_results)} pairs above display threshold.")
 
 
-    # --- Step 3.5: Optional Gemini Analysis ---
+
     if args.gemini_analysis:
         run_gemini_analysis(
-            comparison_results, 
-            all_scanned_folders, 
+            comparison_results,
+            all_scanned_folders,
             args.gemini_range,
-            cached_results_map=cached_comparison_results_map # Pass the map
+            cached_results_map=cached_comparison_results_map
         )
     else:
         logger.info("Gemini analysis was not requested (--gemini-analysis flag not set).")
 
-    # --- Save Updated Comparison Results (including any new Gemini data) ---
-    if comparison_results: # Only save if there are results
+
+    if comparison_results:
         logger.info(f"Saving {len(comparison_results)} comparison results (with Gemini data) to cache: {data_store.comparison_cache_file}")
         data_store.save_comparison_results(comparison_results)
         logger.info("Comparison results saved successfully.")
@@ -534,17 +534,17 @@ def run_analysis(args):
         logger.info("No comparison results to save.")
 
 
-    # --- Step 4: Display Results ---
-    # Display functions now handle the new gemini_verdict field
+
+
     display_comparison_results(comparison_results, all_scanned_folders)
     display_quality_results_grouped(all_scanned_folders, comparison_results)
 
-    # --- Step 5: Initialize Action Handler ---
+
     preferred_root_path_obj = Path(args.preferred_root) if args.preferred_root else None
     action_handler = ActionHandler(all_scanned_folders, file_processor, preferred_root_path=preferred_root_path_obj)
 
 
-    # --- Step 6: User Actions (Merge) ---
+
     merge_candidates = [r for r in comparison_results if r.weighted_score >= config.MIN_SIMILARITY_FOR_MERGE]
     if merge_candidates:
         try:
@@ -565,8 +565,8 @@ def run_analysis(args):
         print(f"\nNo folder pairs found with similarity >= {config.MIN_SIMILARITY_FOR_MERGE}% for merging.")
 
 
-    # --- Step 7: User Actions (Delete) ---
-    min_similarity_for_delete = None # Initialize
+
+    min_similarity_for_delete = None
     try:
         if any(r.weighted_score >= config.MINIMAL_DISPLAY_SIMILARITY for r in comparison_results):
              del_thresh_input = input(f"\nEnter minimum similarity % to mark for deletion (e.g., {config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}), or leave blank to skip: ").strip()
@@ -576,10 +576,10 @@ def run_analysis(args):
                      print(f"{utils.AnsiColors.YELLOW}Warning: Invalid threshold '{del_thresh_input}'. Using default: {config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}%{utils.AnsiColors.RESET}")
                      min_similarity_for_delete = config.DEFAULT_MIN_SIMILARITY_FOR_DELETE
                      logger.warning(f"Invalid delete threshold input '{del_thresh_input}', using default {config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}")
-             # If input is blank, min_similarity_for_delete remains None
+
         else:
              print("\nNo similar pairs found, skipping deletion prompt.")
-             # min_similarity_for_delete remains None
+
 
     except ValueError:
         print(f"{utils.AnsiColors.RED}Error: Invalid input. Please enter a number.{utils.AnsiColors.RESET}")
@@ -611,7 +611,7 @@ def run_analysis(args):
 
 
 if __name__ == "__main__":
-    # --- Argument Parser Setup ---
+
     parser = argparse.ArgumentParser(
         description="Analyzes music folders to find duplicates, assess quality, and optionally leverage Gemini API for deeper comparison.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -650,33 +650,33 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # --- Initial Logging Setup ---
+
     log_level_initial = getattr(logging, args.log_level.upper(), logging.INFO)
-    # Basic config first to catch early path errors
+
     logging.basicConfig(level=log_level_initial, format=config.LOG_FORMAT, handlers=[logging.StreamHandler()])
-    logger = logging.getLogger(__name__) # Now logger is available for clear_comparison_cache
+    logger = logging.getLogger(__name__)
 
 
-    # --- Handle Cache Clearing Argument ---
+
     if args.clear_comparison_cache:
-        # Note: logger might not be fully configured with file handlers yet,
-        # but basic console logging should work. Print is also safe.
+
+
         print(f"Attempting to clear comparison results cache: {config.COMPARISON_RESULTS_CACHE_FILE}")
         logger.info(f"User requested clearing of comparison results cache: {config.COMPARISON_RESULTS_CACHE_FILE}")
         try:
             deleted = config.COMPARISON_RESULTS_CACHE_FILE.unlink(missing_ok=True)
-            if deleted is None: # missing_ok=True makes unlink return None if file didn't exist
+            if deleted is None:
                  print(f"Comparison results cache file did not exist or was already deleted: {config.COMPARISON_RESULTS_CACHE_FILE}")
                  logger.info(f"Comparison results cache file did not exist or was already deleted: {config.COMPARISON_RESULTS_CACHE_FILE}")
             else: # On Python < 3.8, missing_ok doesn't make it return None, it just doesn't raise error.
                   # For 3.8+, it returns None if it didn't exist, or nothing (void/implicit None) if it did and was deleted.
-                  # So we check if it still exists.
+
                 if not config.COMPARISON_RESULTS_CACHE_FILE.exists():
                     print(f"Successfully cleared comparison results cache: {config.COMPARISON_RESULTS_CACHE_FILE}")
                     logger.info(f"Successfully cleared comparison results cache: {config.COMPARISON_RESULTS_CACHE_FILE}")
                 else:
-                    # This case should ideally not be reached if unlink worked without error.
-                    # It might occur if there's a race condition or permission issue not caught by unlink.
+
+
                     print(f"{utils.AnsiColors.YELLOW}Warning: Comparison results cache may not have been fully cleared, or was re-created: {config.COMPARISON_RESULTS_CACHE_FILE}{utils.AnsiColors.RESET}")
                     logger.warning(f"Comparison results cache may not have been fully cleared or was re-created: {config.COMPARISON_RESULTS_CACHE_FILE}")
 

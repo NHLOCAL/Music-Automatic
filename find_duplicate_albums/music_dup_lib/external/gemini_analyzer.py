@@ -8,14 +8,18 @@ from io import BytesIO
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
+
+class _DummyPillowError(Exception):
+    pass
+
 try:
     from PIL import Image, UnidentifiedImageError
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
     Image = None
-    UnidentifiedImageError = None
-    logging.warning("Pillow library not found. Gemini album art analysis will be skipped.")
+    UnidentifiedImageError = _DummyPillowError 
+    logging.warning("Pillow library not found. Gemini album art analysis will be limited/skipped.")
 
 from google import genai
 from google.genai import types
@@ -62,19 +66,19 @@ class GeminiAnalyzer:
         logger.info(f"Gemini Analyzer initialized for model: {MODEL_NAME}")
 
     def _encode_image_to_base64(self, image_path: Path) -> Optional[str]:
-        if not PIL_AVAILABLE:
-            logger.debug("Pillow not available, cannot encode image.")
+        if not PIL_AVAILABLE or Image is None:
+            logger.debug("Pillow not available or Image module is None, cannot encode image.")
             return None
         if not image_path.is_file():
             logger.warning(f"Image path not found or not a file: {image_path}")
             return None
         try:
             with Image.open(image_path) as img:
-                img.convert('RGB')
+                img.convert('RGB') 
             with open(image_path, "rb") as image_file:
                 encoded_bytes = base64.b64encode(image_file.read())
                 return encoded_bytes.decode("utf-8")
-        except UnidentifiedImageError:
+        except UnidentifiedImageError: 
             logger.warning(f"Cannot identify image file (possibly not an image or corrupted): {image_path}")
             return None
         except Exception as e:
@@ -85,9 +89,9 @@ class GeminiAnalyzer:
         for art_name in config.ALBUM_ART_FILES:
             art_path = folder_path / art_name
             if art_path.is_file():
-                if PIL_AVAILABLE:
+                if PIL_AVAILABLE and Image is not None:
                     try:
-                        with Image.open(art_path) as img:
+                        with Image.open(art_path) as img: 
                             img.verify()
                         logger.debug(f"Found valid album art file: {art_path}")
                         return art_path
@@ -98,8 +102,8 @@ class GeminiAnalyzer:
                         logger.error(f"Unexpected error verifying image {art_path}: {e}")
                         continue
                 else:
-                    logger.debug(f"Found potential album art file (PIL unavailable for verification): {art_path}")
-                    return art_path
+                    logger.debug(f"Found potential album art file (PIL unavailable or Image module is None for verification): {art_path}")
+                    return art_path 
         return None
 
     def _prepare_album_data(self, folder_info: FolderInfo) -> Dict[str, Any]:
@@ -159,10 +163,10 @@ class GeminiAnalyzer:
             response_mime_type="application/json",
             response_schema={
                 "type": "OBJECT",
-                "required": ["verdict", "confidence", "reason"],
+                "required": ["verdict", "similarity_score_from_model", "reason"],
                 "properties": {
                     "verdict": {"type": "STRING", "description": "The verdict: 'duplicate', 'different', or 'uncertain'"},
-                    "confidence": {"type": "NUMBER", "description": "Your estimated similarity score for the two albums (0-100). See system instruction for details."},
+                    "similarity_score_from_model": {"type": "NUMBER", "description": "Your estimated similarity score for the two albums (0-100). See system instruction for details."},
                     "reason": {"type": "STRING", "description": "Short explanation in Hebrew"}
                 }
             },
@@ -236,10 +240,14 @@ class GeminiAnalyzer:
                 file=BytesIO(art_bytes),
                 config=UploadFileConfig(mime_type="image/jpeg")
             )
-            self.conversation.append(types.UserContent(parts=[
-                types.Part.from_uri(file_uri=file1.uri, mime_type=file1.mime_type),
-                types.Part.from_text(text="[Album 1 Art Above]")
-            ]))
+            if file1 and file1.uri:
+                self.conversation.append(types.UserContent(parts=[
+                    types.Part.from_uri(file_uri=file1.uri, mime_type=file1.mime_type),
+                    types.Part.from_text(text="[Album 1 Art Above]")
+                ]))
+            else:
+                logger.warning(f"Failed to upload or get URI for album 1 art ({folder_info1.path.name}). Skipping art in Gemini prompt.")
+
 
         if album2.get("album_art_base64"):
             art_bytes = base64.b64decode(album2["album_art_base64"])
@@ -247,10 +255,13 @@ class GeminiAnalyzer:
                 file=BytesIO(art_bytes),
                 config=UploadFileConfig(mime_type="image/jpeg")
             )
-            self.conversation.append(types.UserContent(parts=[
-                types.Part.from_uri(file_uri=file2.uri, mime_type=file2.mime_type),
-                types.Part.from_text(text="[Album 2 Art Above]")
-            ]))
+            if file2 and file2.uri:
+                self.conversation.append(types.UserContent(parts=[
+                    types.Part.from_uri(file_uri=file2.uri, mime_type=file2.mime_type),
+                    types.Part.from_text(text="[Album 2 Art Above]")
+                ]))
+            else:
+                logger.warning(f"Failed to upload or get URI for album 2 art ({folder_info2.path.name}). Skipping art in Gemini prompt.")
 
         response_text = self._send_and_receive()
 
@@ -259,16 +270,16 @@ class GeminiAnalyzer:
             if match:
                 resp_json = json.loads(match.group(0))
                 verdict = resp_json.get("verdict")
-                # This is now expected to be the "similarity score" (0-100) directly from the model,
-                # based on the updated system instruction.
-                similarity_score_from_model_val = resp_json.get("confidence")
+
+
+                similarity_score_from_model_val = resp_json.get("similarity_score_from_model")
                 reason = resp_json.get("reason", "No reason provided by Gemini.")
 
                 allowed_verdicts = {'duplicate','different','uncertain'}
                 if verdict not in allowed_verdicts:
                     logger.warning(f"Invalid verdict from Gemini: {verdict}")
                     reason += f" (Invalid verdict '{verdict}' received from API)"
-                    verdict = None # Treat as uncertain or error
+                    verdict = None
 
                 parsed_similarity_score_from_model: Optional[float] = None
                 if similarity_score_from_model_val is not None:
@@ -277,7 +288,7 @@ class GeminiAnalyzer:
                         if not (0.0 <= parsed_similarity_score_from_model <= 100.0):
                             logger.warning(f"Similarity score from Gemini out of range (0-100): {parsed_similarity_score_from_model}")
                             reason += f" (Similarity score '{parsed_similarity_score_from_model}' out of range)"
-                            parsed_similarity_score_from_model = None # Invalidate if out of range
+                            parsed_similarity_score_from_model = None
                     except ValueError:
                         logger.warning(f"Similarity score from Gemini not a number: {similarity_score_from_model_val}")
                         reason += f" (Similarity score '{similarity_score_from_model_val}' not a number)"
@@ -288,7 +299,7 @@ class GeminiAnalyzer:
                      return None, None, reason
 
                 logger.info(f"Gemini result: verdict={verdict}, similarity_score_from_model={parsed_similarity_score_from_model}, reason={reason}")
-                # Return the score directly as received and validated
+
                 return verdict, parsed_similarity_score_from_model, reason
             else:
                 return None, None, f"JSON_PARSE_ERROR: Could not extract JSON. Raw: {response_text}"
