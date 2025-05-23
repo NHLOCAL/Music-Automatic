@@ -243,7 +243,7 @@ def _select_representatives(
                 if len(component_folders) > 1:
                     clusters_found += 1
 
-                    best_folder = max(component_folders, key=lambda f: f.quality_score)
+                    best_folder = max(component_folders, key=lambda f: f.quality_score if f.quality_score is not None else -1.0)
                     representative_path = best_folder.path
                     logger.debug(f"Cluster found. Representative: {representative_path.name} (Q:{best_folder.quality_score:.2f}) for folders: {[f.path.name for f in component_folders]}")
 
@@ -326,7 +326,13 @@ def run_gemini_analysis(
 
         # Skip Condition 2: Check if this *pair of representatives* has already been processed.
         # Use canonical representation (sorted string paths)
-        canonical_rep_pair = tuple(sorted((str(rep1), str(rep2))))
+        # Convert rep1 and rep2 Path objects to strings
+        rep1_str = str(rep1)
+        rep2_str = str(rep2)
+        
+        # Create a tuple of these two strings, sorted alphabetically
+        # Then explicitly type hint it as Tuple[str, str]
+        canonical_rep_pair: Tuple[str, str] = tuple(sorted((rep1_str, rep2_str)))
         if canonical_rep_pair in processed_representative_pairs:
             skipped_count_dup_rep += 1
             logger.debug(f"Skipping Gemini (Duplicate Rep Pair): {f1_path.name} ({rep1.name}) <-> {f2_path.name} ({rep2.name})")
