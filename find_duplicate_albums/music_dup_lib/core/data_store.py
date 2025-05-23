@@ -92,23 +92,11 @@ class DataStore:
             for item in data:
                 try:
                     result = FolderComparisonResult(
-                        folder1_path=Path(item["folder1_path"]),
-                        folder2_path=Path(item["folder2_path"]),
+                        folder1_path=Path(item["folder1_path"]), # Assuming folder1_path is always present
+                        folder2_path=Path(item["folder2_path"]), # Assuming folder2_path is always present
                         similarity_scores=item.get("similarity_scores", {}),
                         weighted_score=item.get("weighted_score", 0.0),
-                        # Make sure all fields from FolderComparisonResult are handled
-                        # Using .get() for optional fields to avoid KeyError if cache is old
-                        files1_count=item.get("files1_count"),
-                        files2_count=item.get("files2_count"),
-                        matched_filenames=item.get("matched_filenames", {}),
-                        matched_titles=item.get("matched_titles", {}),
-                        matched_albums=item.get("matched_albums", {}),
-                        matched_artists=item.get("matched_artists", {}),
-                        matched_albumartists=item.get("matched_albumartists", {}),
-                        matched_durations=item.get("matched_durations", {}),
-                        hash_comparison_result=item.get("hash_comparison_result", {}), # This might need more specific loading if it's complex
                         is_identical_by_hash=item.get("is_identical_by_hash", False),
-                        album_art_comparison=item.get("album_art_comparison", {}), # Same here
                         gemini_verdict=item.get("gemini_verdict"),
                         gemini_confidence=item.get("gemini_confidence"),
                         gemini_reason=item.get("gemini_reason"),
@@ -142,17 +130,7 @@ class DataStore:
                 "folder2_path": str(result.folder2_path),
                 "similarity_scores": result.similarity_scores,
                 "weighted_score": result.weighted_score,
-                "files1_count": result.files1_count,
-                "files2_count": result.files2_count,
-                "matched_filenames": result.matched_filenames,
-                "matched_titles": result.matched_titles,
-                "matched_albums": result.matched_albums,
-                "matched_artists": result.matched_artists,
-                "matched_albumartists": result.matched_albumartists,
-                "matched_durations": result.matched_durations,
-                "hash_comparison_result": result.hash_comparison_result,
                 "is_identical_by_hash": result.is_identical_by_hash,
-                "album_art_comparison": result.album_art_comparison,
                 "gemini_verdict": result.gemini_verdict,
                 "gemini_confidence": result.gemini_confidence,
                 "gemini_reason": result.gemini_reason,
