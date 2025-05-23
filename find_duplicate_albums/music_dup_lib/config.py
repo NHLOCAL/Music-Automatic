@@ -9,6 +9,7 @@ LOGS_DIR = Path("logs")
 LOGS_DIR.mkdir(exist_ok=True) # Ensure logs directory exists
 
 MUSIC_DATA_CACHE_FILE = DATA_DIR / "music_data.json"
+COMPARISON_RESULTS_CACHE_FILE = DATA_DIR / "comparison_results_cache.json"
 ARTIST_CSV_FILE = DATA_DIR / "singer-list.csv"
 
 # --- File Handling ---
