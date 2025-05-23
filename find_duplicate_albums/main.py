@@ -2,7 +2,7 @@ import argparse
 from collections import defaultdict
 import logging
 from pathlib import Path
-from typing import List, Dict, Tuple, Set, Optional
+from typing import List, Dict, Tuple, Set, Optional, FrozenSet
 import time
 import sys
 
@@ -263,7 +263,8 @@ def _select_representatives(
 def run_gemini_analysis(
     comparison_results: List[FolderComparisonResult],
     all_folders: Dict[Path, FolderInfo],
-    gemini_range_str: str
+    gemini_range_str: str,
+    cached_results_map: Dict[FrozenSet[str], FolderComparisonResult] # Added
 ) -> None:
 
     global logger # Make sure logger is accessible
@@ -363,6 +364,7 @@ def run_gemini_analysis(
 
     # --- Run Analysis on Filtered Pairs ---
     analysis_count = 0
+    cached_hits_count = 0 # To count how many times cache was used
     start_time = time.time()
     for i, result in enumerate(pairs_to_analyze): # Iterate over the filtered list
         f1 = all_folders.get(result.folder1_path)
@@ -372,15 +374,35 @@ def run_gemini_analysis(
             continue
 
         progress = f"({i+1}/{len(pairs_to_analyze)})"
-        print(f"{progress} Analyzing pair: '{f1.path.name}' <-> '{f2.path.name}' (Score: {result.weighted_score:.2f}%)", end='\r')
-        logger.info(f"{progress} Sending pair to Gemini: {f1.path.name} <-> {f2.path.name}")
 
-        # Call analyze_pair (logic remains the same here)
+        # --- Check Cache ---
+        cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
+        if cached_results_map and cache_key in cached_results_map:
+            cached_result = cached_results_map[cache_key]
+            if cached_result.gemini_verdict is not None and cached_result.gemini_error is None:
+                result.gemini_verdict = cached_result.gemini_verdict
+                result.gemini_confidence = cached_result.gemini_confidence
+                result.gemini_reason = cached_result.gemini_reason
+                result.gemini_error = None  # Clear any error if using good cache
+
+                logger.info(f"{progress} Using cached Gemini result for pair ({f1.path.name}, {f2.path.name}). Verdict: {result.gemini_verdict}")
+                print(f"{progress} Using cached Gemini result for pair: '{f1.path.name}' <-> '{f2.path.name}'. Verdict: {result.gemini_verdict}")
+                cached_hits_count += 1
+                analysis_count += 1 # Count as analyzed, even if from cache for progress display
+                # time.sleep is at the end of the loop, continue will bypass it.
+                continue 
+            else:
+                logger.debug(f"Cached Gemini result for pair ({f1.path.name}, {f2.path.name}) was invalid (verdict: {cached_result.gemini_verdict}, error: {cached_result.gemini_error}). Will re-analyze.")
+        
+        print(f"{progress} Analyzing pair: '{f1.path.name}' <-> '{f2.path.name}' (Score: {result.weighted_score:.2f}%) with Gemini API", end='\r')
+        logger.info(f"{progress} Sending pair to Gemini API: {f1.path.name} <-> {f2.path.name}")
+
+        # Call analyze_pair
         verdict, conf, reason_or_error = gemini_analyzer.analyze_pair(f1, f2, result.weighted_score)
 
         print(" " * 120, end='\r') # Clear progress line
 
-        # Store results (logic remains the same here)
+        # Store results
         is_error = reason_or_error and ("API_ERROR" in reason_or_error or "PARSE_ERROR" in reason_or_error or "TIMEOUT" in reason_or_error or "UNEXPECTED" in reason_or_error)
         is_invalid_response = verdict is None and not is_error
 
@@ -407,9 +429,10 @@ def run_gemini_analysis(
 
     end_time = time.time()
     duration = end_time - start_time
+    api_calls_made = analysis_count - cached_hits_count
     print(" " * 120, end='\r')
-    print(f"{utils.AnsiColors.CYAN}--- Gemini Analysis Complete ({analysis_count} pairs analyzed in {duration:.2f}s) ---{utils.AnsiColors.RESET}")
-    logger.info(f"Gemini analysis finished. Analyzed {analysis_count} pairs in {duration:.2f} seconds.")
+    print(f"{utils.AnsiColors.CYAN}--- Gemini Analysis Complete ({analysis_count} pairs processed in {duration:.2f}s; {cached_hits_count} from cache, {api_calls_made} via API) ---{utils.AnsiColors.RESET}")
+    logger.info(f"Gemini analysis finished. Processed {analysis_count} pairs in {duration:.2f} seconds. Used cache for {cached_hits_count} pairs, made {api_calls_made} API calls.")
 
 
 # --- Main Execution Logic ---
@@ -425,7 +448,10 @@ def run_analysis(args):
     logger.info(f"Run arguments: {vars(args)}")
 
     # --- Initialization ---
-    data_store = DataStore(config.MUSIC_DATA_CACHE_FILE)
+    data_store = DataStore(
+        music_cache_file=config.MUSIC_DATA_CACHE_FILE,
+        comparison_cache_file=config.COMPARISON_RESULTS_CACHE_FILE
+    )
     enable_hashing = not args.disable_hash
     file_processor = FileProcessor(enable_hashing=enable_hashing)
     folder_scanner = FolderScanner(file_processor, data_store, force_rescan=args.force_rescan)
@@ -439,6 +465,22 @@ def run_analysis(args):
     all_scanned_folders: Dict[Path, FolderInfo] = folder_scanner.scan_folders(root_paths)
     scan_duration = time.time() - start_scan_time
     logger.info(f"Folder scanning finished in {scan_duration:.2f} seconds.")
+
+    # --- Load Cached Comparison Results (unless --force-rescan is used) ---
+    cached_comparison_results_map: Dict[FrozenSet[str], FolderComparisonResult] = {}
+    if args.force_rescan:
+        logger.info("`--force-rescan` is set. Skipping load of cached comparison results to ensure fresh Gemini analysis if needed.")
+        print("`--force-rescan` is set. Cached comparison results will be ignored, and Gemini analysis will be re-fetched for relevant pairs.")
+    else:
+        loaded_comparison_results_list = data_store.load_comparison_results()
+        if loaded_comparison_results_list: # Check if list is not empty
+            for result in loaded_comparison_results_list:
+                # Ensure paths are strings for frozenset compatibility
+                cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
+                cached_comparison_results_map[cache_key] = result
+            logger.info(f"Loaded {len(cached_comparison_results_map)} cached comparison results into map.")
+        else:
+            logger.info("No cached comparison results found or loaded.")
 
     if not all_scanned_folders:
         logger.warning("No valid music folders found or processed. Exiting.")
@@ -465,9 +507,22 @@ def run_analysis(args):
 
     # --- Step 3.5: Optional Gemini Analysis ---
     if args.gemini_analysis:
-        run_gemini_analysis(comparison_results, all_scanned_folders, args.gemini_range)
+        run_gemini_analysis(
+            comparison_results, 
+            all_scanned_folders, 
+            args.gemini_range,
+            cached_results_map=cached_comparison_results_map # Pass the map
+        )
     else:
         logger.info("Gemini analysis was not requested (--gemini-analysis flag not set).")
+
+    # --- Save Updated Comparison Results (including any new Gemini data) ---
+    if comparison_results: # Only save if there are results
+        logger.info(f"Saving {len(comparison_results)} comparison results (with Gemini data) to cache: {data_store.comparison_cache_file}")
+        data_store.save_comparison_results(comparison_results)
+        logger.info("Comparison results saved successfully.")
+    else:
+        logger.info("No comparison results to save.")
 
 
     # --- Step 4: Display Results ---
@@ -568,7 +623,14 @@ if __name__ == "__main__":
     scan_group.add_argument("-d", "--disable-hash", action="store_true",
                             help="Disable file hashing (faster scan, less accurate identity check).")
     scan_group.add_argument("-r", "--force-rescan", action="store_true",
-                            help="Force rescan, ignoring cache.")
+                            help="Force rescan of folder metadata, ignoring music data cache. Also forces re-fetching of Gemini results.")
+    scan_group.add_argument(
+        "--clear-comparison-cache",
+        action="store_true",
+        help="Clear the cached comparison and Gemini results before running. "
+             "This forces re-computation of algorithmic similarities if they were cached "
+             "and re-fetching all Gemini analysis results."
+    )
 
     gemini_group = parser.add_argument_group('Gemini Analysis Options (Optional)')
     gemini_group.add_argument("-g", "--gemini-analysis", action="store_true",
@@ -583,7 +645,38 @@ if __name__ == "__main__":
     log_level_initial = getattr(logging, args.log_level.upper(), logging.INFO)
     # Basic config first to catch early path errors
     logging.basicConfig(level=log_level_initial, format=config.LOG_FORMAT, handlers=[logging.StreamHandler()])
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__) # Now logger is available for clear_comparison_cache
+
+
+    # --- Handle Cache Clearing Argument ---
+    if args.clear_comparison_cache:
+        # Note: logger might not be fully configured with file handlers yet,
+        # but basic console logging should work. Print is also safe.
+        print(f"Attempting to clear comparison results cache: {config.COMPARISON_RESULTS_CACHE_FILE}")
+        logger.info(f"User requested clearing of comparison results cache: {config.COMPARISON_RESULTS_CACHE_FILE}")
+        try:
+            deleted = config.COMPARISON_RESULTS_CACHE_FILE.unlink(missing_ok=True)
+            if deleted is None: # missing_ok=True makes unlink return None if file didn't exist
+                 print(f"Comparison results cache file did not exist or was already deleted: {config.COMPARISON_RESULTS_CACHE_FILE}")
+                 logger.info(f"Comparison results cache file did not exist or was already deleted: {config.COMPARISON_RESULTS_CACHE_FILE}")
+            else: # On Python < 3.8, missing_ok doesn't make it return None, it just doesn't raise error.
+                  # For 3.8+, it returns None if it didn't exist, or nothing (void/implicit None) if it did and was deleted.
+                  # So we check if it still exists.
+                if not config.COMPARISON_RESULTS_CACHE_FILE.exists():
+                    print(f"Successfully cleared comparison results cache: {config.COMPARISON_RESULTS_CACHE_FILE}")
+                    logger.info(f"Successfully cleared comparison results cache: {config.COMPARISON_RESULTS_CACHE_FILE}")
+                else:
+                    # This case should ideally not be reached if unlink worked without error.
+                    # It might occur if there's a race condition or permission issue not caught by unlink.
+                    print(f"{utils.AnsiColors.YELLOW}Warning: Comparison results cache may not have been fully cleared, or was re-created: {config.COMPARISON_RESULTS_CACHE_FILE}{utils.AnsiColors.RESET}")
+                    logger.warning(f"Comparison results cache may not have been fully cleared or was re-created: {config.COMPARISON_RESULTS_CACHE_FILE}")
+
+        except Exception as e:
+            logger.error(f"Error clearing comparison results cache {config.COMPARISON_RESULTS_CACHE_FILE}: {e}", exc_info=True)
+            print(f"{utils.AnsiColors.RED}Error clearing comparison results cache {config.COMPARISON_RESULTS_CACHE_FILE}: {e}{utils.AnsiColors.RESET}")
+            # Decide if you want to exit or continue if clearing fails. For now, continue.
+            # sys.exit(1)
+
 
     # --- Validate Input Folders ---
     valid_folders = []
