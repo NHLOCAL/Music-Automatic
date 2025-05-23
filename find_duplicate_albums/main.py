@@ -634,7 +634,7 @@ if __name__ == "__main__":
     scan_group.add_argument("-r", "--force-rescan", action="store_true",
                             help="Force rescan of folder metadata, ignoring music data cache. Also forces re-fetching of Gemini results.")
     scan_group.add_argument(
-        "--clear-comparison-cache",
+        "-c", "--clear-comparison-cache",
         action="store_true",
         help="Clear the cached comparison and Gemini results before running. "
              "This forces re-computation of algorithmic similarities if they were cached "
