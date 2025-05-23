@@ -330,9 +330,12 @@ def run_gemini_analysis(
         rep1_str = str(rep1)
         rep2_str = str(rep2)
         
-        # Create a tuple of these two strings, sorted alphabetically
-        # Then explicitly type hint it as Tuple[str, str]
-        canonical_rep_pair: Tuple[str, str] = tuple(sorted((rep1_str, rep2_str)))
+        # Create a list of these two strings, sorted alphabetically
+        sorted_list_of_two_strings = sorted((rep1_str, rep2_str))
+        
+        # Explicitly construct a 2-tuple from the sorted list and type hint it.
+        # This makes the fixed size (2) of the tuple clear to Pylance.
+        canonical_rep_pair: Tuple[str, str] = (sorted_list_of_two_strings[0], sorted_list_of_two_strings[1])
         if canonical_rep_pair in processed_representative_pairs:
             skipped_count_dup_rep += 1
             logger.debug(f"Skipping Gemini (Duplicate Rep Pair): {f1_path.name} ({rep1.name}) <-> {f2_path.name} ({rep2.name})")
