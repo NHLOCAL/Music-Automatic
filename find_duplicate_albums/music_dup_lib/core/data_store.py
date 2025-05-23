@@ -48,10 +48,10 @@ class DataStore:
 
         logger.info(f"Saving music data cache for {len(data)} folders to: {self.music_cache_file}")
         try:
-            # Ensure parent directory exists
+
             self.music_cache_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.music_cache_file, 'w', encoding='utf-8') as f:
-                # Use indent for readability, ensure_ascii=False for non-ASCII chars
+
                 json.dump(data, f, ensure_ascii=False, indent=4)
             logger.info("Music data cache saved successfully.")
         except TypeError as e:
@@ -91,24 +91,25 @@ class DataStore:
             for item in data:
                 try:
                     gemini_similarity_val = item.get("gemini_similarity_score")
-                    if gemini_similarity_val is None: # Backward compatibility
-                        gemini_similarity_val = item.get("gemini_confidence")
+                    if gemini_similarity_val is None:
+                        gemini_similarity_val = item.get("gemini_confidence") # Backwards compatibility
 
                     result = FolderComparisonResult(
-                        folder1_path=Path(item["folder1_path"]), # Assuming folder1_path is always present
-                        folder2_path=Path(item["folder2_path"]), # Assuming folder2_path is always present
+                        folder1_path=Path(item["folder1_path"]),
+                        folder2_path=Path(item["folder2_path"]),
                         similarity_scores=item.get("similarity_scores", {}),
                         weighted_score=item.get("weighted_score", 0.0),
                         is_identical_by_hash=item.get("is_identical_by_hash", False),
                         gemini_verdict=item.get("gemini_verdict"),
                         gemini_similarity_score=gemini_similarity_val,
                         gemini_reason=item.get("gemini_reason"),
-                        gemini_error=item.get("gemini_error")
+                        gemini_error=item.get("gemini_error"),
+                        final_combined_score=item.get("final_combined_score") # Load new field
                     )
                     results.append(result)
                 except KeyError as e:
                     logger.error(f"Missing key {e} in item from comparison cache {self.comparison_cache_file}. Skipping item: {item}", exc_info=True)
-                except Exception as e: # Catch other errors during item processing
+                except Exception as e:
                     logger.error(f"Error processing item from comparison cache {self.comparison_cache_file}: {item}. Error: {e}", exc_info=True)
 
             logger.info(f"Successfully loaded {len(results)} comparison results from cache.")
@@ -138,6 +139,7 @@ class DataStore:
                 "gemini_similarity_score": result.gemini_similarity_score,
                 "gemini_reason": result.gemini_reason,
                 "gemini_error": result.gemini_error,
+                "final_combined_score": result.final_combined_score # Save new field
             }
             data_to_save.append(item)
 

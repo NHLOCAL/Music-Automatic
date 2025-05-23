@@ -2,7 +2,7 @@ from collections import defaultdict
 import logging
 import shutil
 from pathlib import Path
-from typing import List, Tuple, Dict, Set, Optional
+from typing import List, Tuple, Dict, Set, Optional, Union
 from send2trash import send2trash
 
 
@@ -14,7 +14,8 @@ from ..utils import AnsiColors
 from .file_processor import FileProcessor
 
 
-from mutagen import File as MutagenFile
+from mutagen._util import MutagenError # General Mutagen error
+from mutagen._file import File as MutagenFile # More specific import
 from mutagen.easyid3 import EasyID3
 
 logger = logging.getLogger(__name__)
@@ -36,13 +37,15 @@ class ActionHandler:
 
         logger.info("Starting merge process for highly similar folders...")
         merged_pairs_count = 0
-        merge_candidates = [r for r in comparison_results if r.weighted_score >= config.MIN_SIMILARITY_FOR_MERGE]
+        # comparison_results here are already filtered by MIN_SIMILARITY_FOR_MERGE on final_combined_score in main.py
+        # So, merge_candidates is essentially the same as comparison_results passed here.
+        merge_candidates = comparison_results
 
         if not merge_candidates:
              logger.info("No folder pairs met the similarity threshold for merging.")
              return
 
-        logger.info(f"Found {len(merge_candidates)} pairs eligible for merge (Score >= {config.MIN_SIMILARITY_FOR_MERGE}%).")
+        logger.info(f"Found {len(merge_candidates)} pairs eligible for merge (Combined Score >= {config.MIN_SIMILARITY_FOR_MERGE}%).")
 
         for result in merge_candidates:
             folder1_path = result.folder1_path
@@ -60,9 +63,9 @@ class ActionHandler:
                  logger.warning(f"Skipping merge: Quality score not calculated for pair {folder1_path.name}, {folder2_path.name}. Run quality analysis first.")
                  continue
 
-            preferred_folder, other_folder = folder1_info, folder2_info # Default assignment
+            preferred_folder, other_folder = folder1_info, folder2_info
 
-            # Determine preferred based on preferred_root_path first
+
             f1_in_pref = self.preferred_root_path and (folder1_path == self.preferred_root_path or self.preferred_root_path in folder1_path.parents)
             f2_in_pref = self.preferred_root_path and (folder2_path == self.preferred_root_path or self.preferred_root_path in folder2_path.parents)
 
@@ -72,8 +75,11 @@ class ActionHandler:
             elif f2_in_pref and not f1_in_pref:
                 preferred_folder, other_folder = folder2_info, folder1_info
                 logger.info(f"Merge preference: {folder2_info.path.name} is in preferred root.")
-            else: # Either both are in preferred, both are not, or no preference set
-                if folder1_info.quality_score >= folder2_info.quality_score:
+            else:
+                # Ensure quality_score is not None before comparison for sorting
+                q1 = folder1_info.quality_score if folder1_info.quality_score is not None else -1.0
+                q2 = folder2_info.quality_score if folder2_info.quality_score is not None else -1.0
+                if q1 >= q2:
                     preferred_folder, other_folder = folder1_info, folder2_info
                 else:
                     preferred_folder, other_folder = folder2_info, folder1_info
@@ -141,7 +147,7 @@ class ActionHandler:
                         break
                     except OSError as e:
                         logger.error(f"Error copying album art {art_name} from {other_path.name} to {preferred_path.name}: {e}")
-                    # Don't break on error, maybe another art file can be copied
+
 
         else:
             logger.debug(f"Preferred folder {preferred_path.name} already has album art file. Skipping art merge.")
@@ -172,9 +178,10 @@ class ActionHandler:
                 except Exception as e:
                     logger.error(f"Error saving merged metadata for {pref_filepath.name}: {e}")
 
+        except MutagenError as me: # Catch specific Mutagen errors
+            logger.error(f"Mutagen error accessing metadata for merging ({pref_filepath.name}, {other_filepath.name}): {me}")
         except Exception as e:
-
-            logger.error(f"Error accessing metadata for merging ({pref_filepath.name}, {other_filepath.name}): {e}")
+            logger.error(f"General error accessing metadata for merging ({pref_filepath.name}, {other_filepath.name}): {e}")
 
 
 
@@ -182,7 +189,7 @@ class ActionHandler:
     def identify_folders_to_delete(self, comparison_results: List[FolderComparisonResult],
                                      min_similarity_for_delete: float) -> List[Tuple[FolderInfo, FolderInfo]]:
 
-        logger.info(f"Identifying folders for potential deletion (Similarity >= {min_similarity_for_delete}%)...")
+        logger.info(f"Identifying folders for potential deletion (Combined Similarity >= {min_similarity_for_delete}%)...")
         if self.preferred_root_path:
             logger.info(f"Preferred root path for keeping files: {self.preferred_root_path}")
         folders_to_delete: List[Tuple[FolderInfo, FolderInfo]] = []
@@ -191,7 +198,10 @@ class ActionHandler:
         nodes_in_graph: Set[Path] = set()
 
 
-        relevant_results = [r for r in comparison_results if r.weighted_score >= min_similarity_for_delete]
+        relevant_results = [
+            r for r in comparison_results 
+            if (r.final_combined_score if r.final_combined_score is not None else r.weighted_score) >= min_similarity_for_delete
+        ]
 
         for result in relevant_results:
             f1_path, f2_path = result.folder1_path, result.folder2_path
@@ -220,49 +230,51 @@ class ActionHandler:
                 # Process the found component if it has more than one folder
                 if len(component_paths) > 1:
                     component_folders = [self.all_folders_data[p] for p in component_paths if p in self.all_folders_data]
-                    # Filter out if data is missing (shouldn't happen ideally) or quality score missing
-                    component_folders = [f for f in component_folders if f and f.quality_score is not None] # Keep this filter
+                    
+                    # Filter out folders with no quality score before determining 'best_folder'
+                    valid_component_folders = [f for f in component_folders if f and f.quality_score is not None]
 
-                    if len(component_folders) > 1: # Ensure there are still at least two folders to compare after filtering
+                    if len(valid_component_folders) > 1:
                         best_folder: Optional[FolderInfo] = None
                         folders_in_preferred_root: List[FolderInfo] = []
 
                         if self.preferred_root_path:
-                            for folder in component_folders: # Use component_folders which are guaranteed to have quality_score
+                            for folder in valid_component_folders: # Iterate over valid folders
                                 if folder.path == self.preferred_root_path or self.preferred_root_path in folder.path.parents:
                                     folders_in_preferred_root.append(folder)
-                        
+
                         if folders_in_preferred_root:
                             if len(folders_in_preferred_root) == 1:
                                 best_folder = folders_in_preferred_root[0]
                                 logger.info(f"Component includes one folder '{best_folder.path.name}' in preferred root '{self.preferred_root_path}'. It will be kept.")
                             else:
-                                # More than one folder in preferred root, pick the best quality *among them*
-                                best_folder = max(folders_in_preferred_root, key=lambda f: f.quality_score) # quality_score is not None here
+                                # Key for max must handle None, provide a default like -1.0
+                                best_folder = max(folders_in_preferred_root, key=lambda f: f.quality_score if f.quality_score is not None else -1.0)
                                 quality_str = f"{best_folder.quality_score:.2f}" if best_folder.quality_score is not None else "N/A"
                                 logger.info(f"Component includes multiple folders in preferred root '{self.preferred_root_path}'. "
                                             f"Keeping '{best_folder.path.name}' (Q:{quality_str}) from this subset.")
                         else:
-                            # No preferred root specified, or no folders from this component are in the preferred root
-                            # Default to highest quality among all in component
-                            best_folder = max(component_folders, key=lambda f: f.quality_score) # quality_score is not None here
+                            # Key for max must handle None, provide a default like -1.0
+                            best_folder = max(valid_component_folders, key=lambda f: f.quality_score if f.quality_score is not None else -1.0)
                             quality_str = f"{best_folder.quality_score:.2f}" if best_folder.quality_score is not None else "N/A"
                             logger.debug(f"Component selection: No specific preferred root match for this component. Defaulting to best quality: "
                                          f"'{best_folder.path.name}' (Q:{quality_str}).")
 
-                        if best_folder:
-                            for folder_to_check in component_folders: # Iterate original component_folders (which might have None quality score before the filter)
+                        if best_folder: # best_folder should now always be a FolderInfo object if valid_component_folders had > 1 item
+                            for folder_to_check in valid_component_folders: # Iterate over valid folders
                                 if folder_to_check.path != best_folder.path:
                                     folders_to_delete.append((folder_to_check, best_folder))
                                     logger.debug(f"Marked for deletion: {folder_to_check.path.name} (Keep: {best_folder.path.name} based on selection logic)")
                         else:
-                            # This case should ideally not be reached if len(component_folders) > 1
-                            logger.warning(f"Could not determine a best folder for component: {[f.path.name for f in component_folders if f in self.all_folders_data]}. Skipping deletion for this group.")
-                    elif component_folders: # Exactly one folder left after filtering, nothing to compare within component
-                        logger.debug(f"Component reduced to one valid folder after quality score filtering: {component_folders[0].path.name}. No duplicates within this component.")
+                            # This case should be less likely now if valid_component_folders had items
+                            logger.warning(f"Could not determine a best folder for component: {[f.path.name for f in valid_component_folders if f in self.all_folders_data]}. Skipping deletion for this group.")
+                    elif valid_component_folders: # Exactly one valid folder
+                        logger.debug(f"Component reduced to one valid folder after quality score filtering: {valid_component_folders[0].path.name}. No duplicates within this component.")
+                    else: # No valid folders (all had None quality score or were missing)
+                        logger.debug(f"Component starting at {node_path.name} has no folders with valid quality scores. Skipping deletion for this group.")
 
 
-        logger.info(f"Identified {len(folders_to_delete)} folders for potential deletion.")
+        logger.info(f"Identified {len(folders_to_delete)} folders for potential deletion based on combined score.")
         return folders_to_delete
 
 
@@ -329,7 +341,7 @@ class ActionHandler:
 
             for folder_to_delete in folders_to_actually_trash:
 
-                best_folder_path_associated = "Unknown"
+                best_folder_path_associated = "Unknown" # type: Union[Path, str]
                 for b_path, (b_info, del_list) in grouped_deletions.items():
                      if folder_to_delete in del_list:
                           best_folder_path_associated = b_info.path

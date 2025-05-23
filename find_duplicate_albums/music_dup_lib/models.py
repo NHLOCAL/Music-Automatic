@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Set
 
-
 @dataclass
 class FileInfo:
 
@@ -56,11 +55,13 @@ class FolderComparisonResult:
 
     similarity_scores: Dict[str, float] = field(default_factory=dict)
 
-    weighted_score: float = 0.0
+    weighted_score: float = 0.0 # This will now represent the algorithmic score
 
     is_identical_by_hash: bool = False
 
     gemini_verdict: Optional[str] = None
     gemini_similarity_score: Optional[float] = None
     gemini_reason: Optional[str] = None
-    gemini_error: Optional[str] = None # To store API or parsing errors
+    gemini_error: Optional[str] = None
+
+    final_combined_score: Optional[float] = None # The new combined score
