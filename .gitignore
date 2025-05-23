@@ -156,3 +156,4 @@ o1_project/RecycleBin
 music_data.json
 **/logs/**
 **/repomix-output.md
+find_duplicate_albums/data/comparison_results_cache.json
