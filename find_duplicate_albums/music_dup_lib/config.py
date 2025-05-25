@@ -22,7 +22,7 @@ ENABLE_HASHING = True
 HASH_CHUNK_SIZE = 4096
 HASH_NUM_RANDOM_CHUNKS = 2
 
-MINIMAL_DISPLAY_SIMILARITY = 50.0
+MINIMAL_DISPLAY_SIMILARITY = 40.0
 
 GENERIC_NAME_SIMILARITY_THRESHOLD = 0.7
 
@@ -32,18 +32,18 @@ BASE_STRING_SIMILARITY_THRESHOLD = 0.4
 
 
 SIMILARITY_WEIGHTS = {
-    'file_hash': 2.2,
+    'file_hash': 2.0,
     'file_size': 0.7,
     'filename': 1.4,
     'title': 1.4,
-    'album': 0.9,
+    'album': 1.0,
     'artist': 0.5,
     'albumartist': 0.5,
     'folder_name': 0.9,
-    'album_art_hash': 0.5,
+    'album_art_hash': 0.8,
     'duration': 1.0,
 
-    'additional_metadata_field_weight': 0.1
+    'additional_metadata_field_weight': 0.2
 }
 
 

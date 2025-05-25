@@ -242,7 +242,7 @@ class ComparisonEngine:
                 avg_metadata_strength = (metadata_strength_score_sum / metadata_strength_weight_sum) # This is a score from 0 to 1
 
                 # If metadata is very strong (e.g., >85%) and the current score is lagging significantly
-                if avg_metadata_strength > 0.85 and final_weighted_score < (avg_metadata_strength * 100 * 0.90): # Check if score is <90% of what metadata strength suggests
+                if avg_metadata_strength > 0.7 and final_weighted_score < (avg_metadata_strength * 100 * 0.90): # Check if score is <90% of what metadata strength suggests
                     
                     # Calculate a target score based purely on this strong metadata perception
                     target_score_based_on_metadata = avg_metadata_strength * 100
