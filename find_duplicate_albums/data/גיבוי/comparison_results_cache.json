@@ -1,0 +1,1539 @@
+[
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\משה לאופר\\משה לאופר   - משה לאופר מנגן חב''ד\\משה לאופר מנגן חב''ד",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\משה לאופר\\משה לאופר ותזמורתו\\משה לאופר   - משה לאופר מנגן חב''ד\\משה לאופר מנגן חב''ד",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 1.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 0.9473684210526317,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "date": 1.0,
+                "length": 1.0
+            }
+        },
+        "weighted_score": 92.16957054721568,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 92.16957054721568
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\להקת רבע לשבע\\סודות",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\רבע לשבע\\סודות",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0,
+                "date": 1.0
+            }
+        },
+        "weighted_score": 89.62962962962963,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 89.62962962962963
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\פיאמנטה\\אבי פיאמנטה - פדותנו תצמיח",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\פיאמנטה\\פדותנו תצמיח",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.631578947368421,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 86.13171715517151,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 86.13171715517151
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\להקת רבע לשבע\\עץ חיים היא",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\רבע לשבע\\להקת רבע לשבע - עץ חיים היא",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.5789473684210527,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0,
+                "date": 1.0
+            }
+        },
+        "weighted_score": 85.88211651695102,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 85.88211651695102
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\פרוג'קט\\פרויקט 2",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\פרויקט 2",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 0.8325751979159,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0
+            }
+        },
+        "weighted_score": 85.42952253475988,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 85.42952253475988
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\להקת רבע לשבע\\קומו",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\רבע לשבע\\להקת רבע לשבע - קומו",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.33333333333333337,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0,
+                "date": 1.0
+            }
+        },
+        "weighted_score": 83.69606720122184,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 83.69606720122184
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\החברה\\the chevra",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\החברה\\החברה 1",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.11764705882352944,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "length": 1.0,
+                "genre": 1.0,
+                "media": 1.0
+            }
+        },
+        "weighted_score": 82.01841336347097,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 82.01841336347097
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\מונה\\פילהרמונה 2",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\מונה רוזנבלום\\פילהרמונה 2",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 0.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "length": 1.0,
+                "media": 1.0
+            }
+        },
+        "weighted_score": 81.59221076746849,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 81.59221076746849
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\מונה\\פילהרמונה 1",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\מונה רוזנבלום\\פילהרמונה 1",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 0.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 0.9166666666666666,
+                "date": 1.0
+            }
+        },
+        "weighted_score": 81.29870971925045,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 81.29870971925045
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונה אבי בלומנטל\\3",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונות שמלצר\\חתונה אבי בלומנטל\\3",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 0.0,
+            "album": 0.9459459459459459,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "length": 1.0
+            }
+        },
+        "weighted_score": 80.48891529148288,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 80.48891529148288
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\מונה\\מונה 4",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\מונה רוזנבלום\\מונה 4",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 0.0,
+            "album": 0.9,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "date": 1.0
+            }
+        },
+        "weighted_score": 76.80808881839809,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 76.80808881839809
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונה רוגע\\חתונה של מצוה",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונה של מצוה",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 75.49114958179342,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 75.49114958179342
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\פרוג'קט\\פרויקט 1",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\פרויקט 1",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "date": 1.0
+            }
+        },
+        "weighted_score": 75.49114958179342,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 75.49114958179342
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\שלווה\\07 - שבת",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\שלווה\\שבת",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.5454545454545454,
+            "album_art_hash": 0.0,
+            "filename": 0.7834120103345564,
+            "title": 0.5601322514661261,
+            "artist": 0.9523809523809524,
+            "albumartist": 0.9523809523809524,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "genre": 1.0,
+                "tracknumber": 0.18181818181818182
+            }
+        },
+        "weighted_score": 72.88707583518176,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 72.88707583518176
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\שלהבת\\הנשמה לך 9 - חנוכה",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\שלהבת\\שלהבת-הנשמה לך 9 - חנוכה",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.8571428571428572,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 0.5904502053927331,
+            "artist": 1.0,
+            "albumartist": 0.11111111111111116,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "date": 1.0,
+                "length": 1.0
+            }
+        },
+        "weighted_score": 71.99695456080052,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 71.99695456080052
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\עמירן דביר\\עמירן דביר שמרה 2 דיסקים\\עמירן דביר שמרה נפשי 1\\עמירן דביר שמרה נפשי 1",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\עמירן דביר\\עמירן דביר שמרה נפשי 1\\עמירן דביר שמרה נפשי 1",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 0.5,
+            "artist": 0.8461538461538463,
+            "albumartist": 0.3478260869565216,
+            "album": 0.9459459459459457,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "length": 1.0
+            }
+        },
+        "weighted_score": 70.75348779179026,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 70.75348779179026
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\עמירן דביר\\עמירן דביר שמרה 2 דיסקים\\עמירן דביר שמרה נפשי 2\\עמירן דביר שמרה נפשי 2",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\עמירן דביר\\עמירן דביר שמרה נפשי 2\\עמירן דביר שמרה נפשי 2",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 0.5,
+            "artist": 0.8461538461538463,
+            "albumartist": 0.3478260869565216,
+            "album": 0.9459459459459457,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "length": 1.0
+            }
+        },
+        "weighted_score": 70.75348779179026,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 70.75348779179026
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\יוסף משה כהנא\\אידיש\\לחיים אידען",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\יוסף משה כהנא\\לחיים אידן",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.9523809523809522,
+            "album_art_hash": 0.0,
+            "filename": 0.8698741596567683,
+            "title": 0.4992171041518868,
+            "artist": 1.0,
+            "albumartist": 0.0,
+            "album": 0.9523809523809523,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "date": 0.9
+            }
+        },
+        "weighted_score": 67.77246538856905,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 67.77246538856905
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\החתונת אייזנר\\3",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונות שמלצר\\החתונת אייזנר\\3",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 1.0,
+            "albumartist": 0.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "date": 1.0
+            }
+        },
+        "weighted_score": 67.41879011865396,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 67.41879011865396
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\מונה\\מונה 3",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\מונה רוזנבלום\\מונה 3",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 1.0,
+            "albumartist": 0.0,
+            "album": 0.0,
+            "duration": 1.0,
+            "additional_metadata_details": {}
+        },
+        "weighted_score": 57.84313725490195,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 57.84313725490195
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\משה לאופר\\משה לאופר ותזמורתו\\חמש - רק להתענג",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\משה לאופר\\משה לאופר חמש\\משה לאופר ותזמורתו חמש רק להתענג",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.5531914893617021,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 0.3763888888888889,
+            "artist": 0.8461538461538461,
+            "albumartist": 0.07999999999999996,
+            "album": 0.9459459459459459,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "length": 1.0
+            }
+        },
+        "weighted_score": 55.979619376347586,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 55.979619376347586
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונה אבי בלומנטל\\2",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונות שמלצר\\חתונה אבי בלומנטל\\2",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.6466165413533836,
+            "title": 0.5657894736842107,
+            "artist": 0.7403846153846153,
+            "albumartist": 0.0,
+            "album": 0.8277027027027026,
+            "duration": 0.875,
+            "additional_metadata_details": {
+                "tracknumber": 0.875,
+                "length": 0.875
+            }
+        },
+        "weighted_score": 53.96474935327964,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 53.96474935327964
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\ברונר\\וקראת לשבת עונג",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\ברונר\\שמואל ברונר\\וקראת לשבת עונג",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 0.0,
+            "albumartist": 0.0,
+            "album": 0.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 53.84615384615385,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 53.84615384615385
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\להקת רבע לשבע\\הגיע הזמן",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\רבע לשבע\\הגיע הזמן",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 0.0,
+            "albumartist": 0.0,
+            "album": 0.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 53.84615384615385,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 53.84615384615385
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\ברונר\\חסידיש\\חסידיש",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\ברונר\\חסידיש\\חסידיש 1",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.7238045090818747,
+            "folder_name": 0.8571428571428572,
+            "album_art_hash": 0.0,
+            "filename": 0.589187800899851,
+            "title": 0.27650968028505685,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 0.8571428571428575,
+            "duration": 0.5734992226976648,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 50.195380012125256,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 50.195380012125256
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\דביקות\\דביקות 1",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\דביקות\\דביקות 4",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.5733203004964794,
+            "folder_name": 0.875,
+            "album_art_hash": 0.0,
+            "filename": 0.6546605720035219,
+            "title": 0.3841993464052288,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 0.875,
+            "duration": 0.39434201173260575,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 50.118585923135775,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 50.118585923135775
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\נשמה יתירה",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\תזמורת נשמה\\נשמה יתירה",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.5635501500848148,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.32491818606825623,
+            "artist": 0.3809523809523812,
+            "albumartist": 0.3809523809523812,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 49.34266930667274,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 49.34266930667274
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\ג'ורניס 2",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\ג'ורניס 3",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.6843340118305757,
+            "folder_name": 0.8888888888888888,
+            "album_art_hash": 0.0,
+            "filename": 0.5837882745079555,
+            "title": 0.2802652227000053,
+            "artist": 0.9565217391304348,
+            "albumartist": 0.9565217391304348,
+            "album": 0.8888888888888891,
+            "duration": 0.4713021401643184,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 49.10774974109612,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 49.10774974109612
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\יוסף משה כהנא\\אידיש\\לחיים אידען",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\יוסף משה כהנא\\אידיש\\לחיים ברודער",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.7420527330117022,
+            "folder_name": 0.6956521739130435,
+            "album_art_hash": 0.0,
+            "filename": 0.570961442781935,
+            "title": 0.40972077922077926,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 0.6956521739130433,
+            "duration": 0.5774584546844497,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 48.97726046255871,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 48.97726046255871
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\שלווה\\הגדולים 1",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\שלווה\\הגדולים 2",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.6780373707804439,
+            "folder_name": 0.8888888888888888,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.3388493465554935,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 0.8888888888888891,
+            "duration": 0.4217448638897644,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 48.67593393870429,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 48.67593393870429
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\מאיר אדלר\\חתונה וואלאס\\1",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\מאיר אדלר וסאמט\\חתונה דיקשטיין\\1",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.3805994256315649,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 0.1657686721224386,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 48.416870472306925,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 48.416870472306925
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\מאיר אדלר\\חתונה רוזנבוים\\2",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\מאיר אדלר וסאמט\\חתונה לוטרמן\\2",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.3609680892595117,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 0.17023435558582556,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 48.32935866101399,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 48.32935866101399
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\דביקות\\דביקות 1",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\דביקות\\דביקות 2",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.6275467563283884,
+            "folder_name": 0.875,
+            "album_art_hash": 0.0,
+            "filename": 0.5880438848857491,
+            "title": 0.26021810173344695,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 0.875,
+            "duration": 0.4301596781666984,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 48.29725649871174,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 48.29725649871174
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\החברה\\אלי גרסנר - החברה - תיקיה חדשה",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\החברה\\החברה 2",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.32432432432432434,
+            "album_art_hash": 0.0,
+            "filename": 1.0,
+            "title": 1.0,
+            "artist": 0.0,
+            "albumartist": 0.0,
+            "album": 0.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 47.9989604989605,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 47.9989604989605
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\מאיר אדלר\\חתונה וואלאס\\3",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\מאיר אדלר\\חתונה רוזנבוים\\3",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.31653100462445083,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 0.1580119557052781,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 47.92060055606031,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 47.92060055606031
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\מאיר אדלר\\רוזובסקי\\חתונת רוזובסקי קלירס 2 סעודה ריקודים",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\מאיר אדלר וסאמט\\רוזובסקי קלירס\\2 סעודה ריקודים",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.5882352941176471,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 0.3478260869565218,
+            "albumartist": 0.3478260869565218,
+            "album": 0.5614035087719298,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0,
+                "length": 1.0
+            }
+        },
+        "weighted_score": 47.58001259661419,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 47.58001259661419
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\דביקות\\דביקות 2",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\דביקות\\דביקות 4",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.6268504630722653,
+            "folder_name": 0.875,
+            "album_art_hash": 0.0,
+            "filename": 0.5994224697047278,
+            "title": 0.24609051079639316,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 0.875,
+            "duration": 0.35262651967106595,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 47.524905816256805,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 47.524905816256805
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\פרוג'קט\\פרוייקט",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\פרוג'קט\\פרויקט 1",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.5955451898378288,
+            "folder_name": 0.8,
+            "album_art_hash": 0.0,
+            "filename": 0.4524431818181819,
+            "title": 0.4375000000000002,
+            "artist": 0.9090909090909093,
+            "albumartist": 1.0,
+            "album": 0.8888888888888892,
+            "duration": 0.39398193794831227,
+            "additional_metadata_details": {
+                "tracknumber": 0.21875,
+                "genre": 1.0,
+                "date": 1.0
+            }
+        },
+        "weighted_score": 46.888596007542496,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 46.888596007542496
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\שלהבת\\שבת שלהבת\\זמירות לשבת ג",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\שלהבת\\שבת שלהבת\\זמירות לשבת ד",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.5190517179925658,
+            "folder_name": 0.923076923076923,
+            "album_art_hash": 0.0,
+            "filename": 0.569551301481391,
+            "title": 0.4266483516483517,
+            "artist": 0.9600000000000003,
+            "albumartist": 0.9600000000000003,
+            "album": 0.8823529411764709,
+            "duration": 0.27023514625816425,
+            "additional_metadata_details": {
+                "genre": 1.0,
+                "tracknumber": 0.07692307692307693
+            }
+        },
+        "weighted_score": 46.38450613740488,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 46.38450613740488
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\פרוג'קט\\פרוייקט",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\פרויקט 1",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.5955398178884004,
+            "folder_name": 0.8,
+            "album_art_hash": 0.0,
+            "filename": 0.4524431818181819,
+            "title": 0.4375000000000002,
+            "artist": 0.9090909090909093,
+            "albumartist": 1.0,
+            "album": 0.8888888888888892,
+            "duration": 0.39398193794831227,
+            "additional_metadata_details": {
+                "tracknumber": 0.21875,
+                "date": 1.0
+            }
+        },
+        "weighted_score": 45.886458570282926,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 45.886458570282926
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\דביקות\\דביקות 5",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\דביקות\\דביקות 6",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.7129632275211957,
+            "folder_name": 0.875,
+            "album_art_hash": 0.0,
+            "filename": 0.5686881312428288,
+            "title": 0.17319059431358896,
+            "artist": 0.769230769230769,
+            "albumartist": 0.769230769230769,
+            "album": 0.7999999999999999,
+            "duration": 0.5409727272777656,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 45.61705633539959,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 45.61705633539959
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\רובי בנט\\הזמנה לחתונה",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\רובי בנט\\רובי בנאט\\הזמנה לחתונה",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.29900722915428796,
+            "title": 0.14285714285714282,
+            "artist": 0.6153846153846154,
+            "albumartist": 0.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0
+            }
+        },
+        "weighted_score": 45.44521565873376,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 45.44521565873376
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\גרשון וירובה\\גרשון ווראבא\\Variations\\Variations 2",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\גרשון וירובה\\וריאיישנס",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.0,
+            "album_art_hash": 0.0,
+            "filename": 0.35083445924719114,
+            "title": 0.07980741810538075,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0,
+                "date": 1.0
+            }
+        },
+        "weighted_score": 45.397209521237045,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 45.397209521237045
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\להבה\\תזמורת להבה הפרוייקט הכפול חדש 2",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\להבה\\תזמורת להבה הפרוייקט הכפול חלק א",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.6626335355877028,
+            "folder_name": 0.90625,
+            "album_art_hash": 0.0,
+            "filename": 0.605247328921782,
+            "title": 0.27572021631619154,
+            "artist": 1.0,
+            "albumartist": 0.0,
+            "album": 0.9047619047619049,
+            "duration": 0.4445834417683169,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 0.8888888888888888
+            }
+        },
+        "weighted_score": 44.71647323162786,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 44.71647323162786
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונת יעקב איזנטל\\חלק א",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונת יעקב איזנטל\\חלק ג",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.3580624563377922,
+            "folder_name": 0.8,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 0.7999999999999999,
+            "duration": 0.14285714285714285,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 44.466989266920734,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 44.466989266920734
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\מאיר אדלר\\32",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\מאיר אדלר\\CHATUNA",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 0.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 0.09999999999999998,
+            "albumartist": 0.09999999999999998,
+            "album": 1.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0,
+                "length": 1.0
+            }
+        },
+        "weighted_score": 44.44444444444443,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 44.44444444444443
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\שלווה\\12 - כנשר",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\שלווה\\13 - פרנסה",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.5804408393011673,
+            "folder_name": 0.5263157894736843,
+            "album_art_hash": 0.0,
+            "filename": 0.6725554191519643,
+            "title": 0.5710053682115535,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 0.5263157894736842,
+            "duration": 0.15577169226699286,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 44.36854134044089,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 44.36854134044089
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\אביש בראדט\\רגש 2",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\אביש בראדט\\רגש 5",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.651996049270662,
+            "folder_name": 0.8,
+            "album_art_hash": 0.0,
+            "filename": 0.47135259801926466,
+            "title": 0.24543458490826917,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 0.7999999999999999,
+            "duration": 0.44819673303578117,
+            "additional_metadata_details": {
+                "genre": 1.0,
+                "tracknumber": 0.1111111111111111
+            }
+        },
+        "weighted_score": 43.870926847603904,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 43.870926847603904
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונה אבי בלומנטל\\1",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונות שמלצר\\חתונה אבי בלומנטל\\1",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.3333333333333333,
+            "artist": 0.5641025641025641,
+            "albumartist": 0.0,
+            "album": 0.6306306306306306,
+            "duration": 0.6666666666666666,
+            "additional_metadata_details": {
+                "tracknumber": 0.6666666666666666,
+                "length": 0.6666666666666666
+            }
+        },
+        "weighted_score": 43.51586710077275,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 43.51586710077275
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\שלווה\\14 - זכור מי האיש",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\שלווה\\זכור מי האיש",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.6208153326244097,
+            "folder_name": 0.8275862068965517,
+            "album_art_hash": 0.0,
+            "filename": 0.19513204835641676,
+            "title": 0.23635179749730834,
+            "artist": 0.9523809523809524,
+            "albumartist": 0.9523809523809524,
+            "album": 0.9600000000000002,
+            "duration": 0.5626045406403777,
+            "additional_metadata_details": {
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 42.86981919481278,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 42.86981919481278
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\יוסי ורסנו - תזמורת הדרן",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\תזמורת הדרן\\יוסי ורסנו",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.7184675290528715,
+            "folder_name": 0.5882352941176471,
+            "album_art_hash": 0.0,
+            "filename": 0.4099378881987577,
+            "title": 0.13055555555555554,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 0.4439048219259397,
+            "additional_metadata_details": {
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 42.62437190600837,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 42.62437190600837
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\יוסף משה כהנא\\אידיש\\דאס אידישע טרער",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\כהנא\\א יידישע טרער",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.45502290784116584,
+            "folder_name": 0.8571428571428572,
+            "album_art_hash": 0.0,
+            "filename": 0.4714304183116953,
+            "title": 0.07489775356783032,
+            "artist": 1.0,
+            "albumartist": 0.0,
+            "album": 0.8148148148148151,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0
+            }
+        },
+        "weighted_score": 42.015565984264796,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 42.015565984264796
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\חתונות\\חתונה",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\מאיר אדלר וסאמט\\חתונה",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 1.0,
+            "folder_name": 1.0,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 0.0,
+            "albumartist": 0.0,
+            "album": 0.0,
+            "duration": 1.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 41.50943396226414,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 41.50943396226414
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\מונה\\החתונה הגדולה - מונה רוזנבלום",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\מונה רוזנבלום\\החתונה הגדולה",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.6509845845702487,
+            "folder_name": 0.6190476190476191,
+            "album_art_hash": 0.0,
+            "filename": 0.26339656336499717,
+            "title": 0.1607142857142857,
+            "artist": 1.0,
+            "albumartist": 0.0,
+            "album": 1.0,
+            "duration": 0.9947705517510972,
+            "additional_metadata_details": {
+                "tracknumber": 1.0
+            }
+        },
+        "weighted_score": 41.35920968080888,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 41.35920968080888
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\נגינה אורקסטרה\\Everybody's Favorite Chupah Songs",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\נגינה אורקסטרה\\Favorite Chuppa Songs - Vol II",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.2854315736056186,
+            "folder_name": 0.6349206349206349,
+            "album_art_hash": 0.0,
+            "filename": 0.6507446010990044,
+            "title": 0.4482195336220582,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 0.5666666666666665,
+            "duration": 0.08416198317393066,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 41.1378218056848,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 41.1378218056848
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\מאיר אדלר וסאמט\\רוזובסקי קלירס\\1 חופה-סעודה",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\מאיר אדלר וסאמט\\רוזובסקי קלירס\\2 סעודה ריקודים",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.15298397961433344,
+            "folder_name": 0.4444444444444444,
+            "album_art_hash": 0.0,
+            "filename": 0.5,
+            "title": 0.5,
+            "artist": 1.0,
+            "albumartist": 1.0,
+            "album": 1.0,
+            "duration": 0.0,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 40.632913072924836,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 40.632913072924836
+    },
+    {
+        "folder1_path": "E:\\אוסף אייזנטל\\להקות\\שלשלת\\1",
+        "folder2_path": "E:\\אוסף אייזנטל\\להקות\\שלשלת\\2",
+        "similarity_scores": {
+            "file_hash": 0.0,
+            "file_size": 0.6111318310962786,
+            "folder_name": 0.0,
+            "album_art_hash": 0.0,
+            "filename": 0.615180903758212,
+            "title": 0.2465895215895216,
+            "artist": 0.8333333333333337,
+            "albumartist": 0.8333333333333337,
+            "album": 0.8333333333333337,
+            "duration": 0.5933524787831262,
+            "additional_metadata_details": {
+                "tracknumber": 1.0,
+                "genre": 1.0
+            }
+        },
+        "weighted_score": 40.51217002550958,
+        "is_identical_by_hash": false,
+        "gemini_verdict": null,
+        "gemini_similarity_score": null,
+        "gemini_reason": null,
+        "gemini_error": null,
+        "final_combined_score": 40.51217002550958
+    }
+]
