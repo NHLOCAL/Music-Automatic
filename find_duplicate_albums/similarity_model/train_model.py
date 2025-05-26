@@ -50,15 +50,11 @@ def load_and_prepare_data(csv_path, target_column, irrelevant_columns, test_size
     # הסר עמודות לא רלוונטיות כדי לקבל את התכונות (X)
     # ודא שכל העמודות ב-irrelevant_columns אכן קיימות ב-df לפני הניסיון להסירן
     actual_irrelevant_cols = [col for col in irrelevant_columns if col in df.columns]
-    X = df.drop(columns=actual_irrelevant_cols, errors='ignore') # errors='ignore' to prevent error if a col is already removed
+    X = df.drop(columns=actual_irrelevant_cols, errors='ignore')
 
     print(f"\nצורת מטריצת התכונות (X): {X.shape}")
     print(f"צורת וקטור המטרה (y): {y.shape}")
     print(f"שמות התכונות (Features) שישמשו לאימון:\n{X.columns.tolist()}")
-
-    # טיפול בערכים חסרים (NaN) - LightGBM יכול להתמודד איתם מובנית
-    # אם תרצה להשתמש באלגוריתם אחר, ייתכן שתצטרך לבצע imputation כאן
-    # לדוגמה: X = X.fillna(X.mean())
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state
@@ -67,38 +63,36 @@ def load_and_prepare_data(csv_path, target_column, irrelevant_columns, test_size
     print(f"\nגודל סט האימון: X_train={X_train.shape}, y_train={y_train.shape}")
     print(f"גודל סט הבדיקה: X_test={X_test.shape}, y_test={y_test.shape}")
 
-    return X_train, X_test, y_train, y_test, X.columns.tolist(), df # החזר גם את שמות התכונות וה-DF המקורי
+    return X_train, X_test, y_train, y_test, X.columns.tolist(), df
 
-def train_lgbm_regressor(X_train, y_train, params=None, random_state=RANDOM_STATE_SEED):
+def train_lgbm_regressor(X_train, y_train, X_test, y_test, params=None, random_state=RANDOM_STATE_SEED): # <--- נוספו X_test, y_test
     """
     מאמן מודל LightGBM Regressor.
     'params' הוא מילון של היפר-פרמטרים. אם None, ישתמש בברירת המחדל.
     """
     if params is None:
-        # פרמטרים בסיסיים טובים להתחלה, ניתן לשפר עם כוונון
         params = {
-            'objective': 'regression_l1',  #MAE, אפשר גם 'regression' (MSE) או 'huber'
-            'metric': 'mae',              # מדד הערכה במהלך האימון
-            'n_estimators': 1000,         # מספר עצים, להגדיל לביצועים טובים יותר (יחד עם early_stopping)
+            'objective': 'regression_l1',
+            'metric': 'mae',
+            'n_estimators': 1000,
             'learning_rate': 0.05,
             'num_leaves': 31,
-            'max_depth': -1,              # אין הגבלה על עומק
+            'max_depth': -1,
             'min_child_samples': 20,
             'subsample': 0.8,
             'colsample_bytree': 0.8,
             'random_state': random_state,
-            'n_jobs': -1,                 # השתמש בכל המעבדים הזמינים
-            'verbose': -1,                # להפחית פלט במהלך האימון
+            'n_jobs': -1,
+            'verbose': -1,
         }
     
     model = lgb.LGBMRegressor(**params)
     
     print("\nמתחיל אימון מודל LightGBM...")
-    # הוספת early_stopping יכולה לשפר את האימון ולמנוע overfitting
     model.fit(X_train, y_train,
-              eval_set=[(X_test, y_test)], # אם רוצים לעקוב אחרי הביצועים על סט הבדיקה במהלך האימון
-              eval_metric='mae', # או 'rmse'
-              callbacks=[lgb.early_stopping(100, verbose=True)]) # הפסק אם הביצועים לא משתפרים ב-100 איטרציות
+              eval_set=[(X_test, y_test)], # <--- עכשיו X_test ו-y_test מוכרים כאן
+              eval_metric='mae',
+              callbacks=[lgb.early_stopping(100, verbose=True)])
 
     print("אימון המודל הושלם.")
     return model
@@ -118,7 +112,6 @@ def evaluate_model(model, X_test, y_test, model_name="LightGBM"):
     print(f"Mean Absolute Error (MAE):      {mae:.4f}")
     print(f"R-squared (R²):                 {r2:.4f}")
     
-    # תצוגה ויזואלית של השגיאות
     plt.figure(figsize=(10, 6))
     sns.histplot(y_test - y_pred, kde=True, bins=30)
     plt.title('התפלגות השגיאות (Actual - Predicted)')
@@ -129,7 +122,7 @@ def evaluate_model(model, X_test, y_test, model_name="LightGBM"):
 
     plt.figure(figsize=(10, 6))
     plt.scatter(y_test, y_pred, alpha=0.5)
-    plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', lw=2) # קו אלכסוני y=x
+    plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', lw=2)
     plt.xlabel('ערכים אמיתיים (Actual)')
     plt.ylabel('ערכים חזויים (Predicted)')
     plt.title('ערכים אמיתיים מול ערכים חזויים')
@@ -151,15 +144,21 @@ def tune_hyperparameters_gridsearch(X_train, y_train, random_state=RANDOM_STATE_
         'num_leaves': [31, 50, 70],
         'max_depth': [-1, 10, 20],
         'min_child_samples': [20, 50],
-        # אפשר להוסיף עוד פרמטרים כמו 'subsample', 'colsample_bytree'
     }
 
     estimator = lgb.LGBMRegressor(objective='regression_l1', metric='mae', random_state=random_state, n_jobs=-1, verbose=-1)
     
-    # CV=3 כדי לחסוך בזמן, בשימוש אמיתי אפשר להגדיל ל-5 או 10
     grid_search = GridSearchCV(estimator, param_grid, scoring='neg_mean_absolute_error', cv=3, verbose=1)
     
-    grid_search.fit(X_train, y_train, callbacks=[lgb.early_stopping(50, verbose=False)]) # Early stopping בתוך ה-GridSearch
+    # Early stopping בתוך GridSearchCV ידרוש הגדרת eval_set לכל fold,
+    # או להשתמש בפרמטר fit_params של GridSearchCV.
+    # לצורך הפשטות כאן, נפעיל fit ללא early stopping ספציפי ל-GridSearchCV,
+    # ונאמן את המודל הסופי עם early stopping.
+    # אם רוצים early_stopping בתוך GridSearchCV, יש להשתמש ב- fit_params:
+    # fit_params = {"callbacks": [lgb.early_stopping(50, verbose=False)], "eval_metric": "mae"}
+    # ולבחור eval_set מתאים, או להסתמך על ה-validation הפנימי של ה-CV.
+    # LightGBM עושה זאת אוטומטית עבור ה-CV אם לא מוגדר eval_set.
+    grid_search.fit(X_train, y_train) 
     
     print("כוונון היפר-פרמטרים הושלם.")
     print(f"הפרמטרים הטובים ביותר שנמצאו: {grid_search.best_params_}")
@@ -181,75 +180,68 @@ def plot_feature_importances(model, feature_names, top_n=20):
     """
     מציג גרף של חשיבות התכונות.
     """
+    if not hasattr(model, 'feature_importances_'):
+        print("למודל זה אין מאפיין 'feature_importances_'. לא ניתן להציג חשיבות תכונות.")
+        return
+        
     importances = model.feature_importances_
     indices = np.argsort(importances)[::-1]
     
-    plt.figure(figsize=(12, max(6, top_n // 2))) # גובה דינמי
+    plt.figure(figsize=(12, max(6, top_n // 2)))
     plt.title(f"חשיבות {top_n} התכונות המובילות")
     
-    # הצג את top_n התכונות
     sns.barplot(x=importances[indices[:top_n]], y=[feature_names[i] for i in indices[:top_n]], palette="viridis")
     
     plt.xlabel("חשיבות יחסית")
     plt.ylabel("שם התכונה")
-    plt.tight_layout() # התאמה אוטומטית של גבולות הגרף
+    plt.tight_layout()
     plt.show()
 
 # --- 3. הפעלה ראשית ---
 def main():
-    # שלב 1: טעינה והכנת הנתונים
     X_train, X_test, y_train, y_test, feature_names, original_df = load_and_prepare_data(
         CSV_FILE_PATH, TARGET_COLUMN, IRRELEVANT_COLUMNS_FOR_TRAINING, TEST_SET_SIZE, RANDOM_STATE_SEED
     )
 
-    if X_train is None: # אם הייתה שגיאה בטעינה
+    if X_train is None:
         return
-
-    # שלב 2: אימון המודל
-    # אפשרות א': אימון עם פרמטרים מוגדרים מראש
-    # trained_model = train_lgbm_regressor(X_train, y_train)
-
-    # אפשרות ב': כוונון היפר-פרמטרים ואז אימון עם הפרמטרים הטובים ביותר
-    # הערה: הרצת כוונון היפר-פרמטרים יכולה לקחת זמן רב!
-    # אם אתה מריץ בפעם הראשונה, אולי כדאי להתחיל עם אימון פשוט (אפשרות א')
-    # ולהפעיל את הכוונון רק לאחר מכן.
-    
-    # בטל את ההערה אם ברצונך לבצע כוונון היפר-פרמטרים:
-    # best_hyperparams = tune_hyperparameters_gridsearch(X_train, y_train)
-    # trained_model = train_lgbm_regressor(X_train, y_train, params=best_hyperparams)
     
     # ברירת מחדל: אימון עם פרמטרים בסיסיים ו-early stopping
-    trained_model = train_lgbm_regressor(X_train, y_train)
+    # כאן אנחנו מעבירים את X_test ו-y_test לפונקציית האימון
+    trained_model = train_lgbm_regressor(X_train, y_train, X_test, y_test) # <--- התיקון הוחל כאן
 
+    # אם תרצה להפעיל כוונון היפר-פרמטרים:
+    # 1. הסר את השורה הנ"ל (trained_model = train_lgbm_regressor(...))
+    # 2. הסר את ההערות מהשורות הבאות:
+    # print("שימו לב: כוונון היפר-פרמטרים עשוי לקחת זמן רב.")
+    # user_choice_tune = input("האם ברצונך לבצע כוונון היפר-פרמטרים כעת? (כן/לא): ").strip().lower()
+    # if user_choice_tune == 'כן':
+    #     best_hyperparams = tune_hyperparameters_gridsearch(X_train, y_train)
+    #     print(f"אימון מודל סופי עם הפרמטרים הטובים ביותר: {best_hyperparams}")
+    #     trained_model = train_lgbm_regressor(X_train, y_train, X_test, y_test, params=best_hyperparams) # <--- וגם כאן
+    # else:
+    #     print("מדלג על כוונון היפר-פרמטרים, מאמן עם פרמטרים בסיסיים.")
+    #     trained_model = train_lgbm_regressor(X_train, y_train, X_test, y_test)
 
-    # שלב 3: הערכת המודל
     if trained_model:
         evaluate_model(trained_model, X_test, y_test)
-
-        # שלב 4: הצגת חשיבות תכונות
         plot_feature_importances(trained_model, feature_names)
-
-        # שלב 5: שמירת המודל המאומן
         save_model_artifact(trained_model, MODEL_SAVE_PATH)
-        
-        # (אופציונלי) הדפסת חיזויים על כמה דוגמאות מסט הבדיקה
-        # יחד עם ערכי המטרה האמיתיים והתכונות שלהן
         print_sample_predictions(trained_model, X_test, y_test, original_df, feature_names, num_samples=5)
 
 
 def print_sample_predictions(model, X_test, y_test, original_df, feature_names, num_samples=5):
-    """
-    מדפיס חיזויים עבור מספר דגימות מסט הבדיקה, יחד עם הערכים האמיתיים
-    והתכונות המקוריות (כולל עמודות שלא שימשו לאימון כמו נתיבי תיקיות).
-    """
     print(f"\n--- דוגמאות חיזויים מסט הבדיקה (ראשונות {num_samples}) ---")
     
+    if num_samples > len(X_test):
+        num_samples = len(X_test)
+        print(f"מספר הדגימות המבוקש ({num_samples}) גדול מגודל סט הבדיקה. מציג {len(X_test)} דגימות.")
+
     sample_indices = X_test.head(num_samples).index
     X_sample = X_test.loc[sample_indices]
     y_sample_actual = y_test.loc[sample_indices]
     y_sample_pred = model.predict(X_sample)
     
-    # קבל את השורות המקוריות מה-DataFrame המקורי כדי לראות גם את העמודות שהוסרו
     original_samples_df = original_df.loc[sample_indices]
 
     for i in range(len(sample_indices)):
@@ -262,15 +254,10 @@ def print_sample_predictions(model, X_test, y_test, original_df, feature_names, 
         print(f"  ערך מטרה חזוי: {predicted:.4f}")
         print(f"  הפרש (Actual - Predicted): {actual - predicted:.4f}")
         
-        # הצג את נתיבי התיקיות אם קיימים
         if 'folder1_path_id' in original_samples_df.columns:
             print(f"  תיקייה 1: {original_samples_df.loc[idx, 'folder1_path_id']}")
         if 'folder2_path_id' in original_samples_df.columns:
             print(f"  תיקייה 2: {original_samples_df.loc[idx, 'folder2_path_id']}")
-        
-        # (אופציונלי) אפשר להדפיס כאן גם כמה מה-features החשובים עבור הדגימה הזו
-        # print("  תכונות עיקריות לדוגמה זו:")
-        # print(X_sample.iloc[i][feature_names[:5]]) # הצג 5 תכונות ראשונות
 
 if __name__ == "__main__":
     main()
