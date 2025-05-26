@@ -74,7 +74,7 @@ def train_lgbm_regressor(X_train, y_train, X_test, y_test, params=None, random_s
         params = {
             'objective': 'regression_l1',
             'metric': 'mae',
-            'n_estimators': 1000,
+            'n_estimators': 3000,
             'learning_rate': 0.05,
             'num_leaves': 31,
             'max_depth': -1,
