@@ -1,3 +1,3 @@
 @echo off
 
-npx repomix -i "data/**,logs/**,run_repomix.bat,experiments/**,repomix-output.*,app.py" --style markdown --remove-comments
+npx repomix -i "data/**,logs/**,run_repomix.bat,experiments/**,repomix-output.*,app.py,create_ml_dataset.py" --style markdown --remove-comments
