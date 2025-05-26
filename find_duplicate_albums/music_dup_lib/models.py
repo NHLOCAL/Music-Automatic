@@ -1,10 +1,11 @@
+# music_dup_lib/models.py
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Set
 
 @dataclass
 class FileInfo:
-
+    # ... (existing FileInfo fields) ...
     filename: str
     filepath: Path
     extension: str
@@ -24,7 +25,7 @@ class FileInfo:
 
 @dataclass
 class FolderInfo:
-
+    # ... (existing FolderInfo fields) ...
     path: Path
     folder_name: str
     parent_folder_name: str
@@ -49,19 +50,17 @@ class FolderInfo:
 
 @dataclass
 class FolderComparisonResult:
-
     folder1_path: Path
     folder2_path: Path
 
     similarity_scores: Dict[str, float] = field(default_factory=dict)
-
-    weighted_score: float = 0.0 # This will now represent the algorithmic score
-
+    weighted_score: float = 0.0
     is_identical_by_hash: bool = False
 
     gemini_verdict: Optional[str] = None
-    gemini_similarity_score: Optional[float] = None
+    gemini_similarity_score: Optional[float] = None # Renamed from gemini_confidence for clarity
     gemini_reason: Optional[str] = None
     gemini_error: Optional[str] = None
 
-    final_combined_score: Optional[float] = None # The new combined score
+    ml_similarity_score: Optional[float] = None # <-- ADDED FIELD for ML model's score
+    final_combined_score: Optional[float] = None

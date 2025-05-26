@@ -10,6 +10,8 @@ MUSIC_DATA_CACHE_FILE = DATA_DIR / "music_data.json"
 COMPARISON_RESULTS_CACHE_FILE = DATA_DIR / "comparison_results_cache.json"
 ARTIST_CSV_FILE = DATA_DIR / "singer-list.csv"
 
+ML_MODEL_FILE = DATA_DIR / "lgbm_regressor_model.joblib"
+
 ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
 LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
 IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini',
@@ -81,7 +83,7 @@ JIBRISH_FIX_LANGUAGE = "heb"
 
 GEMINI_API_KEY_ENV_VAR = "GEMINI_API_KEY"
 GEMINI_SYSTEM_INST_FILE = Path("gemini_system_instruction.txt")
-GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-05-20" # "gemini-2.5-flash-lite"
+GEMINI_MODEL_NAME = "gemini-2.0-flash" # "gemini-2.5-flash-lite"
 DEFAULT_GEMINI_SIMILARITY_RANGE = "50-90"
 GEMINI_API_DELAY_SECONDS = 0.5
 GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE = 95.0
