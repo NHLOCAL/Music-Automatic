@@ -49,13 +49,13 @@ class ComparisonEngine:
         logger.info(f"Comparison complete. Found {len(similar_folder_pairs)} pairs above display threshold ({config.MINIMAL_DISPLAY_SIMILARITY}%).")
         return similar_folder_pairs
 
-
     def compare_two_folders(self, folder1: FolderInfo, folder2: FolderInfo) -> Optional[FolderComparisonResult]:
 
         if len(folder1.files) != len(folder2.files) or len(folder1.files) == 0: # Added check for empty folders
             logger.debug(f"Skipping comparison: Different file counts ({len(folder1.files)} vs {len(folder2.files)}) or empty folders for {folder1.path.name} and {folder2.path.name}")
             return None
 
+        """
         album1_repr = next(iter(folder1.unique_albums), None) if len(folder1.unique_albums) == 1 else None
         album2_repr = next(iter(folder2.unique_albums), None) if len(folder2.unique_albums) == 1 else None
         if album1_repr and album2_repr:
@@ -63,6 +63,7 @@ class ComparisonEngine:
              if album_similarity < 0.5: # Check if albums are at least somewhat similar if both defined
                  logger.debug(f"Skipping comparison: Low album name similarity ({album_similarity:.2f}) for {folder1.path.name} and {folder2.path.name}")
                  return None
+        """
 
         similarity_scores: Dict[str, float] = {}
         
