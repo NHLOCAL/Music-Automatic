@@ -25,6 +25,11 @@ def setup_logging(log_level_str: str = "INFO", log_dir: Path = config.LOGS_DIR):
     """Configures logging for the application."""
     log_level = getattr(logging, log_level_str.upper(), config.DEFAULT_LOG_LEVEL)
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        print(f"Error creating log directory {log_dir}: {e}")
+
     log_file = log_dir / f'duplicate_detector_{timestamp}.log'
 
     # Remove existing handlers to avoid duplicate logs if called multiple times
