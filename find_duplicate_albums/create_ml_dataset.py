@@ -7,6 +7,7 @@ import time
 import pandas as pd
 from typing import Dict, List, Tuple, Optional, Set, FrozenSet
 from itertools import combinations
+from sklearn.model_selection import train_test_split # Required for splitting
 
 from music_dup_lib import config as app_config
 from music_dup_lib import utils
@@ -24,7 +25,13 @@ except ImportError:
     GeminiAnalyzer = None
     GEMINI_AVAILABLE = False
 
-OUTPUT_DATASET_FILE = Path("similarity_model/data/album_pair_features.csv")
+# OUTPUT_DATASET_FILE = Path("similarity_model/data/album_pair_features.csv") # Old
+TRAIN_DATASET_FILE = Path("similarity_model/data/album_pair_features_train.csv")
+TEST_DATASET_FILE = Path("similarity_model/data/album_pair_features_test.csv")
+TEST_SPLIT_RATIO = 0.2  # Should match TEST_SET_SIZE in train_model.py (for consistency)
+DATASET_RANDOM_STATE = 42 # Should match RANDOM_STATE_SEED in train_model.py (for consistency)
+
+
 HIGH_CERTAINTY_THRESHOLD = 85.0
 LOW_CERTAINTY_THRESHOLD = 35.0
 
@@ -38,7 +45,6 @@ logger = logging.getLogger("DatasetBuilder") # Specific logger for this module
 
 # --- פונקציות עזר שהיו בדיון הקודם ---
 def calculate_jaccard_index(set1: Set[str], set2: Set[str]) -> float:
-    # ... (no changes in this function) ...
     if not set1 and not set2: return 1.0
     intersection_size = len(set1.intersection(set2))
     union_size = len(set1.union(set2))
@@ -49,7 +55,6 @@ def extract_features_for_pair(
     folder2_info: FolderInfo,
     comparison_result: Optional[FolderComparisonResult]
 ) -> Optional[Dict[str, any]]:
-    # ... (no changes in this function) ...
     features = {}
     if not folder1_info or not folder2_info: return None
     features['f1_avg_bitrate'] = folder1_info.avg_bitrate
@@ -101,7 +106,6 @@ def extract_features_for_pair(
     return features
 
 def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
-    # ... (no changes in this function) ...
     return FileInfo(
         filename=data.get("filename", "unknown.mp3"), filepath=Path(data.get("filepath", "unknown.mp3")),
         extension=data.get("extension", ".mp3"), size_mb=float(data.get("size_mb", 0.0)),
@@ -116,7 +120,6 @@ def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
     )
 
 def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> FolderInfo:
-    # ... (no changes in this function) ...
     return FolderInfo(
         path=Path(path_str), folder_name=folder_dict['folder_name'],
         parent_folder_name=folder_dict.get('parent_folder_name', Path(path_str).parent.name),
@@ -167,30 +170,20 @@ def build_dataset(args):
     logger.info(f"Loaded {len(all_music_folders)} FolderInfo objects.")
     if not all_music_folders: return
 
-    # Load comparison results: returns Dict[FrozenSet[str], FolderComparisonResult]
     existing_comparison_results_str_keys: Dict[FrozenSet[str], FolderComparisonResult] = data_store.load_comparison_results()
-    
-    # Convert to Dict[FrozenSet[Path], FolderComparisonResult] for internal use if needed,
-    # but for updates to DataStore, Dict[FrozenSet[str], ...] is also fine.
-    # We'll use str keys for consistency with how DataStore now manages it internally for updates.
-    # The `comp_res` objects themselves will still hold Path objects.
     logger.info(f"Loaded {len(existing_comparison_results_str_keys)} existing comparison results from cache.")
 
     dataset_rows: List[Dict[str, any]] = []
-    # processed_pairs will now store FrozenSet[str] to match keys in existing_comparison_results_str_keys
     processed_pairs: Set[FrozenSet[str]] = set()
     gemini_candidates_new: List[Tuple[FolderInfo, FolderInfo, FolderComparisonResult]] = []
 
-    # --- שלב א': עיבוד זוגות מקאש ההשוואות הקיים ---
     logger.info("Processing pairs from existing comparison cache...")
-    # Iterate directly over the map from DataStore
     for pair_key_str, comp_res in existing_comparison_results_str_keys.items():
-        # pair_key_str is FrozenSet[str], comp_res has Path objects internally
-        f1p, f2p = comp_res.folder1_path, comp_res.folder2_path # Get Path objects from comp_res
+        f1p, f2p = comp_res.folder1_path, comp_res.folder2_path 
 
         if f1p not in all_music_folders or f2p not in all_music_folders:
             logger.warning(f"FolderInfo missing for pair from cache: {f1p.name}, {f2p.name}. Skipping.")
-            processed_pairs.add(pair_key_str) # Add the string key
+            processed_pairs.add(pair_key_str)
             continue
 
         folder1 = all_music_folders[f1p]
@@ -199,10 +192,10 @@ def build_dataset(args):
         if len(folder1.files) != len(folder2.files):
             logger.debug(f"Skipping cached pair {f1p.name}-{f2p.name} due to different file counts: "
                          f"{len(folder1.files)} vs {len(folder2.files)}. Not adding to dataset.")
-            processed_pairs.add(pair_key_str) # Add the string key
+            processed_pairs.add(pair_key_str)
             continue
 
-        processed_pairs.add(pair_key_str) # Add the string key
+        processed_pairs.add(pair_key_str)
 
         current_algorithmic_score = comp_res.weighted_score
         label = None
@@ -229,12 +222,12 @@ def build_dataset(args):
             if features:
                 features['target_label'] = label
                 features['label_source'] = label_source
-                features['folder1_path_id'] = str(f1p) # Store as string ID
-                features['folder2_path_id'] = str(f2p) # Store as string ID
+                features['folder1_path_id'] = str(f1p)
+                features['folder2_path_id'] = str(f2p)
                 dataset_rows.append(features)
 
     logger.info("Sampling and processing additional pairs...")
-    all_folder_paths_list = list(all_music_folders.keys()) # List[Path]
+    all_folder_paths_list = list(all_music_folders.keys())
     num_total_folders = len(all_folder_paths_list)
 
     max_sampling_attempts = max( (MAX_LOW_SIM_PAIRS_FROM_SAMPLING + MAX_GEMINI_CANDIDATES_FROM_SAMPLING) * 20, num_total_folders * 5 )
@@ -250,9 +243,8 @@ def build_dataset(args):
             break
 
         idx1, idx2 = random.sample(range(num_total_folders), 2)
-        f1p_path_obj, f2p_path_obj = all_folder_paths_list[idx1], all_folder_paths_list[idx2] # These are Path objects
+        f1p_path_obj, f2p_path_obj = all_folder_paths_list[idx1], all_folder_paths_list[idx2]
 
-        # Key for processed_pairs and existing_comparison_results_str_keys is FrozenSet[str]
         current_pair_key_str = frozenset({str(f1p_path_obj), str(f2p_path_obj)})
 
         if current_pair_key_str in processed_pairs:
@@ -289,7 +281,6 @@ def build_dataset(args):
             else:
                 if gemini_actually_available and new_gemini_candidates_count < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
                     gemini_candidates_new.append((folder1, folder2, fresh_comp_res))
-                    # Also add this fresh result to our main map so it can be saved later
                     existing_comparison_results_str_keys[current_pair_key_str] = fresh_comp_res
                     new_gemini_candidates_count += 1
                 else:
@@ -320,7 +311,7 @@ def build_dataset(args):
                                f"at Gemini processing stage. Skipping.")
                 continue
 
-            f1p_path_obj, f2p_path_obj = f1_info.path, f2_info.path # Path objects
+            f1p_path_obj, f2p_path_obj = f1_info.path, f2_info.path
             algo_score = comp_res_for_gemini.weighted_score
             logger.info(f"Gemini ({gemini_api_calls+1}/{len(gemini_candidates_new)}): {f1p_path_obj.name} vs {f2p_path_obj.name} (Algo: {algo_score:.2f})")
 
@@ -331,7 +322,6 @@ def build_dataset(args):
             label = None
             label_source = "gemini_new_run_failed"
             
-            # Key for existing_comparison_results_str_keys is FrozenSet[str]
             current_pair_key_str_for_gemini = frozenset({str(f1p_path_obj), str(f2p_path_obj)})
 
             if gemini_sim_score is not None and ("ERROR" not in reason_or_error and verdict is not None):
@@ -341,18 +331,15 @@ def build_dataset(args):
                 comp_res_for_gemini.gemini_similarity_score = gemini_sim_score
                 comp_res_for_gemini.gemini_reason = reason_or_error
                 comp_res_for_gemini.gemini_error = None
-                # Update the main map with the Gemini results
                 existing_comparison_results_str_keys[current_pair_key_str_for_gemini] = comp_res_for_gemini
             else:
                 logger.warning(f"Gemini analysis failed or returned invalid data for {f1p_path_obj.name} vs {f2p_path_obj.name}. "
                                f"Error/Reason: {reason_or_error}. This pair will not be added with Gemini label.")
-                # Update the error in the main map if it exists
                 if current_pair_key_str_for_gemini in existing_comparison_results_str_keys:
                     existing_comparison_results_str_keys[current_pair_key_str_for_gemini].gemini_error = reason_or_error
                     existing_comparison_results_str_keys[current_pair_key_str_for_gemini].gemini_verdict = None
                     existing_comparison_results_str_keys[current_pair_key_str_for_gemini].gemini_similarity_score = None
                     existing_comparison_results_str_keys[current_pair_key_str_for_gemini].gemini_reason = None
-
 
             if label is not None:
                 features = extract_features_for_pair(f1_info, f2_info, comp_res_for_gemini)
@@ -367,32 +354,70 @@ def build_dataset(args):
 
     if not dataset_rows:
         logger.warning("No data rows were generated for the dataset (possibly due to file count filtering or other criteria). Exiting.")
-        # Still save the comparison cache if updates were made
         if args.update_comparison_cache and existing_comparison_results_str_keys:
             logger.info(f"Updating comparison_results_cache.json with {len(existing_comparison_results_str_keys)} entries (even if dataset is empty)...")
-            # Pass the map of string keys directly to DataStore for merging and saving
             data_store.save_comparison_results(existing_comparison_results_str_keys)
             logger.info("Comparison cache updated.")
         return
 
     final_df = pd.DataFrame(dataset_rows)
-    final_df.dropna(subset=['target_label'], inplace=True)
-    final_df.fillna(0.0, inplace=True)
+    final_df.dropna(subset=['target_label'], inplace=True) # Critical: rows without a target are useless
+    final_df.fillna(0.0, inplace=True) # Fill other NaNs with 0.0, assuming features should be numeric or handled
 
-    logger.info(f"Final dataset: {final_df.shape[0]} rows, {final_df.shape[1]} columns.")
-    logger.info(f"Target label statistics:\n{final_df['target_label'].describe()}")
-    logger.info(f"Label source distribution:\n{final_df['label_source'].value_counts(dropna=False)}")
+    logger.info(f"Total dataset rows before split: {final_df.shape[0]}, columns: {final_df.shape[1]}.")
+    logger.info(f"Target label statistics (full dataset):\n{final_df['target_label'].describe()}")
+    logger.info(f"Label source distribution (full dataset):\n{final_df['label_source'].value_counts(dropna=False)}")
 
-    try:
-        OUTPUT_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True)
-        final_df.to_csv(OUTPUT_DATASET_FILE, index=False, encoding='utf-8')
-        logger.info(f"Dataset successfully saved to: {OUTPUT_DATASET_FILE}")
-    except Exception as e:
-        logger.error(f"Error saving dataset to {OUTPUT_DATASET_FILE}: {e}", exc_info=True)
+    if final_df.shape[0] < 2:
+        logger.warning("Dataset has less than 2 rows. Cannot split into training and testing sets. Saving all to train file if any.")
+        if final_df.shape[0] == 1:
+            try:
+                TRAIN_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True)
+                final_df.to_csv(TRAIN_DATASET_FILE, index=False, encoding='utf-8')
+                logger.info(f"Single row dataset saved to: {TRAIN_DATASET_FILE}")
+            except Exception as e:
+                logger.error(f"Error saving single row dataset to {TRAIN_DATASET_FILE}: {e}", exc_info=True)
+        else: # 0 rows
+             logger.info("Dataset is empty, no files will be saved.")
+    else:
+        logger.info(f"Splitting dataset into training ({1-TEST_SPLIT_RATIO:.0%}) and testing ({TEST_SPLIT_RATIO:.0%}).")
+        try:
+            # Stratify by label_source if there's enough variety and it's deemed important.
+            # For now, a simple random split. If target_label was categorical, could stratify on it.
+            # For continuous target, stratification is more complex or less common.
+            train_df, test_df = train_test_split(
+                final_df,
+                test_size=TEST_SPLIT_RATIO,
+                random_state=DATASET_RANDOM_STATE,
+                shuffle=True
+                # stratify=final_df['label_source'] # Optional, if useful and data supports it
+            )
+        except ValueError as e: # Happens if a class in stratify has only 1 member
+            logger.warning(f"Could not stratify during train-test split (Reason: {e}). Performing non-stratified split.")
+            train_df, test_df = train_test_split(
+                final_df,
+                test_size=TEST_SPLIT_RATIO,
+                random_state=DATASET_RANDOM_STATE,
+                shuffle=True
+            )
+
+
+        logger.info(f"Training set shape: {train_df.shape}")
+        logger.info(f"Testing set shape: {test_df.shape}")
+
+        try:
+            TRAIN_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True) # Ensures directory exists
+            train_df.to_csv(TRAIN_DATASET_FILE, index=False, encoding='utf-8')
+            logger.info(f"Training dataset successfully saved to: {TRAIN_DATASET_FILE}")
+
+            TEST_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True) # Ensure dir for test file too
+            test_df.to_csv(TEST_DATASET_FILE, index=False, encoding='utf-8')
+            logger.info(f"Testing dataset successfully saved to: {TEST_DATASET_FILE}")
+        except Exception as e:
+            logger.error(f"Error saving train/test datasets: {e}", exc_info=True)
 
     if args.update_comparison_cache and existing_comparison_results_str_keys:
         logger.info(f"Updating comparison_results_cache.json with {len(existing_comparison_results_str_keys)} entries...")
-        # Pass the map of string keys directly to DataStore for merging and saving
         data_store.save_comparison_results(existing_comparison_results_str_keys)
         logger.info("Comparison cache updated.")
 

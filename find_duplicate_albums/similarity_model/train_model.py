@@ -1,19 +1,18 @@
 import pandas as pd
 import numpy as np
 import lightgbm as lgb
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import GridSearchCV # train_test_split is no longer needed here
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns # For prettier plots
 
 # --- 1. הגדרות ופרמטרים ---
-CSV_FILE_PATH = 'data/album_pair_features.csv'  # שנה לשם הקובץ שלך
+TRAIN_CSV_FILE_PATH = 'data/album_pair_features_train.csv'  # קובץ נתוני האימון
+TEST_CSV_FILE_PATH = 'data/album_pair_features_test.csv'    # קובץ נתוני הבדיקה
 TARGET_COLUMN = 'target_label'       # שם עמודת המטרה
 
 # עמודות שאינן חלק מה-features לאימון (כולל עמודת המטרה עצמה)
-# הוסף לכאן שמות של עמודות נוספות אם ישנן שאינן features
-# למשל, מזהים ייחודיים, מקור התווית, נתיבי תיקיות וכו'.
 IRRELEVANT_COLUMNS_FOR_TRAINING = [
     TARGET_COLUMN,
     'label_source',
@@ -21,51 +20,73 @@ IRRELEVANT_COLUMNS_FOR_TRAINING = [
     'folder2_path_id'
 ]
 
-TEST_SET_SIZE = 0.2  # 20% מהנתונים ישמשו לבדיקה
-RANDOM_STATE_SEED = 42  # לקבלת תוצאות עקביות בריצות חוזרות
+# TEST_SET_SIZE = 0.2 # גודל סט הבדיקה כפי שהוגדר ביצירת הקבצים, לתיעוד בלבד
+RANDOM_STATE_SEED = 42  # לקבלת תוצאות עקביות בריצות חוזרות (באימון המודל, GridSearchCV וכו')
 MODEL_SAVE_PATH = 'lgbm_regressor_model.joblib' # שם הקובץ לשמירת המודל
 
 # --- 2. פונקציות עזר ---
 
-def load_and_prepare_data(csv_path, target_column, irrelevant_columns, test_size, random_state):
+def load_and_prepare_data(train_csv_path, test_csv_path, target_column, irrelevant_columns):
     """
-    טוען את הנתונים מקובץ CSV, מפריד תכונות ותווית, ומפצל לסט אימון ובדיקה.
+    טוען את נתוני האימון והבדיקה מקבצי CSV נפרדים, מפריד תכונות ותווית.
     """
     try:
-        df = pd.read_csv(csv_path)
-    except FileNotFoundError:
-        print(f"שגיאה: קובץ ה-CSV לא נמצא בנתיב: {csv_path}")
-        return None, None, None, None, None, None
+        train_df = pd.read_csv(train_csv_path)
+        test_df = pd.read_csv(test_csv_path)
+    except FileNotFoundError as e:
+        print(f"שגיאה: אחד מקבצי ה-CSV לא נמצא. בדוק נתיבים: {train_csv_path}, {test_csv_path}. שגיאה: {e}")
+        return None, None, None, None, None, None, None
 
-    print(f"נתונים נטענו. צורת ה-DataFrame: {df.shape}")
-    print(f"תצוגה מקדימה של הנתונים:\n{df.head()}")
+    print(f"נתוני אימון נטענו. צורת ה-DataFrame: {train_df.shape}")
+    print(f"תצוגה מקדימה של נתוני האימון:\n{train_df.head()}")
+    print(f"נתוני בדיקה נטענו. צורת ה-DataFrame: {test_df.shape}")
+    print(f"תצוגה מקדימה של נתוני הבדיקה:\n{test_df.head()}")
 
-    # ודא שעמודת המטרה קיימת
-    if target_column not in df.columns:
-        print(f"שגיאה: עמודת המטרה '{target_column}' לא נמצאה ב-CSV.")
-        return None, None, None, None, None, None
+    # ודא שעמודת המטרה קיימת בשני ה-DataFrames
+    if target_column not in train_df.columns:
+        print(f"שגיאה: עמודת המטרה '{target_column}' לא נמצאה בקובץ האימון: {train_csv_path}.")
+        return None, None, None, None, None, None, None
+    if target_column not in test_df.columns:
+        print(f"שגיאה: עמודת המטרה '{target_column}' לא נמצאה בקובץ הבדיקה: {test_csv_path}.")
+        return None, None, None, None, None, None, None
 
-    y = df[target_column]
+    y_train = train_df[target_column]
+    y_test = test_df[target_column]
     
     # הסר עמודות לא רלוונטיות כדי לקבל את התכונות (X)
-    # ודא שכל העמודות ב-irrelevant_columns אכן קיימות ב-df לפני הניסיון להסירן
-    actual_irrelevant_cols = [col for col in irrelevant_columns if col in df.columns]
-    X = df.drop(columns=actual_irrelevant_cols, errors='ignore')
+    # קבע את רשימת התכונות על סמך סט האימון
+    actual_irrelevant_cols_train = [col for col in irrelevant_columns if col in train_df.columns]
+    X_train = train_df.drop(columns=actual_irrelevant_cols_train, errors='ignore')
+    feature_names = X_train.columns.tolist()
 
-    print(f"\nצורת מטריצת התכונות (X): {X.shape}")
-    print(f"צורת וקטור המטרה (y): {y.shape}")
-    print(f"שמות התכונות (Features) שישמשו לאימון:\n{X.columns.tolist()}")
+    print(f"\nשמות התכונות (Features) שנקבעו מסט האימון:\n{feature_names}")
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
+    # עבד את סט הבדיקה כדי שיתאים לסט האימון
+    actual_irrelevant_cols_test = [col for col in irrelevant_columns if col in test_df.columns]
+    X_test_processed = test_df.drop(columns=actual_irrelevant_cols_test, errors='ignore')
     
-    print(f"\nגודל סט האימון: X_train={X_train.shape}, y_train={y_train.shape}")
-    print(f"גודל סט הבדיקה: X_test={X_test.shape}, y_test={y_test.shape}")
+    try:
+        # ודא שסט הבדיקה מכיל את כל התכונות הנדרשות ובאותו סדר
+        X_test = X_test_processed[feature_names]
+    except KeyError as e:
+        print(f"שגיאה קריטית: עמודות התכונות בסט הבדיקה אינן תואמות לאלו שבסט האימון.")
+        missing_in_test = set(feature_names) - set(X_test_processed.columns)
+        extra_in_test = set(X_test_processed.columns) - set(feature_names)
+        if missing_in_test:
+            print(f"  עמודות חסרות בסט הבדיקה (אמורות להיות שם לפי סט האימון): {missing_in_test}")
+        if extra_in_test:
+            print(f"  עמודות עודפות/שונות בסט הבדיקה (לא אמורות להיות שם או שונות מסט האימון): {extra_in_test}")
+        print(f"  שגיאה מקורית של Pandas: {e}")
+        return None, None, None, None, None, None, None
 
-    return X_train, X_test, y_train, y_test, X.columns.tolist(), df
+    print(f"\nצורת מטריצת התכונות (X_train): {X_train.shape}")
+    print(f"צורת וקטור המטרה (y_train): {y_train.shape}")
+    print(f"צורת מטריצת התכונות (X_test): {X_test.shape}")
+    print(f"צורת וקטור המטרה (y_test): {y_test.shape}")
 
-def train_lgbm_regressor(X_train, y_train, X_test, y_test, params=None, random_state=RANDOM_STATE_SEED): # <--- נוספו X_test, y_test
+    return X_train, X_test, y_train, y_test, feature_names, train_df, test_df
+
+def train_lgbm_regressor(X_train, y_train, X_test, y_test, params=None, random_state=RANDOM_STATE_SEED):
     """
     מאמן מודל LightGBM Regressor.
     'params' הוא מילון של היפר-פרמטרים. אם None, ישתמש בברירת המחדל.
@@ -90,7 +111,7 @@ def train_lgbm_regressor(X_train, y_train, X_test, y_test, params=None, random_s
     
     print("\nמתחיל אימון מודל LightGBM...")
     model.fit(X_train, y_train,
-              eval_set=[(X_test, y_test)], # <--- עכשיו X_test ו-y_test מוכרים כאן
+              eval_set=[(X_test, y_test)], 
               eval_metric='mae',
               callbacks=[lgb.early_stopping(100, verbose=True)])
 
@@ -150,14 +171,6 @@ def tune_hyperparameters_gridsearch(X_train, y_train, random_state=RANDOM_STATE_
     
     grid_search = GridSearchCV(estimator, param_grid, scoring='neg_mean_absolute_error', cv=3, verbose=1)
     
-    # Early stopping בתוך GridSearchCV ידרוש הגדרת eval_set לכל fold,
-    # או להשתמש בפרמטר fit_params של GridSearchCV.
-    # לצורך הפשטות כאן, נפעיל fit ללא early stopping ספציפי ל-GridSearchCV,
-    # ונאמן את המודל הסופי עם early stopping.
-    # אם רוצים early_stopping בתוך GridSearchCV, יש להשתמש ב- fit_params:
-    # fit_params = {"callbacks": [lgb.early_stopping(50, verbose=False)], "eval_metric": "mae"}
-    # ולבחור eval_set מתאים, או להסתמך על ה-validation הפנימי של ה-CV.
-    # LightGBM עושה זאת אוטומטית עבור ה-CV אם לא מוגדר eval_set.
     grid_search.fit(X_train, y_train) 
     
     print("כוונון היפר-פרמטרים הושלם.")
@@ -190,7 +203,12 @@ def plot_feature_importances(model, feature_names, top_n=20):
     plt.figure(figsize=(12, max(6, top_n // 2)))
     plt.title(f"חשיבות {top_n} התכונות המובילות")
     
-    sns.barplot(x=importances[indices[:top_n]], y=[feature_names[i] for i in indices[:top_n]], palette="viridis")
+    # הצג רק את top_n התכונות אם יש יותר מ-top_n
+    num_features_to_plot = min(top_n, len(feature_names))
+    
+    sns.barplot(x=importances[indices[:num_features_to_plot]], 
+                y=[feature_names[i] for i in indices[:num_features_to_plot]], 
+                palette="viridis")
     
     plt.xlabel("חשיבות יחסית")
     plt.ylabel("שם התכונה")
@@ -199,16 +217,16 @@ def plot_feature_importances(model, feature_names, top_n=20):
 
 # --- 3. הפעלה ראשית ---
 def main():
-    X_train, X_test, y_train, y_test, feature_names, original_df = load_and_prepare_data(
-        CSV_FILE_PATH, TARGET_COLUMN, IRRELEVANT_COLUMNS_FOR_TRAINING, TEST_SET_SIZE, RANDOM_STATE_SEED
+    X_train, X_test, y_train, y_test, feature_names, original_train_df, original_test_df = load_and_prepare_data(
+        TRAIN_CSV_FILE_PATH, TEST_CSV_FILE_PATH, TARGET_COLUMN, IRRELEVANT_COLUMNS_FOR_TRAINING
     )
 
-    if X_train is None:
+    if X_train is None or X_test is None: # בדיקה מקיפה יותר
+        print("סיום התוכנית עקב שגיאה בטעינת או הכנת הנתונים.")
         return
     
     # ברירת מחדל: אימון עם פרמטרים בסיסיים ו-early stopping
-    # כאן אנחנו מעבירים את X_test ו-y_test לפונקציית האימון
-    trained_model = train_lgbm_regressor(X_train, y_train, X_test, y_test) # <--- התיקון הוחל כאן
+    trained_model = train_lgbm_regressor(X_train, y_train, X_test, y_test, random_state=RANDOM_STATE_SEED)
 
     # אם תרצה להפעיל כוונון היפר-פרמטרים:
     # 1. הסר את השורה הנ"ל (trained_model = train_lgbm_regressor(...))
@@ -216,48 +234,57 @@ def main():
     # print("שימו לב: כוונון היפר-פרמטרים עשוי לקחת זמן רב.")
     # user_choice_tune = input("האם ברצונך לבצע כוונון היפר-פרמטרים כעת? (כן/לא): ").strip().lower()
     # if user_choice_tune == 'כן':
-    #     best_hyperparams = tune_hyperparameters_gridsearch(X_train, y_train)
+    #     best_hyperparams = tune_hyperparameters_gridsearch(X_train, y_train, random_state=RANDOM_STATE_SEED)
     #     print(f"אימון מודל סופי עם הפרמטרים הטובים ביותר: {best_hyperparams}")
-    #     trained_model = train_lgbm_regressor(X_train, y_train, X_test, y_test, params=best_hyperparams) # <--- וגם כאן
+    #     trained_model = train_lgbm_regressor(X_train, y_train, X_test, y_test, params=best_hyperparams, random_state=RANDOM_STATE_SEED)
     # else:
     #     print("מדלג על כוונון היפר-פרמטרים, מאמן עם פרמטרים בסיסיים.")
-    #     trained_model = train_lgbm_regressor(X_train, y_train, X_test, y_test)
+    #     trained_model = train_lgbm_regressor(X_train, y_train, X_test, y_test, random_state=RANDOM_STATE_SEED)
 
     if trained_model:
         evaluate_model(trained_model, X_test, y_test)
         plot_feature_importances(trained_model, feature_names)
         save_model_artifact(trained_model, MODEL_SAVE_PATH)
-        print_sample_predictions(trained_model, X_test, y_test, original_df, feature_names, num_samples=5)
+        print_sample_predictions(trained_model, X_test, y_test, original_test_df, feature_names, num_samples=5)
 
 
-def print_sample_predictions(model, X_test, y_test, original_df, feature_names, num_samples=5):
+def print_sample_predictions(model, X_test, y_test, original_test_df, feature_names, num_samples=5):
     print(f"\n--- דוגמאות חיזויים מסט הבדיקה (ראשונות {num_samples}) ---")
     
+    if len(X_test) == 0:
+        print("סט הבדיקה ריק. לא ניתן להציג דוגמאות חיזויים.")
+        return
+
     if num_samples > len(X_test):
         num_samples = len(X_test)
-        print(f"מספר הדגימות המבוקש ({num_samples}) גדול מגודל סט הבדיקה. מציג {len(X_test)} דגימות.")
+        print(f"מספר הדגימות המבוקש גדול מגודל סט הבדיקה. מציג {len(X_test)} דגימות.")
 
-    sample_indices = X_test.head(num_samples).index
-    X_sample = X_test.loc[sample_indices]
-    y_sample_actual = y_test.loc[sample_indices]
+    # האינדקסים ב-X_test נשמרים מה-DataFrame המקורי (test_df)
+    sample_original_indices = X_test.head(num_samples).index
+    
+    X_sample = X_test.loc[sample_original_indices]
+    y_sample_actual = y_test.loc[sample_original_indices]
     y_sample_pred = model.predict(X_sample)
     
-    original_samples_df = original_df.loc[sample_indices]
+    original_samples_df = original_test_df.loc[sample_original_indices]
 
-    for i in range(len(sample_indices)):
-        idx = sample_indices[i]
+    for i in range(len(sample_original_indices)):
+        original_idx = sample_original_indices[i] # זהו האינדקס המקורי מהקובץ test_df
+        
+        # y_sample_actual ו- y_sample_pred הם Series/array, אז גישה לפי מיקום iloc[i] נכונה עבור הדגימות שנבחרו
         actual = y_sample_actual.iloc[i]
         predicted = y_sample_pred[i]
         
-        print(f"\nדגימה אינדקס מקורי: {idx}")
+        print(f"\nדגימה (אינדקס מקורי בקובץ הבדיקה: {original_idx})")
         print(f"  ערך מטרה אמיתי ({TARGET_COLUMN}): {actual:.4f}")
         print(f"  ערך מטרה חזוי: {predicted:.4f}")
         print(f"  הפרש (Actual - Predicted): {actual - predicted:.4f}")
         
+        # גישה לנתונים המקוריים באמצעות האינדקס המקורי
         if 'folder1_path_id' in original_samples_df.columns:
-            print(f"  תיקייה 1: {original_samples_df.loc[idx, 'folder1_path_id']}")
+            print(f"  תיקייה 1: {original_samples_df.loc[original_idx, 'folder1_path_id']}")
         if 'folder2_path_id' in original_samples_df.columns:
-            print(f"  תיקייה 2: {original_samples_df.loc[idx, 'folder2_path_id']}")
+            print(f"  תיקייה 2: {original_samples_df.loc[original_idx, 'folder2_path_id']}")
 
 if __name__ == "__main__":
     main()

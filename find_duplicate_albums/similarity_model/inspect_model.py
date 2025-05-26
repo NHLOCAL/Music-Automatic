@@ -3,7 +3,7 @@ import joblib
 import numpy as np
 
 # --- 1. הגדרות ופרמטרים ---
-CSV_FILE_PATH = 'data/album_pair_features.csv'  # נתיב לקובץ ה-CSV המקורי שלך
+CSV_FILE_PATH = 'data/album_pair_features_test.csv'  # נתיב לקובץ ה-CSV המקורי שלך
 MODEL_PATH = 'lgbm_regressor_model.joblib' # נתיב למודל השמור
 TARGET_COLUMN = 'target_label'       # שם עמודת המטרה ב-CSV
 
