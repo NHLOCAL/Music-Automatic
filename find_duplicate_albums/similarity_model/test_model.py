@@ -4,50 +4,30 @@ import joblib
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import matplotlib.pyplot as plt
 import seaborn as sns # For prettier plots
-import shap # For model explanation
+import shap # For model explanations
 import pyperclip # For copying to clipboard
 
 # --- 1. הגדרות וקבועים ---
-MODEL_PATH = 'lgbm_regressor_model.joblib'  # נתיב למודל המאומן השמור
-TEST_CSV_FILE_PATH = 'data/album_pair_features_test.csv'  # קובץ נתוני הבדיקה
-TARGET_COLUMN = 'target_label'  # שם עמודת המטרה
+MODEL_PATH = 'lgbm_regressor_model.joblib'
+TEST_CSV_FILE_PATH = 'data/album_pair_features_test.csv'
+TARGET_COLUMN = 'target_label'
 
-# רשימת התכונות שהמודל אומן עליהן והוא מצפה לקבל
 EXPECTED_FEATURE_NAMES = [
-    'diff_avg_bitrate',
-    'jaccard_unique_artists',
-    'jaccard_unique_albums',
-    'f1_generic_filename_score',
-    'f2_generic_filename_score',
-    'diff_generic_filename_score',
-    'f1_generic_title_score',
-    'f2_generic_title_score',
-    'diff_generic_title_score',
-    'comp_file_hash_similarity',
-    'comp_file_size_similarity',
-    'comp_filename_similarity',
-    'comp_title_similarity',
-    'comp_album_similarity',
-    'comp_artist_similarity',
-    'comp_albumartist_similarity',
-    'comp_folder_name_similarity',
-    'comp_album_art_hash_similarity',
-    'comp_duration_similarity',
-    'comp_avg_add_meta_similarity',
-    'comp_count_high_add_meta_similarity'
+    'diff_avg_bitrate', 'jaccard_unique_artists', 'jaccard_unique_albums',
+    'f1_generic_filename_score', 'f2_generic_filename_score', 'diff_generic_filename_score',
+    'f1_generic_title_score', 'f2_generic_title_score', 'diff_generic_title_score',
+    'comp_file_hash_similarity', 'comp_file_size_similarity', 'comp_filename_similarity',
+    'comp_title_similarity', 'comp_album_similarity', 'comp_artist_similarity',
+    'comp_albumartist_similarity', 'comp_folder_name_similarity', 'comp_album_art_hash_similarity',
+    'comp_duration_similarity', 'comp_avg_add_meta_similarity', 'comp_count_high_add_meta_similarity'
 ]
 
-# קבועים לזיהוי חריגים
-OUTLIER_ERROR_THRESHOLD = 0.3  # סף שגיאה אבסולוטית לזיהוי חריג (בין 0 ל-1)
-# TOP_N_OUTLIERS_TO_SHOW בוטל, נציג את כל החריגים מעל הסף
-TOP_N_SHAP_FEATURES_TO_SHOW = 5 # מספר התכונות המובילות להצגה בנימוק SHAP
+OUTLIER_ERROR_THRESHOLD = 0.3
+N_SHAP_FEATURES_TO_SHOW = 5
 
 # --- 2. פונקציות עזר ---
 
 def load_model(model_path):
-    """
-    טוען מודל מאומן מקובץ .joblib.
-    """
     try:
         model = joblib.load(model_path)
         print(f"המודל נטען בהצלחה מהנתיב: {model_path}")
@@ -60,10 +40,6 @@ def load_model(model_path):
         return None
 
 def load_and_prepare_test_data(csv_path, target_column, expected_features):
-    """
-    טוען נתוני בדיקה מקובץ CSV, מפריד תכונות ומטרה,
-    ומוודא שהתכונות תואמות לרשימת התכונות הצפויה.
-    """
     try:
         test_df = pd.read_csv(csv_path)
     except FileNotFoundError:
@@ -80,7 +56,6 @@ def load_and_prepare_test_data(csv_path, target_column, expected_features):
     missing_features = [col for col in expected_features if col not in test_df.columns]
     if missing_features:
         print(f"שגיאה: התכונות הבאות, שהמודל מצפה להן, חסרות בקובץ הבדיקה: {missing_features}")
-        print("רשימת העמודות הקיימות בקובץ הבדיקה:", test_df.columns.tolist())
         return None, None, None
 
     try:
@@ -91,13 +66,10 @@ def load_and_prepare_test_data(csv_path, target_column, expected_features):
     
     print(f"\nצורת מטריצת התכונות (X_test) לאחר בחירת התכונות הצפויות: {X_test.shape}")
     print(f"צורת וקטור המטרה (y_test): {y_test.shape}")
-    
+
     return X_test, y_test, test_df
 
 def evaluate_model_performance(model, X_test, y_test, model_name="Loaded LightGBM Model"):
-    """
-    מעריך את ביצועי המודל על סט הבדיקה.
-    """
     print(f"\n--- הערכת ביצועי מודל: {model_name} על סט הבדיקה ---")
     y_pred = model.predict(X_test)
 
@@ -109,112 +81,65 @@ def evaluate_model_performance(model, X_test, y_test, model_name="Loaded LightGB
     print(f"Mean Absolute Error (MAE):      {mae:.4f}")
     print(f"R-squared (R²):                 {r2:.4f}")
     
-    # ניתן להסיר את ההערות אם רוצים לראות גרפים
-    # plt.figure(figsize=(10, 6))
-    # sns.histplot(y_test - y_pred, kde=True, bins=30)
-    # plt.title('התפלגות השגיאות (Actual - Predicted) על סט הבדיקה')
-    # plt.xlabel('שגיאה')
-    # plt.ylabel('שכיחות')
-    # plt.grid(True)
-    # plt.show()
+    plt.figure(figsize=(10, 6))
+    sns.histplot(y_test - y_pred, kde=True, bins=30)
+    plt.title('התפלגות השגיאות (Actual - Predicted) על סט הבדיקה')
+    plt.xlabel('שגיאה (אמיתי - חזוי)')
+    plt.ylabel('שכיחות')
+    plt.grid(True)
+    plt.show()
 
-    # plt.figure(figsize=(10, 6))
-    # plt.scatter(y_test, y_pred, alpha=0.5)
-    # plt.plot([min(y_test.min(), y_pred.min()), max(y_test.max(), y_pred.max())], 
-    #          [min(y_test.min(), y_pred.min()), max(y_test.max(), y_pred.max())], 'k--', lw=2)
-    # plt.xlabel('ערכים אמיתיים (Actual)')
-    # plt.ylabel('ערכים חזויים (Predicted)')
-    # plt.title('ערכים אמיתיים מול ערכים חזויים על סט הבדיקה')
-    # plt.grid(True)
-    # plt.show()
+    plt.figure(figsize=(10, 6))
+    plt.scatter(y_test, y_pred, alpha=0.5)
+    # קו Y=X לייחוס, מתחשב בטווח הערכים האמיתי והחזוי
+    min_val = min(y_test.min(), y_pred.min())
+    max_val = max(y_test.max(), y_pred.max())
+    plt.plot([min_val, max_val], [min_val, max_val], 'k--', lw=2)
+    plt.xlabel('ערכים אמיתיים (Actual)')
+    plt.ylabel('ערכים חזויים (Predicted)')
+    plt.title('ערכים אמיתיים מול ערכים חזויים על סט הבדיקה')
+    plt.grid(True)
+    plt.show()
     
     return {'rmse': rmse, 'mae': mae, 'r2': r2}
 
-def print_sample_predictions_from_test_set(model, X_test_features, y_test_actual, original_test_dataframe, 
-                                           target_col_name, num_samples=5):
-    # ... (הפונקציה נשארת כפי שהייתה, אפשר להסיר אותה אם היא לא נדרשת יותר אם נתמקד רק בחריגים)
-    print(f"\n--- דוגמאות חיזויים מסט הבדיקה (עד {num_samples} דגימות) ---")
-    
-    if len(X_test_features) == 0:
-        print("סט תכונות הבדיקה (X_test_features) ריק. לא ניתן להציג דוגמאות חיזויים.")
-        return
 
-    actual_num_samples = min(num_samples, len(X_test_features))
-    if num_samples > len(X_test_features):
-        print(f"מספר הדגימות המבוקש ({num_samples}) גדול מגודל סט הבדיקה ({len(X_test_features)}). מציג {actual_num_samples} דגימות.")
-
-    sample_indices = X_test_features.head(actual_num_samples).index
-    
-    X_sample = X_test_features.loc[sample_indices]
-    y_sample_actual_values = y_test_actual.loc[sample_indices]
-    y_sample_pred_values = model.predict(X_sample)
-    
-    original_samples_info_df = original_test_dataframe.loc[sample_indices]
-
-    for i in range(len(sample_indices)):
-        original_idx = sample_indices[i]
-        actual_val = y_sample_actual_values.iloc[i]
-        predicted_val = y_sample_pred_values[i]
-        
-        print(f"\nדגימה (אינדקס מקורי בקובץ הבדיקה: {original_idx})")
-        print(f"  ערך מטרה אמיתי ({target_col_name}): {actual_val:.4f}")
-        print(f"  ערך מטרה חזוי: {predicted_val:.4f}")
-        print(f"  הפרש (Actual - Predicted): {actual_val - predicted_val:.4f}")
-        
-        if 'folder1_path_id' in original_samples_info_df.columns:
-            print(f"  תיקייה 1: {original_samples_info_df.loc[original_idx, 'folder1_path_id']}")
-        if 'folder2_path_id' in original_samples_info_df.columns:
-            print(f"  תיקייה 2: {original_samples_info_df.loc[original_idx, 'folder2_path_id']}")
-        if 'label_source' in original_samples_info_df.columns:
-            print(f"  מקור התווית: {original_samples_info_df.loc[original_idx, 'label_source']}")
-
-
-def get_shap_explanation(model, X_instance, X_train_for_explainer, feature_names, top_n_features):
+def format_outlier_explanation(shap_values_sample, feature_names, feature_values_sample, top_n_shap):
     """
-    מחזיר הסבר SHAP עבור דגימה בודדת.
-    X_instance צריך להיות DataFrame עם שורה אחת.
-    X_train_for_explainer הוא ה-DataFrame של נתוני האימון או תת-קבוצה מייצגת עבור ה-Explainer.
+    מעצב את הסבר ה-SHAP עבור דגימה בודדת בצורה תמציתית.
     """
-    # עבור מודלים מבוססי עצים כמו LightGBM, TreeExplainer הוא יעיל.
-    # אם X_train_for_explainer גדול, אפשר להשתמש בתת-דגימה שלו כדי לזרז את יצירת ה-Explainer.
-    # למשל: shap.sample(X_train_for_explainer, 100)
-    explainer = shap.TreeExplainer(model, X_train_for_explainer) 
-    shap_values_instance = explainer.shap_values(X_instance)
+    explanation_lines = []
+    contributions = []
+    for i, feature_name in enumerate(feature_names):
+        contributions.append({
+            'feature': feature_name,
+            'value': feature_values_sample[i],
+            'shap_value': shap_values_sample[i] 
+        })
 
-    # יצירת DataFrame עם ערכי SHAP ושמות התכונות
-    shap_df = pd.DataFrame({
-        'feature': feature_names,
-        'shap_value': shap_values_instance[0] # ל-LGBM רגרסיה, shap_values הוא מערך של מערכים
-    })
-    shap_df['abs_shap_value'] = shap_df['shap_value'].abs()
+    sorted_contributions = sorted(contributions, key=lambda x: abs(x['shap_value']), reverse=True)
     
-    # מיון לפי ערך SHAP אבסולוטי (השפעה הגדולה ביותר)
-    top_features_shap = shap_df.sort_values(by='abs_shap_value', ascending=False).head(top_n_features)
-    
-    explanation_parts = []
-    for _, row in top_features_shap.iterrows():
-        direction = "מעלה" if row['shap_value'] > 0 else "מטה"
-        # קבלת הערך המקורי של התכונה בדגימה
-        feature_value = X_instance.iloc[0][row['feature']]
-        explanation_parts.append(
-            f"    - תכונה '{row['feature']}' (ערך: {feature_value:.3f}) דחפה את החיזוי {direction} (SHAP: {row['shap_value']:.3f})"
-        )
-    return "\n".join(explanation_parts)
+    explanation_lines.append(f"  נימוק המודל (Top {min(top_n_shap, len(sorted_contributions))} תכונות משפיעות):")
+    for item in sorted_contributions[:top_n_shap]:
+        sign = "+" if item['shap_value'] >= 0 else "-"
+        explanation_lines.append(f"    {sign} {item['feature']:<30} (ערך: {item['value']:.2f}) -> {item['shap_value']:.3f}")
+    return "\n".join(explanation_lines)
 
 
-def identify_analyze_and_copy_outliers(model, X_test, y_test, original_test_df_full, 
-                                       target_column, error_threshold, 
-                                       top_n_shap_features, X_train_for_shap): # X_train_for_shap נוסף
+def identify_and_collate_outliers_info(model, shap_explainer, X_test, y_test, original_test_df_full, 
+                                       feature_names, target_column, error_threshold, n_shap_features):
     """
-    מזהה דגימות חריגות, מנתח אותן עם SHAP, מדפיס את המידע ומעתיק ללוח.
+    מזהה דגימות חריגות, מחשב הסברי SHAP, ואוסף את כל המידע למחרוזת מעוצבת.
     """
-    print(f"\n--- זיהוי, ניתוח והעתקת דגימות חריגות עם שגיאת חיזוי אבסולוטית גדולה מ- {error_threshold:.4f} ---")
-    
+    output_lines = [f"--- זיהוי דגימות עם שגיאת חיזוי גדולה מ- {error_threshold:.2f} ---"]
+    separator_line = "-" * 60
+
     y_pred = model.predict(X_test)
 
     results_df = pd.DataFrame({
         'actual_value': y_test,
         'predicted_value': y_pred,
+        'error': y_test - y_pred, # שגיאה עם סימן
         'absolute_error': np.abs(y_test - y_pred)
     }, index=y_test.index)
 
@@ -230,121 +155,59 @@ def identify_analyze_and_copy_outliers(model, X_test, y_test, original_test_df_f
     significant_outliers_df = significant_outliers_df.sort_values(by='absolute_error', ascending=False)
 
     if significant_outliers_df.empty:
-        print(f"לא נמצאו דגימות עם שגיאת חיזוי אבסולוטית הגדולה מ- {error_threshold:.4f}.")
-        return
+        no_outliers_message = f"לא נמצאו דגימות עם שגיאת חיזוי אבסולוטית הגדולה מ- {error_threshold:.2f}."
+        output_lines.append(no_outliers_message)
+        return "\n".join(output_lines)
 
     num_outliers_found = len(significant_outliers_df)
-    print(f"נמצאו {num_outliers_found} דגימות חריגות. מנתח ומציג את כולן:")
+    output_lines.append(f"נמצאו {num_outliers_found} דגימות חריגות (עם שגיאה > {error_threshold:.2f}):")
+    
+    X_outliers = X_test.loc[significant_outliers_df.index]
+    shap_values_outliers = shap_explainer.shap_values(X_outliers)
 
-    output_for_clipboard = []
-    output_for_clipboard.append(f"רשימת חריגים (שגיאה > {error_threshold:.4f}):\n")
-
-    # הכנת ה-explainer פעם אחת אם X_train_for_shap קטן מספיק.
-    # אם הוא גדול, נצטרך אולי לדגום ממנו בתוך הלולאה או להשתמש ב-KernelExplainer על כל X_test,
-    # אך TreeExplainer עם כל ה-X_train (אם הוא לא עצום) יהיה מדויק יותר.
-    # אם X_train לא זמין כאן (כי זה סקריפט בדיקה נפרד), נצטרך להעביר אותו או להשתמש ב-X_test כרקע.
-    # השימוש ב-X_test כרקע ל-TreeExplainer הוא פחות אידיאלי מאשר X_train.
-    # נניח ש-X_test הוא הרקע הזמין והטוב ביותר בסקריפט בדיקה זה.
-    print("מכין SHAP explainer (עשוי לקחת זמן אם יש הרבה דגימות ב-X_test)...")
-    # explainer_shap = shap.TreeExplainer(model, X_test) # שימוש ב-X_test כרקע
-    # עדיף להעביר X_train אם אפשר. אם לא, נשתמש ב- X_test כקירוב.
-    # מכיוון ש-X_train לא נטען בסקריפט זה, נשתמש ב-X_test (שהוא ה-X_test המקורי, לא רק החריגים).
-    # עבור TreeExplainer, עדיף להשתמש בנתוני האימון כרקע.
-    # כפשרה, ניתן להשתמש ב- X_test כולו כרקע.
-    background_data_for_shap = X_test # או X_train_for_shap אם הועבר
-    explainer_shap = shap.TreeExplainer(model, background_data_for_shap)
-    print("SHAP explainer מוכן.")
-
-
-    for idx, row in significant_outliers_df.iterrows():
-        print_line = f"\n  דגימה (אינדקס מקורי: {idx})"
-        print(print_line)
-        output_for_clipboard.append(print_line)
-
-        actual_val_str = f"    ערך מטרה אמיתי ({target_column}): {row['actual_value']:.4f}"
-        print(actual_val_str)
-        output_for_clipboard.append(actual_val_str)
-
-        pred_val_str = f"    ערך מטרה חזוי: {row['predicted_value']:.4f}"
-        print(pred_val_str)
-        output_for_clipboard.append(pred_val_str)
-        
-        error_str = f"    שגיאה אבסולוטית: {row['absolute_error']:.4f}"
-        print(error_str)
-        output_for_clipboard.append(error_str)
+    for i, (idx, row) in enumerate(significant_outliers_df.iterrows()):
+        output_lines.append(f"\n{separator_line}")
+        output_lines.append(f"חריג מס' {i+1} (אינדקס מקורי: {idx})")
+        output_lines.append(separator_line)
         
         if 'folder1_path_id' in significant_outliers_df.columns:
-            f1_str = f"    תיקייה 1: {row['folder1_path_id']}"
-            print(f1_str)
-            output_for_clipboard.append(f1_str)
+            output_lines.append(f"  תיקייה 1: {row['folder1_path_id']}")
         if 'folder2_path_id' in significant_outliers_df.columns:
-            f2_str = f"    תיקייה 2: {row['folder2_path_id']}"
-            print(f2_str)
-            output_for_clipboard.append(f2_str)
+            output_lines.append(f"  תיקייה 2: {row['folder2_path_id']}")
         if 'label_source' in significant_outliers_df.columns:
-             ls_str = f"    מקור התווית: {row['label_source']}"
-             print(ls_str)
-             output_for_clipboard.append(ls_str)
-
-        # קבלת שורת התכונות עבור הדגימה החריגה הנוכחית
-        # X_test מכיל את התכונות בסדר הנכון והוא בעל אותו אינדקס כמו y_test ו-original_test_df_full
-        instance_features_df = X_test.loc[[idx]] # צריך להיות DataFrame עם שורה אחת
+             output_lines.append(f"  מקור תווית: {row['label_source']}")
         
-        print("    נימוק SHAP (תכונות עיקריות שתרמו לחיזוי):")
-        output_for_clipboard.append("    נימוק SHAP (תכונות עיקריות שתרמו לחיזוי):")
-        try:
-            # חישוב ערכי SHAP עבור הדגימה הספציפית
-            shap_values_instance = explainer_shap.shap_values(instance_features_df)
-            
-            # יצירת DataFrame עם ערכי SHAP ושמות התכונות
-            shap_df_instance = pd.DataFrame({
-                'feature': X_test.columns, # שמות התכונות מה- DataFrame של התכונות
-                'shap_value': shap_values_instance[0] 
-            })
-            shap_df_instance['abs_shap_value'] = shap_df_instance['shap_value'].abs()
-            top_features_shap = shap_df_instance.sort_values(by='abs_shap_value', ascending=False).head(top_n_shap_features)
-
-            for _, shap_row in top_features_shap.iterrows():
-                direction = "מעלה" if shap_row['shap_value'] > 0 else "מטה"
-                feature_value_instance = instance_features_df.iloc[0][shap_row['feature']]
-                shap_explanation_line = (
-                    f"      - תכונה '{shap_row['feature']}' (ערך בדגימה: {feature_value_instance:.3f}) "
-                    f"דחפה את החיזוי {direction} (תרומת SHAP: {shap_row['shap_value']:.3f})"
-                )
-                print(shap_explanation_line)
-                output_for_clipboard.append(shap_explanation_line)
-
-        except Exception as e_shap:
-            shap_error_msg = f"      שגיאה ביצירת הסבר SHAP: {e_shap}"
-            print(shap_error_msg)
-            output_for_clipboard.append(shap_error_msg)
+        output_lines.append("\n  ערכים:")
+        output_lines.append(f"    אמיתי ({target_column}): {row['actual_value']:.3f}")
+        output_lines.append(f"    חזוי:             {row['predicted_value']:.3f}")
         
-        output_for_clipboard.append("-" * 20) # מפריד בין חריגים
-
-    # העתקה ללוח
-    try:
-        final_clipboard_text = "\n".join(output_for_clipboard)
-        pyperclip.copy(final_clipboard_text)
-        print("\n--- רשימת החריגים המלאה הועתקה ללוח (clipboard) ---")
-    except pyperclip.PyperclipException as e_clip:
-        print(f"\n--- שגיאה בהעתקה ללוח: {e_clip} ---")
-        print("אנא ודא שהחבילה 'pyperclip' מותקנת ושיש לך כלי לוח זמין (למשל, xclip או xsel על לינוקס).")
-        print("הפלט המלא של החריגים הודפס למסך.")
-
+        error_direction = ""
+        if row['error'] > 0: # y_test > y_pred  => המודל העריך בחסר (underestimation)
+            error_direction = f"(הערכת חסר של {abs(row['error']):.3f})"
+        elif row['error'] < 0: # y_test < y_pred => המודל העריך ביתר (overestimation)
+            error_direction = f"(הערכת יתר של {abs(row['error']):.3f})"
+        output_lines.append(f"    שגיאה (אמיתי-חזוי): {row['error']:.3f} {error_direction}")
+        
+        shap_explanation = format_outlier_explanation(
+            shap_values_outliers[i], 
+            feature_names,
+            X_outliers.iloc[i].values,
+            n_shap_features
+        )
+        output_lines.append(shap_explanation)
+        
+    output_lines.append(f"\n{separator_line}")
+    return "\n".join(output_lines)
 
 # --- 3. הפעלה ראשית ---
 def main():
     print("מתחיל תהליך בדיקת המודל...")
 
-    # 1. טען את המודל המאומן
     model = load_model(MODEL_PATH)
     if model is None:
         print("סיום התוכנית עקב שגיאה בטעינת המודל.")
         return
 
-    # 2. טען והכן את נתוני הבדיקה
-    # חשוב: X_test כאן ישמש גם כרקע ל-SHAP TreeExplainer.
-    # באופן אידיאלי, היינו טוענים את X_train המקורי כרקע.
     X_test, y_test, original_test_df = load_and_prepare_test_data(
         TEST_CSV_FILE_PATH, 
         TARGET_COLUMN, 
@@ -355,37 +218,54 @@ def main():
         print("סיום התוכנית עקב שגיאה בטעינת או הכנת נתוני הבדיקה.")
         return
 
-    # 3. הערך את ביצועי המודל
     evaluate_model_performance(model, X_test, y_test)
-
-    # 4. הצג דוגמאות חיזויים (כללי) - אופציונלי, ניתן להסיר אם לא נדרש
-    # print_sample_predictions_from_test_set(
-    #     model, 
-    #     X_test, 
-    #     y_test, 
-    #     original_test_df, 
-    #     TARGET_COLUMN,
-    #     num_samples=3 
-    # )
     
-    # 5. זיהוי, ניתוח והעתקת דגימות חריגות
-    # נעביר את X_test כרקע ל-SHAP.
-    identify_analyze_and_copy_outliers(
-        model,
-        X_test,
-        y_test,
-        original_test_df,
-        TARGET_COLUMN,
-        OUTLIER_ERROR_THRESHOLD,
-        TOP_N_SHAP_FEATURES_TO_SHOW,
-        X_test # שימוש ב-X_test כרקע ל-SHAP TreeExplainer
-    )
+    print("\nמאתחל SHAP explainer...")
+    try:
+        explainer = shap.TreeExplainer(model)
+        print("SHAP explainer אותחל.")
+    except Exception as e:
+        print(f"שגיאה באתחול SHAP explainer: {e}")
+        print("המשך ללא נימוקי SHAP לחריגים.")
+        explainer = None # הגדר כ-None כדי שהקוד יוכל להמשיך
+
+    # אם האתחול הצליח, נמשיך לזיהוי חריגים עם הסברים
+    if explainer:
+        outliers_summary_text = identify_and_collate_outliers_info(
+            model,
+            explainer,
+            X_test,
+            y_test,
+            original_test_df,
+            EXPECTED_FEATURE_NAMES,
+            TARGET_COLUMN,
+            OUTLIER_ERROR_THRESHOLD,
+            N_SHAP_FEATURES_TO_SHOW
+        )
+    else: # אם האתחול נכשל, נפיק רשימת חריגים בסיסית ללא SHAP
+        print("\nמפיק רשימת חריגים בסיסית (ללא נימוקי SHAP עקב שגיאה באתחול).")
+        # כאן אפשר לקרוא לגרסה פשוטה יותר של identify_and_collate_outliers_info
+        # או פשוט להדפיס הודעה שהנימוקים לא זמינים.
+        # לשם הפשטות, נדפיס הודעה ונסיים את החלק הזה.
+        y_pred_basic = model.predict(X_test)
+        errors_basic = np.abs(y_test - y_pred_basic)
+        num_basic_outliers = np.sum(errors_basic > OUTLIER_ERROR_THRESHOLD)
+        outliers_summary_text = (f"--- זיהוי דגימות עם שגיאת חיזוי גדולה מ- {OUTLIER_ERROR_THRESHOLD:.2f} (ללא נימוקי SHAP) ---\n"
+                                 f"נמצאו {num_basic_outliers} דגימות חריגות.\n"
+                                 f"נימוקי SHAP אינם זמינים עקב שגיאה באתחול ה-Explainer.")
+
+
+    print(outliers_summary_text)
+
+    try:
+        pyperclip.copy(outliers_summary_text)
+        print("\nסיכום הדגימות החריגות הועתק ללוח (Clipboard).")
+    except pyperclip.PyperclipException as e:
+        print(f"\nשגיאה בהעתקה ללוח: {e}")
+        print("ייתכן שחסרה לך תוכנת עזר ללוח (כמו xclip או xsel על לינוקס).")
+        print("המידע הודפס למסך.")
 
     print("\nתהליך בדיקת המודל הושלם.")
 
 if __name__ == "__main__":
-    # הדלקת גרפים אם רלוונטי (אני משאיר אותם כבויים כרגע כדי להתמקד בפלט הטקסטואלי)
-    # plt.ion()
     main()
-    # plt.ioff()
-    # input("לחץ Enter לסיום...") 
