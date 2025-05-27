@@ -24,6 +24,7 @@ EXPECTED_FEATURE_NAMES = [
 
 OUTLIER_ERROR_THRESHOLD = 0.3
 N_SHAP_FEATURES_TO_SHOW = 5
+TOP_N_GLOBAL_FEATURES = 15 # מספר תכונות גלובליות חשובות להצגה בגרף
 
 # --- 2. פונקציות עזר ---
 
@@ -69,6 +70,42 @@ def load_and_prepare_test_data(csv_path, target_column, expected_features):
 
     return X_test, y_test, test_df
 
+def plot_and_print_global_feature_importances(model, feature_names, top_n=15):
+    """
+    מציג ומדפיס את חשיבות התכונות הגלובלית מהמודל (model.feature_importances_).
+    """
+    print(f"\n--- חשיבות תכונות גלובלית (מ-model.feature_importances_) ---")
+    if not hasattr(model, 'feature_importances_'):
+        print("למודל זה אין מאפיין 'feature_importances_'. לא ניתן להציג חשיבות תכונות גלובלית בדרך זו.")
+        return
+
+    importances = model.feature_importances_
+    
+    # יצירת DataFrame לחשיבות התכונות
+    feature_importance_df = pd.DataFrame({
+        'feature': feature_names,
+        'importance': importances
+    })
+    
+    # מיון לפי חשיבות (הגבוהה ביותר ראשונה)
+    feature_importance_df = feature_importance_df.sort_values(by='importance', ascending=False)
+    
+    print(f"חשיבות {min(top_n, len(feature_importance_df))} התכונות המובילות:")
+    for index, row in feature_importance_df.head(top_n).iterrows():
+        print(f"  - {row['feature']:<35}: {row['importance']:.4f}")
+
+    # הצגת גרף
+    plt.figure(figsize=(10, max(6, top_n // 2.5))) # התאמת גודל הגרף למספר התכונות
+    sns.barplot(x='importance', y='feature', 
+                data=feature_importance_df.head(top_n), 
+                palette="viridis_r") # שינוי פלטת צבעים
+    plt.title(f'חשיבות {min(top_n, len(feature_importance_df))} התכונות המובילות (גלובלי)')
+    plt.xlabel('חשיבות (לפי המודל)')
+    plt.ylabel('שם התכונה')
+    plt.tight_layout() # להתאמה טובה יותר של התוויות
+    plt.show()
+
+
 def evaluate_model_performance(model, X_test, y_test, model_name="Loaded LightGBM Model"):
     print(f"\n--- הערכת ביצועי מודל: {model_name} על סט הבדיקה ---")
     y_pred = model.predict(X_test)
@@ -91,7 +128,6 @@ def evaluate_model_performance(model, X_test, y_test, model_name="Loaded LightGB
 
     plt.figure(figsize=(10, 6))
     plt.scatter(y_test, y_pred, alpha=0.5)
-    # קו Y=X לייחוס, מתחשב בטווח הערכים האמיתי והחזוי
     min_val = min(y_test.min(), y_pred.min())
     max_val = max(y_test.max(), y_pred.max())
     plt.plot([min_val, max_val], [min_val, max_val], 'k--', lw=2)
@@ -105,9 +141,6 @@ def evaluate_model_performance(model, X_test, y_test, model_name="Loaded LightGB
 
 
 def format_outlier_explanation(shap_values_sample, feature_names, feature_values_sample, top_n_shap):
-    """
-    מעצב את הסבר ה-SHAP עבור דגימה בודדת בצורה תמציתית.
-    """
     explanation_lines = []
     contributions = []
     for i, feature_name in enumerate(feature_names):
@@ -128,9 +161,6 @@ def format_outlier_explanation(shap_values_sample, feature_names, feature_values
 
 def identify_and_collate_outliers_info(model, shap_explainer, X_test, y_test, original_test_df_full, 
                                        feature_names, target_column, error_threshold, n_shap_features):
-    """
-    מזהה דגימות חריגות, מחשב הסברי SHAP, ואוסף את כל המידע למחרוזת מעוצבת.
-    """
     output_lines = [f"--- זיהוי דגימות עם שגיאת חיזוי גדולה מ- {error_threshold:.2f} ---"]
     separator_line = "-" * 60
 
@@ -139,7 +169,7 @@ def identify_and_collate_outliers_info(model, shap_explainer, X_test, y_test, or
     results_df = pd.DataFrame({
         'actual_value': y_test,
         'predicted_value': y_pred,
-        'error': y_test - y_pred, # שגיאה עם סימן
+        'error': y_test - y_pred,
         'absolute_error': np.abs(y_test - y_pred)
     }, index=y_test.index)
 
@@ -182,9 +212,9 @@ def identify_and_collate_outliers_info(model, shap_explainer, X_test, y_test, or
         output_lines.append(f"    חזוי:             {row['predicted_value']:.3f}")
         
         error_direction = ""
-        if row['error'] > 0: # y_test > y_pred  => המודל העריך בחסר (underestimation)
+        if row['error'] > 0:
             error_direction = f"(הערכת חסר של {abs(row['error']):.3f})"
-        elif row['error'] < 0: # y_test < y_pred => המודל העריך ביתר (overestimation)
+        elif row['error'] < 0:
             error_direction = f"(הערכת יתר של {abs(row['error']):.3f})"
         output_lines.append(f"    שגיאה (אמיתי-חזוי): {row['error']:.3f} {error_direction}")
         
@@ -218,6 +248,9 @@ def main():
         print("סיום התוכנית עקב שגיאה בטעינת או הכנת נתוני הבדיקה.")
         return
 
+    # הצגת חשיבות תכונות גלובלית
+    plot_and_print_global_feature_importances(model, EXPECTED_FEATURE_NAMES, top_n=TOP_N_GLOBAL_FEATURES)
+
     evaluate_model_performance(model, X_test, y_test)
     
     print("\nמאתחל SHAP explainer...")
@@ -227,9 +260,8 @@ def main():
     except Exception as e:
         print(f"שגיאה באתחול SHAP explainer: {e}")
         print("המשך ללא נימוקי SHAP לחריגים.")
-        explainer = None # הגדר כ-None כדי שהקוד יוכל להמשיך
+        explainer = None
 
-    # אם האתחול הצליח, נמשיך לזיהוי חריגים עם הסברים
     if explainer:
         outliers_summary_text = identify_and_collate_outliers_info(
             model,
@@ -242,11 +274,7 @@ def main():
             OUTLIER_ERROR_THRESHOLD,
             N_SHAP_FEATURES_TO_SHOW
         )
-    else: # אם האתחול נכשל, נפיק רשימת חריגים בסיסית ללא SHAP
-        print("\nמפיק רשימת חריגים בסיסית (ללא נימוקי SHAP עקב שגיאה באתחול).")
-        # כאן אפשר לקרוא לגרסה פשוטה יותר של identify_and_collate_outliers_info
-        # או פשוט להדפיס הודעה שהנימוקים לא זמינים.
-        # לשם הפשטות, נדפיס הודעה ונסיים את החלק הזה.
+    else:
         y_pred_basic = model.predict(X_test)
         errors_basic = np.abs(y_test - y_pred_basic)
         num_basic_outliers = np.sum(errors_basic > OUTLIER_ERROR_THRESHOLD)
