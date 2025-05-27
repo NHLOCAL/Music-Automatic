@@ -22,7 +22,7 @@ EXPECTED_FEATURE_NAMES = [
     'comp_duration_similarity', 'comp_avg_add_meta_similarity', 'comp_count_high_add_meta_similarity'
 ]
 
-OUTLIER_ERROR_THRESHOLD = 0.3
+OUTLIER_ERROR_THRESHOLD = 3.0
 N_SHAP_FEATURES_TO_SHOW = 5
 TOP_N_GLOBAL_FEATURES = 15 # מספר תכונות גלובליות חשובות להצגה בגרף
 
