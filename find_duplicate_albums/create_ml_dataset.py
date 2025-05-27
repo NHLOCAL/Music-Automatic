@@ -57,22 +57,27 @@ def extract_features_for_pair(
 ) -> Optional[Dict[str, any]]:
     features = {}
     if not folder1_info or not folder2_info: return None
-    features['f1_avg_bitrate'] = folder1_info.avg_bitrate
-    features['f2_avg_bitrate'] = folder2_info.avg_bitrate
+    # Removed: features['f1_avg_bitrate'] = folder1_info.avg_bitrate
+    # Removed: features['f2_avg_bitrate'] = folder2_info.avg_bitrate
     features['diff_avg_bitrate'] = abs(folder1_info.avg_bitrate - folder2_info.avg_bitrate)
-    features['ratio_avg_bitrate'] = min(folder1_info.avg_bitrate, folder2_info.avg_bitrate) / max(1.0, folder1_info.avg_bitrate, folder2_info.avg_bitrate) # max 1.0 למנוע חלוקה ב-0
+    # Removed: features['ratio_avg_bitrate'] = min(folder1_info.avg_bitrate, folder2_info.avg_bitrate) / max(1.0, folder1_info.avg_bitrate, folder2_info.avg_bitrate)
+    
     features['jaccard_unique_artists'] = calculate_jaccard_index(folder1_info.unique_artists, folder2_info.unique_artists)
     features['jaccard_unique_albums'] = calculate_jaccard_index(folder1_info.unique_albums, folder2_info.unique_albums)
+    
     features['f1_generic_filename_score'] = folder1_info.generic_filename_score
     features['f2_generic_filename_score'] = folder2_info.generic_filename_score
     features['diff_generic_filename_score'] = abs(folder1_info.generic_filename_score - folder2_info.generic_filename_score)
+    
     features['f1_generic_title_score'] = folder1_info.generic_title_score
     features['f2_generic_title_score'] = folder2_info.generic_title_score
     features['diff_generic_title_score'] = abs(folder1_info.generic_title_score - folder2_info.generic_title_score)
-    features['f1_has_art'] = 1.0 if folder1_info.album_art_hash else 0.0
-    features['f2_has_art'] = 1.0 if folder2_info.album_art_hash else 0.0
-    features['both_has_art'] = 1.0 if folder1_info.album_art_hash and folder2_info.album_art_hash else 0.0
-    features['art_hashes_match'] = 1.0 if folder1_info.album_art_hash and folder1_info.album_art_hash == folder2_info.album_art_hash else 0.0
+    
+    # Removed: features['f1_has_art'] = 1.0 if folder1_info.album_art_hash else 0.0
+    # Removed: features['f2_has_art'] = 1.0 if folder2_info.album_art_hash else 0.0
+    # Removed: features['both_has_art'] = 1.0 if folder1_info.album_art_hash and folder2_info.album_art_hash else 0.0
+    # Removed: features['art_hashes_match'] = 1.0 if folder1_info.album_art_hash and folder1_info.album_art_hash == folder2_info.album_art_hash else 0.0
+    
     if comparison_result:
         sim_scores = comparison_result.similarity_scores
         features['comp_file_hash_similarity'] = sim_scores.get('file_hash', 0.0)
@@ -83,9 +88,10 @@ def extract_features_for_pair(
         features['comp_artist_similarity'] = sim_scores.get('artist', 0.0)
         features['comp_albumartist_similarity'] = sim_scores.get('albumartist', 0.0)
         features['comp_folder_name_similarity'] = sim_scores.get('folder_name', 0.0)
-        features['comp_album_art_hash_similarity'] = sim_scores.get('album_art_hash', 0.0)
+        features['comp_album_art_hash_similarity'] = sim_scores.get('album_art_hash', 0.0) # This one remains
         features['comp_duration_similarity'] = sim_scores.get('duration', 0.0)
-        features['comp_is_identical_by_hash'] = 1.0 if comparison_result.is_identical_by_hash else 0.0
+        # Removed: features['comp_is_identical_by_hash'] = 1.0 if comparison_result.is_identical_by_hash else 0.0
+        
         add_meta_details = sim_scores.get('additional_metadata_details', {})
         if add_meta_details:
             features['comp_avg_add_meta_similarity'] = sum(add_meta_details.values()) / len(add_meta_details) if add_meta_details else 0.0
@@ -98,8 +104,8 @@ def extract_features_for_pair(
             'comp_file_hash_similarity', 'comp_file_size_similarity', 'comp_filename_similarity',
             'comp_title_similarity', 'comp_album_similarity', 'comp_artist_similarity',
             'comp_albumartist_similarity', 'comp_folder_name_similarity', 'comp_album_art_hash_similarity',
-            'comp_duration_similarity', 'comp_is_identical_by_hash', 'comp_avg_add_meta_similarity',
-            'comp_count_high_add_meta_similarity'
+            'comp_duration_similarity', # 'comp_is_identical_by_hash' removed from this list
+            'comp_avg_add_meta_similarity', 'comp_count_high_add_meta_similarity'
         ]
         for k_comp in comp_keys_to_zero:
             features[k_comp] = 0.0

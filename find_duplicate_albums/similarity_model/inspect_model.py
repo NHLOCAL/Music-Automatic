@@ -1,15 +1,15 @@
+--- START OF FILE inspect_model.py ---
+
 import pandas as pd
 import joblib
 import numpy as np
 
 # --- 1. הגדרות ופרמטרים ---
-CSV_FILE_PATH = 'data/album_pair_features_test.csv'  # נתיב לקובץ ה-CSV המקורי שלך
-MODEL_PATH = 'lgbm_regressor_model.joblib' # נתיב למודל השמור
+CSV_FILE_PATH = 'data/album_pair_features_test.csv'  # נתיב לקובץ ה-CSV המקורי שלך (שנוצר עם התכונות המעודכנות)
+MODEL_PATH = 'lgbm_regressor_model.joblib' # נתיב למודל השמור (שאומן על התכונות המעודכנות)
 TARGET_COLUMN = 'target_label'       # שם עמודת המטרה ב-CSV
 
 # עמודות שאינן חלק מה-features לאימון (כפי שהוגדרו בסקריפט האימון)
-# חשוב שרשימה זו תהיה זהה לזו ששימשה בסקריפט האימון
-# כדי שנוכל לחלץ את התכונות (X) בצורה נכונה מהשורה הנבחרת.
 IRRELEVANT_COLUMNS_FOR_TRAINING = [
     TARGET_COLUMN,
     'label_source',
@@ -17,20 +17,29 @@ IRRELEVANT_COLUMNS_FOR_TRAINING = [
     'folder2_path_id'
 ]
 
-# !!! חשוב מאוד: רשימת שמות התכונות המדויקת והסדר שלהן, כפי שהמודל אומן עליהן !!!
-# העתק את הרשימה הזו מהפלט של סקריפט האימון (הפלט של X.columns.tolist())
-# זוהי אותה רשימה שמופיעה גם בסקריפט train_model.py
+# !!! רשימת התכונות המעודכנת שהמודל אומן עליה !!!
 EXPECTED_FEATURE_NAMES = [
-    'f1_avg_bitrate', 'f2_avg_bitrate', 'diff_avg_bitrate', 'ratio_avg_bitrate', 
-    'jaccard_unique_artists', 'jaccard_unique_albums', 'f1_generic_filename_score', 
-    'f2_generic_filename_score', 'diff_generic_filename_score', 'f1_generic_title_score', 
-    'f2_generic_title_score', 'diff_generic_title_score', 'f1_has_art', 'f2_has_art', 
-    'both_has_art', 'art_hashes_match', 'comp_file_hash_similarity', 
-    'comp_file_size_similarity', 'comp_filename_similarity', 'comp_title_similarity', 
-    'comp_album_similarity', 'comp_artist_similarity', 'comp_albumartist_similarity', 
-    'comp_folder_name_similarity', 'comp_album_art_hash_similarity', 
-    'comp_duration_similarity', 'comp_is_identical_by_hash', 
-    'comp_avg_add_meta_similarity', 'comp_count_high_add_meta_similarity'
+    'diff_avg_bitrate',
+    'jaccard_unique_artists',
+    'jaccard_unique_albums',
+    'f1_generic_filename_score',
+    'f2_generic_filename_score',
+    'diff_generic_filename_score',
+    'f1_generic_title_score',
+    'f2_generic_title_score',
+    'diff_generic_title_score',
+    'comp_file_hash_similarity',
+    'comp_file_size_similarity',
+    'comp_filename_similarity',
+    'comp_title_similarity',
+    'comp_album_similarity',
+    'comp_artist_similarity',
+    'comp_albumartist_similarity',
+    'comp_folder_name_similarity',
+    'comp_album_art_hash_similarity',
+    'comp_duration_similarity',
+    'comp_avg_add_meta_similarity',
+    'comp_count_high_add_meta_similarity'
 ]
 
 
@@ -67,20 +76,24 @@ def get_features_from_row(row_data, irrelevant_cols, expected_feature_names):
     מחלץ את וקטור התכונות (X) משורה בודדת (Series של Pandas),
     בהתאם לתכונות שהמודל אומן עליהן.
     """
-    # הסר את העמודות הלא רלוונטיות כדי לקבל את התכונות
-    # ודא שכל העמודות ב-irrelevant_cols אכן קיימות ב-row_data לפני הניסיון להסירן
     actual_irrelevant_cols_in_row = [col for col in irrelevant_cols if col in row_data.index]
     features_series = row_data.drop(index=actual_irrelevant_cols_in_row, errors='ignore')
     
-    # ודא שהתכונות שנותרו הן אלו שהמודל מצפה להן ובסדר הנכון
     try:
+        # ודא שכל התכונות הצפויות קיימות בסדרה שנותרה
+        missing_features = [f for f in expected_feature_names if f not in features_series.index]
+        if missing_features:
+            print(f"שגיאה: חסרות התכונות הבאות בשורה הנבחרת לאחר הסרת הלא רלוונטיות: {missing_features}")
+            print(f"תכונות זמינות בשורה: {features_series.index.tolist()}")
+            return None
+            
         features_ordered = features_series[expected_feature_names]
     except KeyError as e:
-        print(f"שגיאה: חסרה תכונה בשורה הנבחרת או סדר תכונות שגוי: {e}")
-        print("ודא ש-EXPECTED_FEATURE_NAMES תואם לתכונות ב-CSV (לאחר הסרת הלא רלוונטיות).")
+        print(f"שגיאה קריטית בהבטחת סדר התכונות או בחירת תכונות חסרות: {e}")
+        print(f"תכונות צפויות: {expected_feature_names}")
+        print(f"תכונות בפועל בשורה (לאחר הסרת הלא רלוונטיות): {features_series.index.tolist()}")
         return None
         
-    # המר ל-DataFrame עם שורה אחת, כפי שהמודל מצפה לקבל
     return pd.DataFrame([features_ordered.values], columns=expected_feature_names)
 
 # --- 3. לולאה ראשית לבחירת שורה וחיזוי ---
@@ -93,6 +106,8 @@ def main():
         return
 
     print(f"\nקובץ ה-CSV מכיל {len(full_df)} שורות (אינדקסים מ-0 עד {len(full_df)-1}).")
+    print(f"המודל מצפה לקבל {len(EXPECTED_FEATURE_NAMES)} תכונות.")
+
 
     while True:
         try:
@@ -109,20 +124,17 @@ def main():
             
             print(f"\n--- נתונים עבור שורה באינדקס {row_index} ---")
             
-            # הצגת נתיבי התיקיות אם קיימים
             folder1_path = selected_row_data.get('folder1_path_id', 'לא זמין')
             folder2_path = selected_row_data.get('folder2_path_id', 'לא זמין')
             print(f"תיקייה 1: {folder1_path}")
             print(f"תיקייה 2: {folder2_path}")
 
-            # קבלת הערך האמיתי של המטרה
             actual_target_value = selected_row_data.get(TARGET_COLUMN)
             if actual_target_value is not None:
                 print(f"ערך מטרה אמיתי ({TARGET_COLUMN}): {actual_target_value:.4f}")
             else:
                 print(f"אזהרה: עמודת המטרה '{TARGET_COLUMN}' לא נמצאה בשורה זו.")
 
-            # הכנת התכונות לחיזוי
             features_for_prediction = get_features_from_row(
                 selected_row_data, 
                 IRRELEVANT_COLUMNS_FOR_TRAINING,
@@ -130,11 +142,14 @@ def main():
             )
 
             if features_for_prediction is None:
-                continue # אם הייתה שגיאה בהכנת התכונות
+                continue 
 
-            # ביצוע החיזוי
+            if features_for_prediction.shape[1] != len(EXPECTED_FEATURE_NAMES):
+                print(f"שגיאה: מספר התכונות שהוכן לחיזוי ({features_for_prediction.shape[1]}) אינו תואם למספר התכונות שהמודל מצפה לו ({len(EXPECTED_FEATURE_NAMES)}).")
+                continue
+
             prediction = model.predict(features_for_prediction)
-            predicted_value = prediction[0] # predict מחזיר מערך, גם עבור חיזוי בודד
+            predicted_value = prediction[0] 
 
             print(f"הערכת המודל (ציון דמיון חזוי): {predicted_value:.4f}")
 
