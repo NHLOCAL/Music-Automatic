@@ -35,6 +35,10 @@ EXPECTED_FEATURE_NAMES = [
     'comp_count_high_add_meta_similarity'
 ]
 
+# קבועים לזיהוי חריגים
+OUTLIER_ERROR_THRESHOLD = 0.3  # סף שגיאה אבסולוטית לזיהוי חריג (בין 0 ל-1)
+TOP_N_OUTLIERS_TO_SHOW = 30    # מספר החריגים הגדולים ביותר להצגה
+
 # --- 2. פונקציות עזר ---
 
 def load_model(model_path):
@@ -64,35 +68,30 @@ def load_and_prepare_test_data(csv_path, target_column, expected_features):
         return None, None, None
 
     print(f"נתוני בדיקה נטענו מקובץ: {csv_path}. צורת ה-DataFrame: {test_df.shape}")
-    print(f"תצוגה מקדימה של נתוני הבדיקה:\n{test_df.head()}")
+    # print(f"תצוגה מקדימה של נתוני הבדיקה:\n{test_df.head()}") # אפשר להסיר הערה אם רוצים לראות
 
     if target_column not in test_df.columns:
         print(f"שגיאה: עמודת המטרה '{target_column}' לא נמצאה בקובץ הבדיקה.")
         return None, None, None
     y_test = test_df[target_column]
 
-    # ודא שכל התכונות הצפויות קיימות בקובץ ה-CSV
     missing_features = [col for col in expected_features if col not in test_df.columns]
     if missing_features:
         print(f"שגיאה: התכונות הבאות, שהמודל מצפה להן, חסרות בקובץ הבדיקה: {missing_features}")
         print("רשימת העמודות הקיימות בקובץ הבדיקה:", test_df.columns.tolist())
         return None, None, None
 
-    # בחר רק את התכונות הצפויות ובסדר הנכון
     try:
-        X_test = test_df[expected_features].copy() # .copy() למניעת SettingWithCopyWarning
+        X_test = test_df[expected_features].copy()
     except KeyError as e:
-        # אמור להיתפס בבדיקת missing_features, אך כשכבת הגנה נוספת
         print(f"שגיאה קריטית בבחירת תכונות מה-DataFrame: {e}.")
-        print("ודא שכל התכונות מ-'EXPECTED_FEATURE_NAMES' קיימות בקובץ ושהשמות תואמים בדיוק.")
         return None, None, None
     
     print(f"\nצורת מטריצת התכונות (X_test) לאחר בחירת התכונות הצפויות: {X_test.shape}")
     print(f"צורת וקטור המטרה (y_test): {y_test.shape}")
-    print(f"רשימת התכונות שנבחרו ל-X_test:\n{X_test.columns.tolist()}")
+    # print(f"רשימת התכונות שנבחרו ל-X_test:\n{X_test.columns.tolist()}")
 
-
-    return X_test, y_test, test_df # מחזירים גם את ה-DataFrame המקורי עבור הדפסת דוגמאות
+    return X_test, y_test, test_df
 
 def evaluate_model_performance(model, X_test, y_test, model_name="Loaded LightGBM Model"):
     """
@@ -119,7 +118,8 @@ def evaluate_model_performance(model, X_test, y_test, model_name="Loaded LightGB
 
     plt.figure(figsize=(10, 6))
     plt.scatter(y_test, y_pred, alpha=0.5)
-    plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--', lw=2) # Line y=x
+    plt.plot([min(y_test.min(), y_pred.min()), max(y_test.max(), y_pred.max())], 
+             [min(y_test.min(), y_pred.min()), max(y_test.max(), y_pred.max())], 'k--', lw=2) # Line y=x, adjusted for full range
     plt.xlabel('ערכים אמיתיים (Actual)')
     plt.ylabel('ערכים חזויים (Predicted)')
     plt.title('ערכים אמיתיים מול ערכים חזויים על סט הבדיקה')
@@ -130,9 +130,6 @@ def evaluate_model_performance(model, X_test, y_test, model_name="Loaded LightGB
 
 def print_sample_predictions_from_test_set(model, X_test_features, y_test_actual, original_test_dataframe, 
                                            target_col_name, num_samples=5):
-    """
-    מדפיס דוגמאות של חיזויים מסט הבדיקה, כולל מידע נוסף מה-DataFrame המקורי.
-    """
     print(f"\n--- דוגמאות חיזויים מסט הבדיקה (עד {num_samples} דגימות) ---")
     
     if len(X_test_features) == 0:
@@ -143,20 +140,16 @@ def print_sample_predictions_from_test_set(model, X_test_features, y_test_actual
     if num_samples > len(X_test_features):
         print(f"מספר הדגימות המבוקש ({num_samples}) גדול מגודל סט הבדיקה ({len(X_test_features)}). מציג {actual_num_samples} דגימות.")
 
-    # קבל את האינדקסים המקוריים מה-DataFrame של התכונות (X_test_features)
-    # אינדקסים אלה תואמים לאינדקסים ב-y_test_actual וב-original_test_dataframe
     sample_indices = X_test_features.head(actual_num_samples).index
     
     X_sample = X_test_features.loc[sample_indices]
     y_sample_actual_values = y_test_actual.loc[sample_indices]
     y_sample_pred_values = model.predict(X_sample)
     
-    # קבל את השורות המקוריות המתאימות מה-DataFrame המלא של נתוני הבדיקה
     original_samples_info_df = original_test_dataframe.loc[sample_indices]
 
     for i in range(len(sample_indices)):
-        original_idx = sample_indices[i] # האינדקס המקורי מהקובץ test.csv
-        
+        original_idx = sample_indices[i]
         actual_val = y_sample_actual_values.iloc[i]
         predicted_val = y_sample_pred_values[i]
         
@@ -165,7 +158,6 @@ def print_sample_predictions_from_test_set(model, X_test_features, y_test_actual
         print(f"  ערך מטרה חזוי: {predicted_val:.4f}")
         print(f"  הפרש (Actual - Predicted): {actual_val - predicted_val:.4f}")
         
-        # הדפס מידע נוסף אם קיים ב-DataFrame המקורי
         if 'folder1_path_id' in original_samples_info_df.columns:
             print(f"  תיקייה 1: {original_samples_info_df.loc[original_idx, 'folder1_path_id']}")
         if 'folder2_path_id' in original_samples_info_df.columns:
@@ -173,6 +165,63 @@ def print_sample_predictions_from_test_set(model, X_test_features, y_test_actual
         if 'label_source' in original_samples_info_df.columns:
             print(f"  מקור התווית: {original_samples_info_df.loc[original_idx, 'label_source']}")
 
+
+def identify_and_print_outliers(model, X_test, y_test, original_test_df_full, 
+                                target_column, error_threshold, top_n=10):
+    """
+    מזהה ומדפיס דגימות חריגות שבהן שגיאת החיזוי גדולה מהסף שנקבע.
+    """
+    print(f"\n--- זיהוי דגימות חריגות עם שגיאת חיזוי אבסולוטית גדולה מ- {error_threshold:.4f} (עד {top_n} דגימות) ---")
+
+    y_pred = model.predict(X_test) # y_pred הוא numpy array
+
+    # יצירת DataFrame עם תוצאות החיזוי והשגיאות, תוך שימוש באינדקס של y_test
+    results_df = pd.DataFrame({
+        'actual_value': y_test,
+        'predicted_value': y_pred,
+        'absolute_error': np.abs(y_test - y_pred)
+    }, index=y_test.index)
+
+    # עמודות רלוונטיות מה-DataFrame המקורי שברצוננו להציג
+    cols_to_display_from_original = ['folder1_path_id', 'folder2_path_id', 'label_source']
+    # ודא שהעמודות קיימות לפני שמנסים לגשת אליהן
+    existing_cols_to_display = [col for col in cols_to_display_from_original if col in original_test_df_full.columns]
+    
+    # מיזוג תוצאות החיזוי עם העמודות הרלוונטיות מה-DataFrame המקורי המלא
+    # השתמש ב- .loc[results_df.index] כדי להבטיח סדר וסינון נכונים
+    # ובחר את העמודות הנחוצות מ-original_test_df_full
+    # אם existing_cols_to_display ריק, נשמור רק את תוצאות החיזוי
+    if existing_cols_to_display:
+        outliers_info_df = original_test_df_full.loc[results_df.index, existing_cols_to_display].join(results_df)
+    else:
+        outliers_info_df = results_df.copy()
+
+
+    # סינון הדגימות שעוברות את הסף
+    significant_outliers_df = outliers_info_df[outliers_info_df['absolute_error'] > error_threshold]
+    
+    # מיון לפי גודל השגיאה (הגדולות ביותר ראשונות)
+    significant_outliers_df = significant_outliers_df.sort_values(by='absolute_error', ascending=False)
+
+    if significant_outliers_df.empty:
+        print(f"לא נמצאו דגימות עם שגיאת חיזוי אבסולוטית הגדולה מ- {error_threshold:.4f}.")
+        return
+
+    num_outliers_found = len(significant_outliers_df)
+    print(f"נמצאו {num_outliers_found} דגימות חריגות. מציג עד {min(top_n, num_outliers_found)} החריגות הגדולות ביותר:")
+
+    for idx, row in significant_outliers_df.head(top_n).iterrows():
+        print(f"\n  דגימה (אינדקס מקורי: {idx})")
+        print(f"    ערך מטרה אמיתי ({target_column}): {row['actual_value']:.4f}")
+        print(f"    ערך מטרה חזוי: {row['predicted_value']:.4f}")
+        print(f"    שגיאה אבסולוטית: {row['absolute_error']:.4f}")
+        
+        if 'folder1_path_id' in significant_outliers_df.columns:
+            print(f"    תיקייה 1: {row['folder1_path_id']}")
+        if 'folder2_path_id' in significant_outliers_df.columns:
+            print(f"    תיקייה 2: {row['folder2_path_id']}")
+        if 'label_source' in significant_outliers_df.columns:
+             print(f"    מקור התווית: {row['label_source']}")
 
 # --- 3. הפעלה ראשית ---
 def main():
@@ -191,14 +240,14 @@ def main():
         EXPECTED_FEATURE_NAMES
     )
 
-    if X_test is None or y_test is None:
+    if X_test is None or y_test is None or original_test_df is None:
         print("סיום התוכנית עקב שגיאה בטעינת או הכנת נתוני הבדיקה.")
         return
 
     # 3. הערך את ביצועי המודל
     evaluate_model_performance(model, X_test, y_test)
 
-    # 4. הצג דוגמאות חיזויים
+    # 4. הצג דוגמאות חיזויים (כללי)
     print_sample_predictions_from_test_set(
         model, 
         X_test, 
@@ -207,12 +256,19 @@ def main():
         TARGET_COLUMN,
         num_samples=5
     )
+    
+    # 5. זיהוי והצגת דגימות חריגות
+    identify_and_print_outliers(
+        model,
+        X_test,
+        y_test,
+        original_test_df, # זהו ה-DataFrame המלא שנטען
+        TARGET_COLUMN,
+        OUTLIER_ERROR_THRESHOLD, 
+        TOP_N_OUTLIERS_TO_SHOW
+    )
 
     print("\nתהליך בדיקת המודל הושלם.")
 
 if __name__ == "__main__":
-    # הגדרות להצגת גרפים בסביבות מסוימות (למשל, אם רצים מטרמינל ללא GUI אינטראקטיבי)
-    # plt.ion() # הפעל מצב אינטראקטיבי אם צריך
     main()
-    # plt.ioff() # כבה מצב אינטראקטיבי
-    # input("לחץ Enter לסיום והצגת גרפים...") # השאר חלונות גרפים פתוחים עד ללחיצה
