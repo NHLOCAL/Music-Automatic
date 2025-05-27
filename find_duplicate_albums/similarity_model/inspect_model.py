@@ -1,5 +1,3 @@
---- START OF FILE inspect_model.py ---
-
 import pandas as pd
 import joblib
 import numpy as np

@@ -1,5 +1,3 @@
---- START OF FILE run_model.py ---
-
 import joblib
 import pandas as pd
 import numpy as np # רק לדוגמה ליצירת נתונים
