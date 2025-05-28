@@ -1,3 +1,5 @@
+# --- START OF FILE analyze_shap_importance.py ---
+
 import pandas as pd
 import numpy as np
 import joblib
@@ -14,34 +16,11 @@ except ImportError:
 # --- 1. הגדרות וקבועים ---
 MODEL_PATH = 'lgbm_regressor_model.joblib'  # נתיב למודל המאומן
 # נתיב לקובץ הנתונים שעליו נחשב את חשיבות התכונות (למשל, סט הבדיקה או האימון)
-DATA_CSV_FILE_PATH = 'data/album_pair_features_test.csv'
+DATA_CSV_FILE_PATH = 'data/album_pair_features_test.csv' # ודא שנתיב זה נכון
 
-# רשימת התכונות שהמודל אומן עליהן והוא מצפה לקבל
-EXPECTED_FEATURE_NAMES = [
-    'diff_avg_bitrate',
-    'jaccard_unique_artists',
-    'jaccard_unique_albums',
-    'f1_generic_filename_score',
-    'f2_generic_filename_score',
-    'diff_generic_filename_score',
-    'f1_generic_title_score',
-    'f2_generic_title_score',
-    'diff_generic_title_score',
-    'comp_file_hash_similarity',
-    'comp_file_size_similarity',
-    'comp_filename_similarity',
-    'comp_title_similarity',
-    'comp_album_similarity',
-    'comp_artist_similarity',
-    'comp_albumartist_similarity',
-    'comp_folder_name_similarity',
-    'comp_album_art_hash_similarity',
-    'comp_duration_similarity',
-    'comp_avg_add_meta_similarity',
-    'comp_count_high_add_meta_similarity'
-]
+# EXPECTED_FEATURE_NAMES - הוסר. ייטען מהמודל.
 
-TOP_N_FEATURES_TO_PRINT = 20 # מספר התכונות החשובות ביותר להדפסה
+TOP_N_FEATURES_TO_PRINT = 25 # מספר התכונות החשובות ביותר להדפסה
 
 # --- 2. פונקציות עזר ---
 
@@ -60,9 +39,10 @@ def load_model(model_path):
         print(f"שגיאה בטעינת המודל: {e}")
         return None
 
-def load_data_for_shap_analysis(csv_path, expected_features):
+def load_data_for_shap_analysis(csv_path, model_feature_names):
     """
-    טוען נתונים מקובץ CSV ובוחר רק את התכונות הצפויות.
+    טוען נתונים מקובץ CSV ובוחר רק את התכונות שהמודל מצפה להן.
+    model_feature_names: רשימת שמות התכונות כפי שחולצה מהמודל.
     מחזיר DataFrame של תכונות (X_data).
     """
     try:
@@ -75,24 +55,31 @@ def load_data_for_shap_analysis(csv_path, expected_features):
         print(f"שגיאה בטעינת קובץ ה-CSV: {e}")
         return None
 
-    missing_features = [col for col in expected_features if col not in data_df.columns]
-    if missing_features:
-        print(f"שגיאה: התכונות הבאות, הנדרשות לניתוח SHAP, חסרות בקובץ הנתונים: {missing_features}")
-        print(f"עמודות קיימות: {data_df.columns.tolist()}")
+    # ודא שכל התכונות שהמודל מצפה להן קיימות בקובץ ה-CSV
+    missing_features_in_csv = [col for col in model_feature_names if col not in data_df.columns]
+    if missing_features_in_csv:
+        print(f"שגיאה קריטית: התכונות הבאות, שהמודל אומן עליהן, חסרות בקובץ הנתונים '{csv_path}':")
+        for f in missing_features_in_csv:
+            print(f"  - {f}")
+        print(f"עמודות קיימות בקובץ: {data_df.columns.tolist()}")
+        print("לא ניתן להמשיך. ודא שקובץ הנתונים מכיל את כל התכונות הדרושות ובאותם שמות.")
         return None
 
     try:
-        X_data = data_df[expected_features].copy()
+        # בחר את התכונות לפי הרשימה והסדר מהמודל
+        X_data = data_df[list(model_feature_names)].copy()
     except KeyError as e:
         print(f"שגיאה קריטית בבחירת תכונות מה-DataFrame: {e}.")
+        print("ייתכן שיש אי-התאמה בשמות התכונות בין המודל לקובץ ה-CSV, למרות שהן נמצאו.")
         return None
     
     print(f"צורת מטריצת התכונות (X_data) שנבחרה לניתוח SHAP: {X_data.shape}")
     return X_data
 
-def calculate_and_display_shap_global_importance(model, X_data, top_n_print):
+def calculate_and_display_shap_global_importance(model, X_data, model_feature_names, top_n_print):
     """
     מחשב ומציג חשיבות תכונות גלובלית באמצעות SHAP.
+    model_feature_names: רשימת שמות התכונות כפי שחולצה מהמודל.
     """
     if X_data is None or model is None:
         print("שגיאה: המודל או הנתונים (X_data) אינם זמינים לניתוח SHAP.")
@@ -100,34 +87,24 @@ def calculate_and_display_shap_global_importance(model, X_data, top_n_print):
 
     print("\n--- מתחיל חישוב חשיבות תכונות גלובלית עם SHAP ---")
     
-    # ודא שאין ערכים חסרים ב-X_data, מכיוון שחלק מה-Explainers של SHAP רגישים לכך.
     if X_data.isnull().values.any():
-        print("אזהרה: נמצאו ערכים חסרים ב-X_data.")
         num_nans = X_data.isnull().sum().sum()
-        print(f"מספר כולל של ערכים חסרים: {num_nans}")
-        print("שוקל לבצע Imputation (למשל, מילוי בממוצע) או להסיר שורות/עמודות עם ערכים חסרים.")
-        # דוגמה: מילוי בממוצע של העמודה
-        # for col in X_data.columns:
-        #     if X_data[col].isnull().any():
-        #         X_data[col] = X_data[col].fillna(X_data[col].mean())
-        # print("ערכים חסרים מולאו בממוצע (דוגמה). מומלץ לבחון אסטרטגיית imputation מתאימה יותר.")
-        print("המשך הניתוח עלול להוביל לשגיאות או תוצאות לא מדויקות אם לא יטופלו ערכים חסרים כראוי.")
-        # החלטה אם להפסיק או להמשיך, לדוגמה:
-        # return # אם רוצים להפסיק את התוכנית במקרה של ערכים חסרים
+        print(f"אזהרה: נמצאו {num_nans} ערכים חסרים ב-X_data המשמש לניתוח SHAP.")
+        print("SHAP Explainer עשוי להיכשל או לתת תוצאות לא מדויקות. מומלץ לטפל בערכים חסרים (למשל, imputation).")
+        # לדוגמה, מילוי ערכים חסרים בממוצע (יש להתאים לפי הצורך)
+        # X_data = X_data.fillna(X_data.mean())
+        # print("בוצע מילוי ערכים חסרים בממוצע (דוגמה).")
+
 
     # 1. אתחול SHAP Explainer
     try:
-        # עבור מודלים מבוססי עצים כמו LightGBM, XGBoost, CatBoost, RandomForest
         explainer = shap.TreeExplainer(model)
         print("SHAP TreeExplainer אותחל בהצלחה.")
     except Exception as e_tree:
         print(f"שגיאה באתחול SHAP TreeExplainer: {e_tree}")
-        print("ייתכן שהמודל אינו נתמך ישירות על ידי TreeExplainer או שקיימת בעיית תאימות.")
         print("מנסה לאתחל SHAP KernelExplainer כגיבוי (עשוי להיות איטי משמעותית)...")
         try:
-            # דגימה של נתוני רקע עבור KernelExplainer. גודל הדגימה משפיע על זמן הריצה.
-            # מומלץ לא יותר מכמה מאות דגימות לרקע.
-            background_sample_size = min(200, X_data.shape[0])
+            background_sample_size = min(100, X_data.shape[0]) # הקטנת גודל דגימת הרקע
             background_data = shap.sample(X_data, background_sample_size) 
             explainer = shap.KernelExplainer(model.predict, background_data)
             print(f"SHAP KernelExplainer אותחל בהצלחה עם {background_sample_size} דגימות רקע.")
@@ -145,40 +122,43 @@ def calculate_and_display_shap_global_importance(model, X_data, top_n_print):
         print(f"שגיאה בחישוב ערכי SHAP: {e}")
         return
         
-    # 3. חישוב והדפסת חשיבות גלובלית (ממוצע ערכי SHAP אבסולוטיים)
-    # ודא ש-X_data הוא DataFrame של Pandas כדי שנוכל להשתמש ב-X_data.columns
-    if not isinstance(X_data, pd.DataFrame):
-        print("אזהרה: X_data אינו DataFrame של Pandas. שמות התכונות עלולים לא להופיע בגרפים כראוי.")
-        feature_cols = [f"feature_{i}" for i in range(X_data.shape[1])]
-    else:
-        feature_cols = X_data.columns
+    # 3. חישוב והדפסת חשיבות גלובלית
+    # ודא ש-X_data הוא DataFrame של Pandas עם שמות העמודות הנכונים
+    # כדי ש-shap.summary_plot יעבוד כראוי עם שמות התכונות.
+    # X_data כבר אמור להיות DataFrame עם העמודות הנכונות מהפונקציה load_data_for_shap_analysis
+    
+    if len(model_feature_names) != shap_values.shape[1]:
+        print(f"אזהרה: אי-התאמה בין מספר התכונות מהמודל ({len(model_feature_names)}) למימד השני של shap_values ({shap_values.shape[1]}).")
+        print("המשך עלול להוביל לשיוך שגוי של ערכי SHAP לתכונות.")
+        # ניתן להחליט אם להפסיק כאן
+        # return
 
     mean_abs_shap_values = np.abs(shap_values).mean(axis=0)
     
     feature_importance_df = pd.DataFrame({
-        'feature': feature_cols,
+        'feature': model_feature_names, # שימוש בשמות התכונות מהמודל
         'mean_abs_shap_value': mean_abs_shap_values
     })
     feature_importance_df = feature_importance_df.sort_values(by='mean_abs_shap_value', ascending=False)
 
     print(f"\nחשיבות גלובלית של {min(top_n_print, len(feature_importance_df))} התכונות המובילות (לפי ממוצע ערכי SHAP אבסולוטיים):")
     for i, row in feature_importance_df.head(top_n_print).iterrows():
-        print(f"  - {row['feature']:<35}: {row['mean_abs_shap_value']:.4f}")
+        print(f"  - {row['feature']:<40}: {row['mean_abs_shap_value']:.4f}") # הורחב הרוחב
 
-    # 4. הצגת גרף עמודות של חשיבות גלובלית (SHAP Summary Plot - Bar)
+    # 4. הצגת גרף עמודות של חשיבות גלובלית
     print("\nמציג גרף SHAP Summary Plot (סוג: bar)...")
-    plt.figure(figsize=(10, max(6, len(feature_cols) // 2.5))) # התאמת גודל הגרף
-    shap.summary_plot(shap_values, X_data, plot_type="bar", show=False, max_display=len(feature_cols))
-    plt.title("חשיבות תכונות גלובלית (SHAP Summary Bar Plot)", fontsize=14)
+    plt.figure() # יצירת Figure חדש כדי למנוע חפיפה עם גרפים קודמים
+    shap.summary_plot(shap_values, X_data, plot_type="bar", feature_names=model_feature_names, show=False, max_display=min(top_n_print + 5, len(model_feature_names)))
+    plt.title(f"חשיבות {min(top_n_print + 5, len(model_feature_names))} התכונות המובילות (SHAP Bar Plot)", fontsize=14)
     plt.xlabel("ממוצע |ערך SHAP| (השפעה על גודל החיזוי)", fontsize=12)
     plt.tight_layout()
     plt.show()
 
-    # 5. הצגת גרף "דבורים" (SHAP Summary Plot - Beeswarm)
+    # 5. הצגת גרף "דבורים"
     print("\nמציג גרף SHAP Summary Plot (סוג: beeswarm/dot)...")
-    plt.figure(figsize=(10, max(6, len(feature_cols) // 2.5))) # התאמת גודל הגרף
-    shap.summary_plot(shap_values, X_data, show=False, max_display=len(feature_cols))
-    plt.title("התפלגות ערכי SHAP והשפעת תכונות (SHAP Beeswarm Plot)", fontsize=14)
+    plt.figure() # יצירת Figure חדש
+    shap.summary_plot(shap_values, X_data, feature_names=model_feature_names, show=False, max_display=min(top_n_print + 5, len(model_feature_names)))
+    plt.title(f"התפלגות ערכי SHAP עבור {min(top_n_print + 5, len(model_feature_names))} התכונות המובילות", fontsize=14)
     plt.xlabel("ערך SHAP (השפעה על פלט המודל)", fontsize=12)
     plt.tight_layout()
     plt.show()
@@ -194,14 +174,36 @@ def main():
         print("סיום התוכנית עקב שגיאה בטעינת המודל.")
         return
 
-    X_data_for_shap = load_data_for_shap_analysis(DATA_CSV_FILE_PATH, EXPECTED_FEATURE_NAMES)
+    # חילוץ שמות התכונות מהמודל
+    model_feature_names = None
+    try:
+        if hasattr(model, 'feature_name_'): # LightGBM
+            model_feature_names = model.feature_name_
+        elif hasattr(model, 'feature_names_in_'): # Scikit-learn
+            model_feature_names = model.feature_names_in_
+        
+        if model_feature_names is None or not isinstance(model_feature_names, (list, np.ndarray)) or len(model_feature_names) == 0:
+            raise AttributeError("שמות התכונות לא נמצאו או אינם בפורמט תקין במודל.")
+        
+        model_feature_names = list(map(str, model_feature_names)) # המרה לרשימת מחרוזות
+        print(f"זוהו {len(model_feature_names)} תכונות מהמודל.")
+    except AttributeError as e:
+        print(f"שגיאה: המודל הנטען אינו מכיל מידע על שמות התכונות ({e}).")
+        print("ודא שהמודל נשמר עם מידע זה (למשל, מאפיין 'feature_name_' עבור LightGBM או 'feature_names_in_' עבור מודלי sklearn).")
+        return
+    except Exception as e_feat:
+        print(f"שגיאה לא צפויה בעת ניסיון לגשת לשמות התכונות מהמודל: {e_feat}")
+        return
+
+    X_data_for_shap = load_data_for_shap_analysis(DATA_CSV_FILE_PATH, model_feature_names)
     if X_data_for_shap is None:
         print("סיום התוכנית עקב שגיאה בטעינת או הכנת הנתונים לניתוח SHAP.")
         return
     
-    calculate_and_display_shap_global_importance(model, X_data_for_shap, TOP_N_FEATURES_TO_PRINT)
+    calculate_and_display_shap_global_importance(model, X_data_for_shap, model_feature_names, TOP_N_FEATURES_TO_PRINT)
 
     print("\nתהליך הערכת חשיבות תכונות גלובלית עם SHAP הושלם.")
 
 if __name__ == "__main__":
     main()
+# --- END OF FILE analyze_shap_importance.py ---

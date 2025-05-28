@@ -1,11 +1,13 @@
+# --- START OF FILE inspect_model.py ---
+
 import pandas as pd
 import joblib
 import numpy as np
 
 # --- 1. הגדרות ופרמטרים ---
-CSV_FILE_PATH = 'data/album_pair_features_test.csv'  # נתיב לקובץ ה-CSV המקורי שלך (שנוצר עם התכונות המעודכנות)
-MODEL_PATH = 'lgbm_regressor_model.joblib' # נתיב למודל השמור (שאומן על התכונות המעודכנות)
-TARGET_COLUMN = 'target_label'       # שם עמודת המטרה ב-CSV
+CSV_FILE_PATH = 'data/album_pair_features_test.csv' # ודא שנתיב זה נכון
+MODEL_PATH = 'lgbm_regressor_model.joblib' 
+TARGET_COLUMN = 'target_label'
 
 # עמודות שאינן חלק מה-features לאימון (כפי שהוגדרו בסקריפט האימון)
 IRRELEVANT_COLUMNS_FOR_TRAINING = [
@@ -15,30 +17,7 @@ IRRELEVANT_COLUMNS_FOR_TRAINING = [
     'folder2_path_id'
 ]
 
-# !!! רשימת התכונות המעודכנת שהמודל אומן עליה !!!
-EXPECTED_FEATURE_NAMES = [
-    'diff_avg_bitrate',
-    'jaccard_unique_artists',
-    'jaccard_unique_albums',
-    'f1_generic_filename_score',
-    'f2_generic_filename_score',
-    'diff_generic_filename_score',
-    'f1_generic_title_score',
-    'f2_generic_title_score',
-    'diff_generic_title_score',
-    'comp_file_hash_similarity',
-    'comp_file_size_similarity',
-    'comp_filename_similarity',
-    'comp_title_similarity',
-    'comp_album_similarity',
-    'comp_artist_similarity',
-    'comp_albumartist_similarity',
-    'comp_folder_name_similarity',
-    'comp_album_art_hash_similarity',
-    'comp_duration_similarity',
-    'comp_avg_add_meta_similarity',
-    'comp_count_high_add_meta_similarity'
-]
+# EXPECTED_FEATURE_NAMES - הוסר. ייטען מהמודל.
 
 
 # --- 2. פונקציות עזר ---
@@ -69,30 +48,34 @@ def load_trained_model(model_path):
         print(f"שגיאה בטעינת המודל: {e}")
         return None
 
-def get_features_from_row(row_data, irrelevant_cols, expected_feature_names):
+def get_features_from_row(row_data, irrelevant_cols, model_feature_names):
     """
     מחלץ את וקטור התכונות (X) משורה בודדת (Series של Pandas),
-    בהתאם לתכונות שהמודל אומן עליהן.
+    בהתאם לתכונות שהמודל אומן עליהן (model_feature_names).
     """
     actual_irrelevant_cols_in_row = [col for col in irrelevant_cols if col in row_data.index]
     features_series = row_data.drop(index=actual_irrelevant_cols_in_row, errors='ignore')
     
     try:
-        # ודא שכל התכונות הצפויות קיימות בסדרה שנותרה
-        missing_features = [f for f in expected_feature_names if f not in features_series.index]
-        if missing_features:
-            print(f"שגיאה: חסרות התכונות הבאות בשורה הנבחרת לאחר הסרת הלא רלוונטיות: {missing_features}")
-            print(f"תכונות זמינות בשורה: {features_series.index.tolist()}")
+        # ודא שכל התכונות שהמודל מצפה להן קיימות בסדרה שנותרה
+        missing_features_in_series = [f for f in model_feature_names if f not in features_series.index]
+        if missing_features_in_series:
+            print(f"שגיאה: חסרות התכונות הבאות בשורה הנבחרת (לאחר הסרת הלא רלוונטיות), למרות שהמודל מצפה להן:")
+            for f_name in missing_features_in_series:
+                print(f"  - {f_name}")
+            print(f"תכונות זמינות בשורה (לאחר הסרת לא רלוונטיות): {features_series.index.tolist()}")
+            print(f"תכונות שהמודל מצפה להן: {model_feature_names}")
             return None
             
-        features_ordered = features_series[expected_feature_names]
+        # סדר את התכונות לפי הסדר שהמודל מכיר
+        features_ordered = features_series[list(model_feature_names)]
     except KeyError as e:
         print(f"שגיאה קריטית בהבטחת סדר התכונות או בחירת תכונות חסרות: {e}")
-        print(f"תכונות צפויות: {expected_feature_names}")
+        print(f"תכונות שהמודל מצפה להן: {model_feature_names}")
         print(f"תכונות בפועל בשורה (לאחר הסרת הלא רלוונטיות): {features_series.index.tolist()}")
         return None
         
-    return pd.DataFrame([features_ordered.values], columns=expected_feature_names)
+    return pd.DataFrame([features_ordered.values], columns=model_feature_names)
 
 # --- 3. לולאה ראשית לבחירת שורה וחיזוי ---
 def main():
@@ -103,13 +86,40 @@ def main():
         print("לא ניתן להמשיך עקב שגיאה בטעינת הנתונים או המודל.")
         return
 
+    # חילוץ שמות התכונות מהמודל
+    model_feature_names = None
+    try:
+        if hasattr(model, 'feature_name_'): # LightGBM
+            model_feature_names = model.feature_name_
+        elif hasattr(model, 'feature_names_in_'): # Scikit-learn
+            model_feature_names = model.feature_names_in_
+        
+        if model_feature_names is None or not isinstance(model_feature_names, (list, np.ndarray)) or len(model_feature_names) == 0:
+            raise AttributeError("שמות התכונות לא נמצאו או אינם בפורמט תקין במודל.")
+        
+        model_feature_names = list(map(str, model_feature_names)) # המרה לרשימת מחרוזות
+        print(f"\nזוהו {len(model_feature_names)} תכונות מהמודל שהן חלק מהחיזוי.")
+        # print(f"שמות התכונות לדוגמה: {model_feature_names[:5]}")
+    except AttributeError as e:
+        print(f"שגיאה: המודל הנטען אינו מכיל מידע על שמות התכונות ({e}).")
+        print("ודא שהמודל נשמר עם מידע זה (למשל, מאפיין 'feature_name_' עבור LightGBM או 'feature_names_in_' עבור מודלי sklearn).")
+        return
+    except Exception as e_feat:
+        print(f"שגיאה לא צפויה בעת ניסיון לגשת לשמות התכונות מהמודל: {e_feat}")
+        return
+
+
     print(f"\nקובץ ה-CSV מכיל {len(full_df)} שורות (אינדקסים מ-0 עד {len(full_df)-1}).")
-    print(f"המודל מצפה לקבל {len(EXPECTED_FEATURE_NAMES)} תכונות.")
+    
+    # הדפסת כל העמודות הקיימות ב-CSV לבדיקה
+    # print(f"\nכל העמודות הקיימות בקובץ ה-CSV ({CSV_FILE_PATH}):")
+    # for col_name in full_df.columns:
+    #     print(f"  - {col_name}")
 
 
     while True:
         try:
-            user_input = input("\nהזן את מספר האינדקס של השורה מה-CSV לבדיקה (או 'צא' ליציאה): ").strip()
+            user_input = input(f"\nהזן את מספר האינדקס של השורה מה-CSV (0 עד {len(full_df)-1}) לבדיקה (או 'צא' ליציאה): ").strip()
             if user_input.lower() == 'צא':
                 break
 
@@ -133,17 +143,21 @@ def main():
             else:
                 print(f"אזהרה: עמודת המטרה '{TARGET_COLUMN}' לא נמצאה בשורה זו.")
 
+            # כאן נעביר את model_feature_names
             features_for_prediction = get_features_from_row(
                 selected_row_data, 
                 IRRELEVANT_COLUMNS_FOR_TRAINING,
-                EXPECTED_FEATURE_NAMES
+                model_feature_names # שימוש ברשימה שחולצה מהמודל
             )
 
             if features_for_prediction is None:
+                print("לא ניתן היה להכין את התכונות לחיזוי עבור שורה זו.")
                 continue 
 
-            if features_for_prediction.shape[1] != len(EXPECTED_FEATURE_NAMES):
-                print(f"שגיאה: מספר התכונות שהוכן לחיזוי ({features_for_prediction.shape[1]}) אינו תואם למספר התכונות שהמודל מצפה לו ({len(EXPECTED_FEATURE_NAMES)}).")
+            if features_for_prediction.shape[1] != len(model_feature_names):
+                print(f"שגיאה חמורה: מספר התכונות שהוכן לחיזוי ({features_for_prediction.shape[1]}) "
+                      f"אינו תואם למספר התכונות שהמודל מצפה לו ({len(model_feature_names)}).")
+                print("בדוק את הלוגיקה של get_features_from_row או את תקינות הנתונים.")
                 continue
 
             prediction = model.predict(features_for_prediction)
@@ -159,8 +173,11 @@ def main():
             print("שגיאה: אנא הזן מספר אינדקס חוקי או 'צא'.")
         except Exception as e:
             print(f"אירעה שגיאה בלתי צפויה: {e}")
+            import traceback
+            traceback.print_exc() # להדפסת מידע נוסף על השגיאה
 
     print("התוכנית הסתיימה.")
 
 if __name__ == "__main__":
     main()
+# --- END OF FILE inspect_model.py ---
