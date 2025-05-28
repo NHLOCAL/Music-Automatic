@@ -16,7 +16,7 @@ TARGET_COLUMN = 'target_label'
 
 # EXPECTED_FEATURE_NAMES - הוסר. ייטען מהמודל.
 
-OUTLIER_ERROR_THRESHOLD = 30.0 # הוגדל לדוגמה, יש להתאים לפי טווח ערכי היעד
+OUTLIER_ERROR_THRESHOLD = 5.0 # הוגדל לדוגמה, יש להתאים לפי טווח ערכי היעד
 N_SHAP_FEATURES_TO_SHOW = 7
 TOP_N_GLOBAL_FEATURES = 20 # מספר תכונות גלובליות חשובות להצגה בגרף
 
