@@ -297,7 +297,7 @@ def main():
         else:
              X_test_for_shap = X_test
 
-        explainer = shap.TreeExplainer(model, X_test_for_shap) # ניתן להעביר נתונים לאתחול
+        explainer = shap.TreeExplainer(model, X_test_for_shap, check_additivity=False) # ניתן להעביר נתונים לאתחול
         print("SHAP explainer אותחל.")
     except Exception as e:
         print(f"שגיאה באתחול SHAP explainer: {e}")
