@@ -109,14 +109,14 @@ class FolderScanner:
                         processed_folders[folder_info.path] = folder_info
                 except Exception as e:
 
-                    # Finding which folder failed might be tricky here without extra tracking
+
                     logger.error(f"Error processing a folder: {e}", exc_info=True)
 
 
         logger.info(f"Scan complete. Processed {len(processed_folders)} folders.")
 
-        # Update cache with newly processed/rescanned folders
-        # Convert FolderInfo objects back to dictionaries for JSON serialization
+
+
         updated_cache_data = {str(path): self._folder_info_to_dict(info)
                                for path, info in processed_folders.items()}
         self.data_store.save_data(updated_cache_data)
@@ -139,42 +139,58 @@ class FolderScanner:
 
         logger.info(f"Processing folder: {folder_path}")
         music_files_info: List[FileInfo] = []
+        other_files_list: List[Dict[str, Any]] = []
         try:
             all_entries = list(os.scandir(folder_path))
 
-            # Check if the folder contains any subdirectories
+
             if any(entry.is_dir() for entry in all_entries):
                 logger.info(f"Skipping folder {folder_path}: Contains subdirectories, thus not considered a standard album folder.")
                 return None
 
-            potential_music_files = [
+            potential_music_files_paths = {
                 Path(entry.path) for entry in all_entries
                 if entry.is_file() and Path(entry.name).suffix.lower() in config.ALLOWED_EXTENSIONS
                    and entry.name.lower() not in config.IGNORED_FILES
-            ]
+            }
 
-            if len(potential_music_files) < config.MIN_FILES_PER_FOLDER:
-                 logger.debug(f"Skipping folder {folder_path}: Found {len(potential_music_files)} music files (minimum required: {config.MIN_FILES_PER_FOLDER}).")
+            if len(potential_music_files_paths) < config.MIN_FILES_PER_FOLDER:
+                 logger.debug(f"Skipping folder {folder_path}: Found {len(potential_music_files_paths)} potential music files (minimum required: {config.MIN_FILES_PER_FOLDER}).")
                  return None
 
-            for file_path in potential_music_files:
+            for file_path in potential_music_files_paths:
                  file_info = self.file_processor.process_file(file_path)
                  if file_info:
                      music_files_info.append(file_info)
                  else:
-                      logger.warning(f"Failed to process file, skipping: {file_path}")
+                      logger.warning(f"Failed to process music file, skipping: {file_path}")
 
             if len(music_files_info) < config.MIN_FILES_PER_FOLDER:
-                 logger.debug(f"Skipping folder {folder_path}: Only {len(music_files_info)} files successfully processed (minimum required: {config.MIN_FILES_PER_FOLDER}).")
+                 logger.debug(f"Skipping folder {folder_path}: Only {len(music_files_info)} music files successfully processed (minimum required: {config.MIN_FILES_PER_FOLDER}).")
                  return None
 
-            # Aggregate folder-level information
+            processed_music_filepaths = {fi.filepath for fi in music_files_info}
+
+            for entry in all_entries:
+                entry_path = Path(entry.path)
+                if entry.is_file():
+                    if entry_path in processed_music_filepaths:
+                        continue 
+                    if entry.name.lower() in config.ALBUM_ART_FILES:
+                        continue 
+                    
+                    other_file_details = self.file_processor.process_other_file_info(entry_path)
+                    if other_file_details:
+                        other_files_list.append(other_file_details)
+                        logger.debug(f"Collected other file: {entry.name} in {folder_path.name}")
+
+
             folder_name = folder_path.name
             parent_folder_name = folder_path.parent.name
 
             album_art_hash = self.file_processor.get_folder_album_art_hash(folder_path)
 
-            # Calculate derived metrics
+
             file_hashes_present = all(fi.file_hash is not None for fi in music_files_info)
             total_bitrate = sum(fi.bitrate for fi in music_files_info if fi.bitrate is not None)
             num_files_with_bitrate = sum(1 for fi in music_files_info if fi.bitrate is not None)
@@ -183,7 +199,7 @@ class FolderScanner:
             unique_artists = {fi.artist for fi in music_files_info if fi.artist}
             unique_albums = {fi.album for fi in music_files_info if fi.album}
 
-            # Normalize artists based on CSV map if needed (apply to the set)
+
             normalized_artists = set()
             if self.artists_map:
                  for art in unique_artists:
@@ -191,13 +207,13 @@ class FolderScanner:
                  unique_artists = normalized_artists
 
 
-            # Pre-calculate generic name scores
+
             filenames = [fi.filename for fi in music_files_info]
             titles = [fi.title for fi in music_files_info if fi.title]
             generic_filename_score = self._calculate_generic_score(filenames)
             generic_title_score = self._calculate_generic_score(titles) if titles else 0.0
 
-            # Pre-calculate quality ratios
+
             total_files = len(music_files_info)
             hebrew_metadata_count = sum(1 for fi in music_files_info if contains_hebrew(fi.title) or contains_hebrew(fi.artist) or contains_hebrew(fi.album))
             metadata_completeness_count = sum(1 for fi in music_files_info if fi.metadata_complete)
@@ -211,20 +227,21 @@ class FolderScanner:
                 parent_folder_name=parent_folder_name,
                 files=music_files_info,
                 album_art_hash=album_art_hash,
+                other_files=other_files_list, 
                 file_hashes_present=file_hashes_present,
                 avg_bitrate=avg_bitrate,
                 unique_artists=unique_artists,
                 unique_albums=unique_albums,
                 generic_filename_score=generic_filename_score,
                 generic_title_score=generic_title_score,
-                # Ratios for quality calculation
+
                 hebrew_metadata_ratio=hebrew_metadata_count / total_files if total_files else 0.0,
                 metadata_completeness_ratio=metadata_completeness_count / total_files if total_files else 0.0,
                 lossless_ratio=lossless_count / total_files if total_files else 0.0,
                 lyrics_ratio=lyrics_count / total_files if total_files else 0.0
             )
 
-            logger.info(f"Successfully processed folder: {folder_path} ({len(music_files_info)} files)")
+            logger.info(f"Successfully processed folder: {folder_path} ({len(music_files_info)} music files, {len(other_files_list)} other files)")
             return folder_info
 
         except OSError as e:
@@ -239,7 +256,7 @@ class FolderScanner:
         if len(names) < 2:
             return 0.0
 
-        # Clean names: remove extension and digits for comparison
+
         cleaned_names = [re.sub(r'\d', '', Path(name).stem).strip() for name in names]
 
         cleaned_names = [name for name in cleaned_names if name]
@@ -266,6 +283,7 @@ class FolderScanner:
             "parent_folder_name": folder_info.parent_folder_name,
             "files": [self._file_info_to_dict(fi) for fi in folder_info.files],
             "album_art_hash": folder_info.album_art_hash,
+            "other_files": folder_info.other_files, 
             "file_hashes_present": folder_info.file_hashes_present,
             "avg_bitrate": folder_info.avg_bitrate,
             "unique_artists": sorted(list(folder_info.unique_artists)),
@@ -315,6 +333,7 @@ class FolderScanner:
             parent_folder_name=data["parent_folder_name"],
             files=[self._file_info_from_dict(fi_data) for fi_data in data.get("files", [])],
             album_art_hash=data.get("album_art_hash"),
+            other_files=data.get("other_files", []), 
             file_hashes_present=data.get("file_hashes_present", False),
             avg_bitrate=data.get("avg_bitrate", 0.0),
             unique_artists=unique_artists,

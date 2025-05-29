@@ -44,6 +44,7 @@ SIMILARITY_WEIGHTS = {
     'folder_name': 0.9,
     'album_art_hash': 0.8,
     'duration': 1.0,
+    'other_files_similarity': 0.15, 
 
     'additional_metadata_field_weight': 0.2
 }

@@ -1,4 +1,3 @@
-# File: music_dup_lib/core/data_store.py
 import datetime
 import json
 import logging
@@ -19,7 +18,7 @@ class DataStore:
         self.music_cache_file = music_cache_file
         self.comparison_cache_file = comparison_cache_file
 
-    def load_data(self) -> Dict[str, Any]: # This is for music_data.json
+    def load_data(self) -> Dict[str, Any]:
         if self.music_cache_file.exists():
             logger.info(f"Loading music data cache from: {self.music_cache_file}")
             try:
@@ -31,7 +30,7 @@ class DataStore:
                         return data
                     else:
                         logger.error(f"Music cache file {self.music_cache_file} does not contain a valid JSON dictionary. Using empty cache.")
-                        self._backup_corrupted_file(self.music_cache_file) # Backup if format is wrong
+                        self._backup_corrupted_file(self.music_cache_file)
                         return {}
             except json.JSONDecodeError as e:
                 logger.error(f"Error decoding JSON from music cache file {self.music_cache_file}: {e}. Using empty cache.")
@@ -44,24 +43,24 @@ class DataStore:
             logger.info("Music data cache file not found. Starting with an empty cache.")
             return {}
 
-    def save_data(self, data_to_update: Dict[str, Any]): # Renamed param for clarity, this is for music_data.json
+    def save_data(self, data_to_update: Dict[str, Any]):
         logger.info(f"Attempting to save/update music data cache to: {self.music_cache_file}")
 
-        # Step 1: Load existing music_data cache
-        existing_music_data = self.load_data() # load_data already handles empty/corrupt files
-        
+
+        existing_music_data = self.load_data()
+
         logger.info(f"Loaded {len(existing_music_data)} existing music data entries. Merging with {len(data_to_update)} new/updated entries.")
 
-        # Step 2: Merge new/updated data into existing data
-        # The keys in data_to_update are string paths, which is what load_data returns.
+
+
         existing_music_data.update(data_to_update)
-        
+
         logger.info(f"Total music data entries after merge: {len(existing_music_data)}")
 
-        # Step 3: Save the complete merged dictionary to file
+
         try:
             self.music_cache_file.parent.mkdir(parents=True, exist_ok=True)
-            # 'w' mode is fine here because existing_music_data now holds the complete merged data
+
             with open(self.music_cache_file, 'w', encoding='utf-8') as f:
                 json.dump(existing_music_data, f, ensure_ascii=False, indent=4)
             logger.info(f"Music data cache successfully updated and saved with {len(existing_music_data)} total entries.")
@@ -73,7 +72,7 @@ class DataStore:
             logger.error(f"Unexpected error saving updated music data cache file {self.music_cache_file}: {e}", exc_info=True)
 
     def _backup_corrupted_file(self, file_path: Path):
-        if file_path.exists() and file_path.stat().st_size > 0: # Only backup non-empty files
+        if file_path.exists() and file_path.stat().st_size > 0:
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
             backup_name = f"{file_path.stem}.corrupted_{timestamp}{file_path.suffix}"
             backup_path = file_path.with_name(backup_name)
@@ -84,7 +83,7 @@ class DataStore:
                 logger.error(f"Could not back up corrupted/invalid file {file_path}: {e}")
         elif not file_path.exists():
             logger.debug(f"File {file_path} does not exist, no backup needed.")
-        else: # File exists but is empty
+        else:
             logger.debug(f"File {file_path} is empty, no backup needed. It will be overwritten or created.")
 
 
@@ -108,7 +107,7 @@ class DataStore:
                 try:
                     f1_path_str = item["folder1_path"]
                     f2_path_str = item["folder2_path"]
-                    
+
                     if not isinstance(f1_path_str, str) or not isinstance(f2_path_str, str):
                         logger.warning(f"Found non-string path in cache item: {item}. Converting to string.")
                         f1_path_str = str(f1_path_str)
@@ -117,7 +116,7 @@ class DataStore:
                     pair_key = frozenset({f1_path_str, f2_path_str})
                     gemini_similarity_val = item.get("gemini_similarity_score")
                     if gemini_similarity_val is None:
-                        gemini_similarity_val = item.get("gemini_confidence")
+                        gemini_similarity_val = item.get("gemini_confidence") # Legacy key
 
                     result = FolderComparisonResult(
                         folder1_path=Path(f1_path_str),
@@ -148,13 +147,13 @@ class DataStore:
             logger.error(f"Unexpected error loading comparison cache file {self.comparison_cache_file}: {e}", exc_info=True)
             return {}
 
-    def save_comparison_results(self, 
+    def save_comparison_results(self,
                                 results_to_update: Union[List[FolderComparisonResult], Dict[FrozenSet[Path], FolderComparisonResult], Dict[FrozenSet[str], FolderComparisonResult]]):
-        
+
         logger.info(f"Attempting to save/update comparison results to: {self.comparison_cache_file}")
 
-        existing_results_map = self.load_comparison_results()
-        
+        existing_results_map: Dict[FrozenSet[str], FolderComparisonResult] = self.load_comparison_results() # Ensure type
+
         logger.info(f"Loaded {len(existing_results_map)} existing comparison results. Merging with {len(results_to_update) if isinstance(results_to_update, (list,dict)) else 'N/A'} new/updated results.")
 
         update_map_str_keys: Dict[FrozenSet[str], FolderComparisonResult] = {}
@@ -163,16 +162,20 @@ class DataStore:
                 key = frozenset({str(res.folder1_path), str(res.folder2_path)})
                 update_map_str_keys[key] = res
         elif isinstance(results_to_update, dict):
-            sample_key = next(iter(results_to_update.keys()), None)
-            if sample_key and isinstance(next(iter(sample_key)), Path):
-                for path_key_set, res in results_to_update.items():
-                    str_key_set = frozenset({str(p) for p in path_key_set})
-                    update_map_str_keys[str_key_set] = res
-            else:
-                update_map_str_keys = results_to_update
-        
+            # Handle both Dict[FrozenSet[Path], ...] and Dict[FrozenSet[str], ...]
+            for key_set, res_val in results_to_update.items(): # Iterate directly
+                if not key_set: continue # Skip empty keys
+                first_element = next(iter(key_set), None)
+                if isinstance(first_element, Path):
+                    str_key_set = frozenset({str(p) for p in key_set}) # type: ignore
+                    update_map_str_keys[str_key_set] = res_val
+                elif isinstance(first_element, str):
+                    update_map_str_keys[key_set] = res_val # type: ignore # Already FrozenSet[str]
+                else:
+                     logger.warning(f"Unsupported key type in results_to_update dictionary: {type(first_element)}. Skipping item.")
+
         existing_results_map.update(update_map_str_keys)
-        
+
         logger.info(f"Total comparison results after merge: {len(existing_results_map)}")
 
         data_to_save_as_list = []
