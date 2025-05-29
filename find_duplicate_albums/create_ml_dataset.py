@@ -1,15 +1,14 @@
-# File: create_ml_dataset.py
 import argparse
 import logging
 from pathlib import Path
 import random
 import time
 import pandas as pd
-from typing import Dict, List, Tuple, Optional, Set, FrozenSet
+from typing import Dict, List, Tuple, Optional, Set, FrozenSet, Any
 from itertools import combinations
-from sklearn.model_selection import train_test_split # Required for splitting
-import numpy as np # Added for numerical operations (std, mean, etc.)
-import re # Added for regex in word jaccard
+from sklearn.model_selection import train_test_split
+import numpy as np
+import re
 
 from music_dup_lib import config as app_config
 from music_dup_lib import utils
@@ -61,33 +60,42 @@ def _calculate_folder_stats(folder_info: FolderInfo) -> Dict[str, float]:
     stats: Dict[str, Optional[float]] = {
         "avg_duration": None, "std_duration": None, "min_duration": None, "max_duration": None, "total_duration": None,
         "std_bitrate": None, "min_bitrate": None, "max_bitrate": None,
-        # folder_info.avg_bitrate is used directly
+        "avg_other_file_size_bytes": None, "total_other_file_size_bytes": None, # New for other files
     }
-    if not folder_info.files:
-        # Fill with 0.0 if no files, for consistency
+    if not folder_info.files and not folder_info.other_files:
         return {k: 0.0 for k in stats.keys()}
 
-    durations = [f.duration for f in folder_info.files if f.duration is not None and f.duration > 0]
-    bitrates = [f.bitrate for f in folder_info.files if f.bitrate is not None and f.bitrate > 0]
+    # Music file stats
+    if folder_info.files:
+        durations = [f.duration for f in folder_info.files if f.duration is not None and f.duration > 0]
+        bitrates = [f.bitrate for f in folder_info.files if f.bitrate is not None and f.bitrate > 0]
 
-    if durations:
-        stats["avg_duration"] = float(np.mean(durations))
-        stats["std_duration"] = float(np.std(durations)) if len(durations) > 1 else 0.0
-        stats["min_duration"] = float(np.min(durations))
-        stats["max_duration"] = float(np.max(durations))
-        stats["total_duration"] = float(np.sum(durations))
-    
-    if bitrates:
-        stats["std_bitrate"] = float(np.std(bitrates)) if len(bitrates) > 1 else 0.0
-        stats["min_bitrate"] = float(np.min(bitrates))
-        stats["max_bitrate"] = float(np.max(bitrates))
+        if durations:
+            stats["avg_duration"] = float(np.mean(durations))
+            stats["std_duration"] = float(np.std(durations)) if len(durations) > 1 else 0.0
+            stats["min_duration"] = float(np.min(durations))
+            stats["max_duration"] = float(np.max(durations))
+            stats["total_duration"] = float(np.sum(durations))
 
-    # Ensure all stat keys exist and are floats (0.0 if None)
+        if bitrates:
+            stats["std_bitrate"] = float(np.std(bitrates)) if len(bitrates) > 1 else 0.0
+            stats["min_bitrate"] = float(np.min(bitrates))
+            stats["max_bitrate"] = float(np.max(bitrates))
+
+    # Other file stats
+    if folder_info.other_files:
+        other_file_sizes = [f.get('size_bytes', 0) for f in folder_info.other_files if f.get('size_bytes', 0) > 0]
+        if other_file_sizes:
+            stats["avg_other_file_size_bytes"] = float(np.mean(other_file_sizes))
+            stats["total_other_file_size_bytes"] = float(np.sum(other_file_sizes))
+
+
     final_stats: Dict[str, float] = {}
     for key in ["avg_duration", "std_duration", "min_duration", "max_duration", "total_duration",
-                "std_bitrate", "min_bitrate", "max_bitrate"]:
+                "std_bitrate", "min_bitrate", "max_bitrate",
+                "avg_other_file_size_bytes", "total_other_file_size_bytes"]: # Added new keys
         final_stats[key] = stats.get(key, 0.0) if stats.get(key) is not None else 0.0
-            
+
     return final_stats
 
 def extract_features_for_pair(
@@ -98,46 +106,52 @@ def extract_features_for_pair(
     features = {}
     if not folder1_info or not folder2_info: return None
 
-    # --- Basic FolderInfo stats (already somewhat present) ---
+
     f1_avg_bitrate = folder1_info.avg_bitrate if folder1_info.avg_bitrate is not None else 0.0
     f2_avg_bitrate = folder2_info.avg_bitrate if folder2_info.avg_bitrate is not None else 0.0
-    features['f1_avg_bitrate'] = f1_avg_bitrate # Re-adding for individual assessment
-    features['f2_avg_bitrate'] = f2_avg_bitrate # Re-adding
+    features['f1_avg_bitrate'] = f1_avg_bitrate
+    features['f2_avg_bitrate'] = f2_avg_bitrate
     features['diff_avg_bitrate'] = abs(f1_avg_bitrate - f2_avg_bitrate)
-    
+
     features['jaccard_unique_artists'] = calculate_jaccard_index(folder1_info.unique_artists, folder2_info.unique_artists)
     features['jaccard_unique_albums'] = calculate_jaccard_index(folder1_info.unique_albums, folder2_info.unique_albums)
-    
+
     f1_gen_fname_score = folder1_info.generic_filename_score if folder1_info.generic_filename_score is not None else 0.0
     f2_gen_fname_score = folder2_info.generic_filename_score if folder2_info.generic_filename_score is not None else 0.0
     features['f1_generic_filename_score'] = f1_gen_fname_score
     features['f2_generic_filename_score'] = f2_gen_fname_score
     features['diff_generic_filename_score'] = abs(f1_gen_fname_score - f2_gen_fname_score)
-    
+
     f1_gen_title_score = folder1_info.generic_title_score if folder1_info.generic_title_score is not None else 0.0
     f2_gen_title_score = folder2_info.generic_title_score if folder2_info.generic_title_score is not None else 0.0
     features['f1_generic_title_score'] = f1_gen_title_score
     features['f2_generic_title_score'] = f2_gen_title_score
     features['diff_generic_title_score'] = abs(f1_gen_title_score - f2_gen_title_score)
 
-    # --- New: Detailed file stats (duration, bitrate variations) ---
+
     folder1_stats = _calculate_folder_stats(folder1_info)
     folder2_stats = _calculate_folder_stats(folder2_info)
 
     for stat_key in ["avg_duration", "std_duration", "min_duration", "max_duration", "total_duration",
-                     "std_bitrate", "min_bitrate", "max_bitrate"]:
+                     "std_bitrate", "min_bitrate", "max_bitrate",
+                     "avg_other_file_size_bytes", "total_other_file_size_bytes"]: # Added other file stats keys
         s1_val = folder1_stats[stat_key]
         s2_val = folder2_stats[stat_key]
         features[f'f1_{stat_key}'] = s1_val
         features[f'f2_{stat_key}'] = s2_val
         features[f'diff_{stat_key}'] = abs(s1_val - s2_val)
-        if stat_key == "total_duration":
+        if stat_key == "total_duration": # Could add similar for total_other_file_size_bytes
             if s1_val == 0 and s2_val == 0:
                 features['ratio_total_duration'] = 1.0
             else:
                 features['ratio_total_duration'] = min(s1_val, s2_val) / max(1.0, s1_val, s2_val)
-    
-    # --- New: Parent folder name features ---
+        if stat_key == "total_other_file_size_bytes":
+            if s1_val == 0 and s2_val == 0:
+                features['ratio_total_other_file_size_bytes'] = 1.0
+            else:
+                features['ratio_total_other_file_size_bytes'] = min(s1_val,s2_val) / max(1.0, s1_val, s2_val)
+
+
     f1_parent_name = folder1_info.parent_folder_name
     f2_parent_name = folder2_info.parent_folder_name
     features['f1_parent_folder_name_len'] = len(f1_parent_name) if f1_parent_name else 0
@@ -146,7 +160,7 @@ def extract_features_for_pair(
     features['parent_folder_names_match'] = 1.0 if f1_parent_name and f1_parent_name == f2_parent_name else 0.0
     features['jaccard_parent_folder_names'] = calculate_word_jaccard_index(f1_parent_name, f2_parent_name)
 
-    # --- New: Quality score and other FolderInfo ratios ---
+
     quality_related_fields = {
         'quality_score': (folder1_info.quality_score, folder2_info.quality_score),
         'hebrew_metadata_ratio': (folder1_info.hebrew_metadata_ratio, folder2_info.hebrew_metadata_ratio),
@@ -161,45 +175,88 @@ def extract_features_for_pair(
         features[f'f2_{field}'] = v2
         features[f'diff_{field}'] = abs(v1 - v2)
 
-    # --- Features from ComparisonResult (if available) ---
+    # --- Features for "other files" (New Section) ---
+    f1_other_files_details: List[Dict[str, Any]] = folder1_info.other_files
+    f2_other_files_details: List[Dict[str, Any]] = folder2_info.other_files
+
+    f1_other_files_names = {f['name'] for f in f1_other_files_details}
+    f2_other_files_names = {f['name'] for f in f2_other_files_details}
+
+    features['f1_num_other_files'] = len(f1_other_files_details)
+    features['f2_num_other_files'] = len(f2_other_files_details)
+    features['diff_num_other_files'] = abs(features['f1_num_other_files'] - features['f2_num_other_files'])
+    if max(features['f1_num_other_files'], features['f2_num_other_files']) > 0:
+        features['ratio_num_other_files'] = min(features['f1_num_other_files'], features['f2_num_other_files']) / \
+                                            max(1.0, features['f1_num_other_files'], features['f2_num_other_files'])
+    else:
+        features['ratio_num_other_files'] = 1.0
+
+    features['jaccard_other_file_names'] = calculate_jaccard_index(f1_other_files_names, f2_other_files_names)
+
+    # Compare hashes and sizes of common "other" files
+    common_other_file_names = f1_other_files_names.intersection(f2_other_files_names)
+    other_files_hash_match_count = 0
+    other_files_size_similarity_sum = 0.0
+    if common_other_file_names:
+        f1_other_map = {f['name']: f for f in f1_other_files_details}
+        f2_other_map = {f['name']: f for f in f2_other_files_details}
+        for name in common_other_file_names:
+            of1 = f1_other_map[name]
+            of2 = f2_other_map[name]
+            if of1.get('hash') and of2.get('hash') and of1['hash'] == of2['hash']:
+                other_files_hash_match_count += 1
+
+            s1, s2 = of1.get('size_bytes', 0), of2.get('size_bytes', 0)
+            if s1 > 0 and s2 > 0:
+                ratio = min(s1, s2) / max(s1, s2)
+                other_files_size_similarity_sum += 1.0 if ratio >= 0.95 else ratio * ratio # Similar to music file size
+            elif s1 == 0 and s2 == 0: # both zero size
+                other_files_size_similarity_sum += 1.0
+            # If one is zero and other not, or one/both missing size, effectively 0 similarity for that file
+
+    num_common_other_files = len(common_other_file_names)
+    features['other_files_common_hash_ratio'] = other_files_hash_match_count / num_common_other_files if num_common_other_files > 0 else 0.0
+    features['other_files_common_avg_size_similarity'] = other_files_size_similarity_sum / num_common_other_files if num_common_other_files > 0 else 0.0
+    # --- End Features for "other files" ---
+
     if comparison_result:
         sim_scores = comparison_result.similarity_scores
         comp_feature_keys = [
-            'file_hash', 'file_size', 'filename', 'title', 'album', 
+            'file_hash', 'file_size', 'filename', 'title', 'album',
             'artist', 'albumartist', 'folder_name', 'album_art_hash', 'duration'
         ]
         for key in comp_feature_keys:
             features[f'comp_{key}_similarity'] = sim_scores.get(key, 0.0)
-        
+
+        features['comp_other_files_similarity'] = sim_scores.get('other_files_similarity', 0.0)
+
         add_meta_details = sim_scores.get('additional_metadata_details', {})
         if add_meta_details:
             features['comp_avg_add_meta_similarity'] = sum(add_meta_details.values()) / len(add_meta_details) if add_meta_details else 0.0
             features['comp_count_high_add_meta_similarity'] = sum(1 for v in add_meta_details.values() if v >= 0.8)
-            # New: unpack additional_metadata_details into separate features
+
             for meta_key, meta_sim_score in add_meta_details.items():
-                # Sanitize key for feature name (e.g. replace spaces, non-alphanum with underscore)
                 safe_meta_key = re.sub(r'[^a-zA-Z0-9_]', '_', meta_key.lower())
                 features[f'comp_add_meta_sim_{safe_meta_key}'] = meta_sim_score
         else:
             features['comp_avg_add_meta_similarity'] = 0.0
             features['comp_count_high_add_meta_similarity'] = 0.0
-            # If no add_meta_details, the specific comp_add_meta_sim_<key> features won't be added,
-            # and will be handled by final_df.fillna(0.0) later.
     else:
-        # If no comparison_result, zero out all comparison-derived features
         comp_keys_to_zero = [
             'comp_file_hash_similarity', 'comp_file_size_similarity', 'comp_filename_similarity',
             'comp_title_similarity', 'comp_album_similarity', 'comp_artist_similarity',
             'comp_albumartist_similarity', 'comp_folder_name_similarity', 'comp_album_art_hash_similarity',
-            'comp_duration_similarity',
+            'comp_duration_similarity', 'comp_other_files_similarity',
             'comp_avg_add_meta_similarity', 'comp_count_high_add_meta_similarity'
         ]
-        # Also zero out potential comp_add_meta_sim_<key> features if they were expected.
-        # This is trickier as we don't know all possible keys beforehand.
-        # However, if comparison_result is None, they wouldn't have been added anyway.
-        # The final_df.fillna(0.0) will handle any columns that exist in some rows but not others.
         for k_comp in comp_keys_to_zero:
             features[k_comp] = 0.0
+            
+        # Also zero out the new "other files" features if no comparison_result
+        features['other_files_common_hash_ratio'] = 0.0
+        features['other_files_common_avg_size_similarity'] = 0.0
+        # The f1/f2_num_other_files, diff, ratio, jaccard are calculated from FolderInfo directly, so they remain.
+
     return features
 
 def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
@@ -217,12 +274,12 @@ def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
     )
 
 def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> FolderInfo:
-    # Ensure all expected fields by FolderInfo are present, even if None
     return FolderInfo(
         path=Path(path_str),
         folder_name=folder_dict.get('folder_name', Path(path_str).name),
         parent_folder_name=folder_dict.get('parent_folder_name', Path(path_str).parent.name),
         files=[_file_info_from_dict(f_dict) for f_dict in folder_dict.get('files',[])],
+        other_files=folder_dict.get('other_files', []), # Ensure this is loaded
         album_art_hash=folder_dict.get('album_art_hash'),
         file_hashes_present=folder_dict.get('file_hashes_present', False),
         avg_bitrate=folder_dict.get('avg_bitrate', 0.0),
@@ -230,7 +287,7 @@ def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> Folder
         unique_albums=set(folder_dict.get('unique_albums', [])),
         generic_filename_score=folder_dict.get('generic_filename_score', 0.0),
         generic_title_score=folder_dict.get('generic_title_score', 0.0),
-        quality_score=folder_dict.get('quality_score'), # Will be None if not in cache
+        quality_score=folder_dict.get('quality_score'),
         quality_breakdown=folder_dict.get('quality_breakdown', {}),
         hebrew_metadata_ratio=folder_dict.get('hebrew_metadata_ratio', 0.0),
         metadata_completeness_ratio=folder_dict.get('metadata_completeness_ratio', 0.0),
@@ -278,7 +335,7 @@ def build_dataset(args):
 
     logger.info("Processing pairs from existing comparison cache...")
     for pair_key_str, comp_res in existing_comparison_results_str_keys.items():
-        f1p, f2p = comp_res.folder1_path, comp_res.folder2_path 
+        f1p, f2p = comp_res.folder1_path, comp_res.folder2_path
 
         if f1p not in all_music_folders or f2p not in all_music_folders:
             logger.warning(f"FolderInfo missing for pair from cache: {f1p.name}, {f2p.name}. Skipping.")
@@ -364,7 +421,7 @@ def build_dataset(args):
         label = None
         label_source = "unknown_sampled"
 
-        if not fresh_comp_res: # Should ideally not happen if folders are valid
+        if not fresh_comp_res:
             if low_sim_pairs_count < MAX_LOW_SIM_PAIRS_FROM_SAMPLING:
                 label = DEFINITE_DIFFERENT_LABEL
                 label_source = "algo_no_comparison_result_sampled"
@@ -379,10 +436,9 @@ def build_dataset(args):
                     label = DEFINITE_DIFFERENT_LABEL
                     label_source = "algo_low_certainty_sampled"
                     low_sim_pairs_count += 1
-            else: # In Gemini range
+            else: 
                 if gemini_actually_available and new_gemini_candidates_count < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
                     gemini_candidates_new.append((folder1, folder2, fresh_comp_res))
-                    # Add to cache so Gemini results can be saved later
                     existing_comparison_results_str_keys[current_pair_key_str] = fresh_comp_res
                     new_gemini_candidates_count += 1
                 else:
@@ -407,7 +463,6 @@ def build_dataset(args):
         logger.info(f"Running Gemini analysis on {len(gemini_candidates_new)} new candidate pairs...")
         gemini_api_calls = 0
         for f1_info, f2_info, comp_res_for_gemini in gemini_candidates_new:
-            # Re-check file count condition for Gemini candidates as it's critical for some Gemini prompts
             if len(f1_info.files) != len(f2_info.files) and app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI:
                 logger.warning(f"Skipping Gemini for {f1_info.path.name} vs {f2_info.path.name} "
                                f"due to different file counts ({len(f1_info.files)} vs {len(f2_info.files)}) "
@@ -418,22 +473,18 @@ def build_dataset(args):
             algo_score = comp_res_for_gemini.weighted_score
             logger.info(f"Gemini ({gemini_api_calls+1}/{len(gemini_candidates_new)}): {f1p_path_obj.name} vs {f2p_path_obj.name} (Algo: {algo_score:.2f})")
 
-            time.sleep(app_config.GEMINI_API_DELAY_SECONDS) # Respect API rate limits
+            time.sleep(app_config.GEMINI_API_DELAY_SECONDS)
             verdict, gemini_sim_score, reason_or_error = gemini_analyzer.analyze_pair(f1_info, f2_info, algo_score)
             gemini_api_calls += 1
 
             label = None
             label_source = "gemini_new_run_failed"
-            
-            current_pair_key_str_for_gemini = frozenset({str(f1p_path_obj), str(f2p_path_obj)})
 
-            # Update the comparison result object in existing_comparison_results_str_keys
-            # This ensures that if we save the cache, it has the Gemini info.
-            # It might be a new comp_res (from sampling) or an existing one (from cache but without Gemini score)
+            current_pair_key_str_for_gemini = frozenset({str(f1p_path_obj), str(f2p_path_obj)})
             target_comp_res_obj = existing_comparison_results_str_keys.get(current_pair_key_str_for_gemini)
-            if not target_comp_res_obj: # Should not happen if logic is correct
+            if not target_comp_res_obj:
                 logger.error(f"Consistency issue: comp_res object not found in cache for Gemini pair {f1p_path_obj} - {f2p_path_obj}")
-                target_comp_res_obj = comp_res_for_gemini # Fallback to the one passed in
+                target_comp_res_obj = comp_res_for_gemini
 
             if gemini_sim_score is not None and ("ERROR" not in reason_or_error.upper() if reason_or_error else True and verdict is not None):
                 label = gemini_sim_score
@@ -449,12 +500,11 @@ def build_dataset(args):
                 target_comp_res_obj.gemini_verdict = None
                 target_comp_res_obj.gemini_similarity_score = None
                 target_comp_res_obj.gemini_reason = None
-            
+
             existing_comparison_results_str_keys[current_pair_key_str_for_gemini] = target_comp_res_obj
 
-
             if label is not None:
-                features = extract_features_for_pair(f1_info, f2_info, target_comp_res_obj) # Use updated comp_res
+                features = extract_features_for_pair(f1_info, f2_info, target_comp_res_obj)
                 if features:
                     features['target_label'] = label
                     features['label_source'] = label_source
@@ -473,8 +523,8 @@ def build_dataset(args):
         return
 
     final_df = pd.DataFrame(dataset_rows)
-    final_df.dropna(subset=['target_label'], inplace=True) 
-    final_df.fillna(0.0, inplace=True) 
+    final_df.dropna(subset=['target_label'], inplace=True)
+    final_df.fillna(0.0, inplace=True) # Crucial: ensure all features have numeric values
 
     logger.info(f"Total dataset rows before split: {final_df.shape[0]}, columns: {final_df.shape[1]}.")
     if final_df.shape[0] > 0:
@@ -502,7 +552,7 @@ def build_dataset(args):
                 random_state=DATASET_RANDOM_STATE,
                 shuffle=True
             )
-        except ValueError as e: 
+        except ValueError as e:
             logger.warning(f"Could not stratify during train-test split (Reason: {e}). Performing non-stratified split.")
             train_df, test_df = train_test_split(
                 final_df,
@@ -540,10 +590,9 @@ if __name__ == "__main__":
                         help="Update the comparison_results_cache.json file with any new Gemini results or new comparisons made during dataset creation.")
     cli_args = parser.parse_args()
 
-    # Example of how config items might be set (these should ideally be in music_dup_lib.config)
     if not hasattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML'):
-        app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML = True # Default for example
+        app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML = True
     if not hasattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI'):
-        app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI = True # Default for example
-        
+        app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI = True
+
     build_dataset(cli_args)
