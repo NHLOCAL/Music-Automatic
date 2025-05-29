@@ -205,7 +205,7 @@ def identify_and_collate_outliers_info(model, shap_explainer, X_test, y_test, or
     
     # חשוב: השתמש באינדקס של הדגימות החריגות כדי לבחור את השורות הנכונות מ-X_test המקורי
     X_outliers = X_test.loc[significant_outliers_df.index]
-    shap_values_outliers = shap_explainer.shap_values(X_outliers)
+    shap_values_outliers = shap_explainer.shap_values(X_outliers, check_additivity=False)
 
     for i, (idx, row) in enumerate(significant_outliers_df.iterrows()):
         output_lines.append(f"\n{separator_line}")
@@ -297,7 +297,7 @@ def main():
         else:
              X_test_for_shap = X_test
 
-        explainer = shap.TreeExplainer(model, X_test_for_shap, check_additivity=False) # ניתן להעביר נתונים לאתחול
+        explainer = shap.TreeExplainer(model, X_test_for_shap) # ניתן להעביר נתונים לאתחול
         print("SHAP explainer אותחל.")
     except Exception as e:
         print(f"שגיאה באתחול SHAP explainer: {e}")
