@@ -584,9 +584,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build a training dataset for music duplicate detection ML model, using Gemini for labeling.")
     parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         default="INFO", help="Set the logging level.")
-    parser.add_argument("--disable-gemini", action="store_true",
+    parser.add_argument("-d", "--disable-gemini", action="store_true",
                         help="Completely disable new Gemini API calls, even if API key is present. Will only use cached Gemini results if available.")
-    parser.add_argument("--update-comparison-cache", action="store_true",
+    parser.add_argument("-u", "--update-comparison-cache", action="store_true",
                         help="Update the comparison_results_cache.json file with any new Gemini results or new comparisons made during dataset creation.")
     cli_args = parser.parse_args()
 
