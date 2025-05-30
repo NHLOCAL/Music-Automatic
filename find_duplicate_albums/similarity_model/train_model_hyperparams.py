@@ -202,17 +202,17 @@ def tune_hyperparameters_gridsearch(X_train, y_train, random_state_seed):
     מבצע כוונון היפר-פרמטרים באמצעות GridSearchCV.
     """
     print("\nמתחיל כוונון היפר-פרמטרים (GridSearchCV)... זה עשוי לקחת זמן.")
-    
+
     param_grid = {
-        'n_estimators': [500, 1000, 1500], # אפשר להרחיב או לצמצם טווח זה
-        'learning_rate': [0.01, 0.05, 0.1],
-        'num_leaves': [21, 31, 41, 51],
+        'n_estimators': [700, 1200],
+        'learning_rate': [0.02, 0.05, 0.08],
+        'num_leaves': [25, 35, 50],
         'max_depth': [-1], # בדרך כלל מומלץ להשאיר -1 ב-LGBM ולשלוט עם num_leaves
-        'min_child_samples': [20, 30, 50],
-        'subsample': [0.7, 0.8, 0.9],
-        'colsample_bytree': [0.7, 0.8, 0.9],
-        'reg_alpha': [0.0, 0.01, 0.1],
-        'reg_lambda': [0.0, 0.01, 0.1],
+        'min_child_samples': [20, 35],
+        'subsample': [0.8, 0.9],
+        'colsample_bytree': [0.7, 0.9],
+        'reg_alpha': [0.0, 0.05],
+        'reg_lambda': [0.0, 0.05],
     }
 
     # פרמטרים קבועים שלא נכללים בחיפוש הרשת
