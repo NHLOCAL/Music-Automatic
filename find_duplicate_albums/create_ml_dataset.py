@@ -37,8 +37,8 @@ LOW_CERTAINTY_THRESHOLD = 30.0
 DEFINITE_DUPLICATE_LABEL = 98.0
 DEFINITE_DIFFERENT_LABEL = 2.0
 
-MAX_LOW_SIM_PAIRS_FROM_SAMPLING = 5000
-MAX_GEMINI_CANDIDATES_FROM_SAMPLING = 2000
+MAX_LOW_SIM_PAIRS_FROM_SAMPLING = 10000
+MAX_GEMINI_CANDIDATES_FROM_SAMPLING = 1000
 
 logger = logging.getLogger("DatasetBuilder")
 
@@ -354,7 +354,12 @@ def build_dataset(args):
 
         processed_pairs.add(pair_key_str)
 
-        current_algorithmic_score = comp_res.weighted_score
+        # MODIFIED: Use final_combined_score instead of weighted_score
+        current_algorithmic_score = comp_res.final_combined_score if comp_res.final_combined_score is not None else comp_res.weighted_score
+        if comp_res.final_combined_score is None:
+             logger.warning(f"final_combined_score is None for cached pair {f1p.name}-{f2p.name}. Falling back to weighted_score ({comp_res.weighted_score}).")
+
+
         label = None
         label_source = "unknown"
 
@@ -427,7 +432,12 @@ def build_dataset(args):
                 label_source = "algo_no_comparison_result_sampled"
                 low_sim_pairs_count += 1
         else:
-            current_algorithmic_score = fresh_comp_res.weighted_score
+            # MODIFIED: Use final_combined_score instead of weighted_score
+            current_algorithmic_score = fresh_comp_res.final_combined_score if fresh_comp_res.final_combined_score is not None else fresh_comp_res.weighted_score
+            if fresh_comp_res.final_combined_score is None:
+                logger.warning(f"final_combined_score is None for sampled pair {f1p_path_obj.name}-{f2p_path_obj.name}. Falling back to weighted_score ({fresh_comp_res.weighted_score}).")
+
+
             if current_algorithmic_score >= HIGH_CERTAINTY_THRESHOLD:
                 label = DEFINITE_DUPLICATE_LABEL
                 label_source = "algo_high_certainty_sampled"
@@ -439,7 +449,7 @@ def build_dataset(args):
             else: 
                 if gemini_actually_available and new_gemini_candidates_count < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
                     gemini_candidates_new.append((folder1, folder2, fresh_comp_res))
-                    existing_comparison_results_str_keys[current_pair_key_str] = fresh_comp_res
+                    existing_comparison_results_str_keys[current_pair_key_str] = fresh_comp_res # Store it for potential Gemini run
                     new_gemini_candidates_count += 1
                 else:
                     label_source = "gemini_range_no_gemini_available_sampled"
@@ -470,8 +480,12 @@ def build_dataset(args):
                 continue
 
             f1p_path_obj, f2p_path_obj = f1_info.path, f2_info.path
-            algo_score = comp_res_for_gemini.weighted_score
-            logger.info(f"Gemini ({gemini_api_calls+1}/{len(gemini_candidates_new)}): {f1p_path_obj.name} vs {f2p_path_obj.name} (Algo: {algo_score:.2f})")
+            # MODIFIED: Use final_combined_score for context to Gemini
+            algo_score = comp_res_for_gemini.final_combined_score if comp_res_for_gemini.final_combined_score is not None else comp_res_for_gemini.weighted_score
+            if comp_res_for_gemini.final_combined_score is None:
+                 logger.warning(f"final_combined_score is None for Gemini candidate pair {f1p_path_obj.name}-{f2p_path_obj.name} when sending to Gemini. Falling back to weighted_score ({comp_res_for_gemini.weighted_score}).")
+
+            logger.info(f"Gemini ({gemini_api_calls+1}/{len(gemini_candidates_new)}): {f1p_path_obj.name} vs {f2p_path_obj.name} (Algo Score (final_combined): {algo_score:.2f})")
 
             time.sleep(app_config.GEMINI_API_DELAY_SECONDS)
             verdict, gemini_sim_score, reason_or_error = gemini_analyzer.analyze_pair(f1_info, f2_info, algo_score)
@@ -484,7 +498,7 @@ def build_dataset(args):
             target_comp_res_obj = existing_comparison_results_str_keys.get(current_pair_key_str_for_gemini)
             if not target_comp_res_obj:
                 logger.error(f"Consistency issue: comp_res object not found in cache for Gemini pair {f1p_path_obj} - {f2p_path_obj}")
-                target_comp_res_obj = comp_res_for_gemini
+                target_comp_res_obj = comp_res_for_gemini # Use the one we have, though it's odd
 
             if gemini_sim_score is not None and ("ERROR" not in reason_or_error.upper() if reason_or_error else True and verdict is not None):
                 label = gemini_sim_score
@@ -552,7 +566,7 @@ def build_dataset(args):
                 random_state=DATASET_RANDOM_STATE,
                 shuffle=True
             )
-        except ValueError as e:
+        except ValueError as e: # Should not happen if target_label is present
             logger.warning(f"Could not stratify during train-test split (Reason: {e}). Performing non-stratified split.")
             train_df, test_df = train_test_split(
                 final_df,

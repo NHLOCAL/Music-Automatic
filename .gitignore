@@ -158,3 +158,4 @@ music_data.json
 **/repomix-output.md
 find_duplicate_albums/data/comparison_results_cache.json
 /find_duplicate_albums/data
+/find_duplicate_albums/similarity_model/training_runs_output
