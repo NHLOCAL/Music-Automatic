@@ -275,117 +275,96 @@ def display_combined_tracklist_details(f1_info: FolderInfo, f2_info: FolderInfo)
         st.write("לא נמצאו קבצי מוזיקה להשוואה.")
         return
 
-    # הגדרת מחלקות CSS לצבעי רקע
-    st.markdown("""
+    # הגדרת צבעי רקע ישירות לשימוש
+    color1_bg_value = "rgba(220, 235, 255, 0.7)" # כחלחל בהיר עם קצת יותר אטימות
+    color2_bg_value = "rgba(255, 245, 220, 0.7)" # כתמתם בהיר עם קצת יותר אטימות
+
+    st.markdown(f"""
     <style>
-        .album1-row-bg {
-            background-color: rgba(220, 235, 255, 0.6) !important;
-        }
-        .album2-row-bg {
-            background-color: rgba(255, 240, 220, 0.6) !important;
-        }
-        .track-row-outer-container {
-            margin-bottom: 3px !important;
-            border-radius: 8px !important; /* Moved from inline to CSS */
-            overflow: hidden; /* To ensure border-radius applies to background */
-        }
-        .track-row-main {
-            border: 1px solid #e0e0e0 !important;
-            border-radius: 8px !important;
-            padding: 6px 10px !important; /* Adjusted padding */
-            font-size: 0.88rem !important; /* Slightly smaller font */
+        .track-cell-common {{ /* סגנונות משותפים לכל התאים */
+            border: 1px solid #d0d0d0 !important; /* גבול מעט כהה יותר */
+            border-radius: 6px !important;
+            padding: 6px 8px !important; /* ריווח פנימי אחיד */
+            font-size: 0.88rem !important;
             display: flex !important;
             align-items: center !important;
-            height: 100% !important;
-            overflow: hidden; /* To prevent content overflow */
-            text-overflow: ellipsis; /* Add ellipsis for overflowed text */
-            white-space: nowrap; /* Keep text on one line */
-        }
-        .track-row-main strong {
-            color: var(--text-color);
-        }
-        .filename-tooltip {
+            height: 42px !important; /* גובה קבוע לתא, נסה להתאים לפי הצורך */
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }}
+        /* אין צורך במחלקות צבע רקע נפרדות אם נשתמש בסגנון inline מחושב */
+
+        .filename-tooltip {{
             position: relative;
-            display: inline-block;
+            display: inline-block; /* או block אם רוצים שיתפוס את כל רוחב התא */
             cursor: default;
-        }
-        .filename-tooltip .tooltiptext {
+            width: 100%; /* כדי שה-tooltip יתייחס לרוחב התא */
+        }}
+        .filename-tooltip .tooltiptext {{
             visibility: hidden;
             width: auto;
             min-width: 150px;
-            max-width: 350px; /* Increased max-width for tooltip */
-            background-color: #222; /* Darker tooltip */
+            max-width: 350px;
+            background-color: #282828;
             color: #fff;
             text-align: left;
             border-radius: 6px;
-            padding: 5px 8px;
+            padding: 6px 10px;
             position: absolute;
-            z-index: 100 !important; /* Ensure tooltip is on top */
+            z-index: 100 !important;
             bottom: 125%;
             left: 50%;
             transform: translateX(-50%);
             opacity: 0;
             transition: opacity 0.2s;
-            white-space: normal; /* Allow tooltip text to wrap */
-            word-wrap: break-word; /* Break long words */
-        }
-        .filename-tooltip:hover .tooltiptext {
+            white-space: normal; 
+            word-wrap: break-word; 
+        }}
+        .filename-tooltip:hover .tooltiptext {{
             visibility: visible;
             opacity: 0.98;
-        }
-        .track-details-expanded-content {
+        }}
+        .track-details-expanded-content {{ 
+            /* הרקע יוחל ישירות ב-HTML עם משתנה הצבע */
             margin-left: 15px !important;
-            padding: 10px !important;
-            border: 1px dashed #ccc !important;
+            padding: 12px !important;
+            border: 1px dashed #b0b0b0 !important;
             border-radius: 5px !important;
-            margin-top: 0px !important;
+            margin-top: 1px !important; /* רווח מינימלי מהשורה */
             margin-bottom: 8px !important;
             font-size: 0.85rem !important;
-        }
-        .track-details-expanded-content p {
-            margin-bottom: 0.2rem !important;
-        }
-        .track-details-expanded-content h6 {
-            margin-top: 0 !important;
-            margin-bottom: 0.5rem !important;
-            font-size: 0.9rem !important;
-            font-weight: bold !important;
-        }
-        div[data-testid="stToggle"] label {
-            font-size: 0.85rem !important;
-        }
-        div[data-testid="stToggle"] {
-            padding: 0 !important;
-            margin: 0 !important;
+        }}
+        .track-details-expanded-content p {{ margin-bottom: 0.3rem !important; }}
+        .track-details-expanded-content h6 {{ margin-top: 0 !important; margin-bottom: 0.6rem !important; font-size: 0.9rem !important; font-weight: bold !important; }}
+        
+        /* עיצוב כפתור ה-Toggle שיהיה קטן יותר וממורכז בתא שלו */
+        div[data-testid="stToggle"] {{
+            width: 100%;
+            height: 100%;
             display: flex !important;
             justify-content: center !important;
             align-items: center !important;
-        }
+            padding: 0 !important; margin: 0 !important;
+        }}
+        div[data-testid="stToggle"] label {{ 
+             /* הסתרת הטקסט של ה-toggle אם לא רצוי */
+            display: none !important; 
+        }}
     </style>
     """, unsafe_allow_html=True)
 
-    # Updated column distribution: הגדלת "גודל" על חשבון "אלבום"
-    # סדר: מקור(1), #(0.5), שם קובץ(2.5), כותרת(2), אמן(1.5), אלבום(1.7), אורך(0.7), גודל(1.0), פרטים(0.8)
-    # סה"כ: 1 + 0.5 + 2.5 + 2 + 1.5 + 1.7 + 0.7 + 1.0 + 0.8 = 12.7 (נשאר 11.7, נרמול פנימי של streamlit)
     cols_header = st.columns([1, 0.5, 2.5, 2, 1.5, 1.7, 0.7, 1.0, 0.8])
-    cols_header[0].markdown("**מקור**")
-    cols_header[1].markdown("**#**")
-    cols_header[2].markdown("**שם קובץ (ללא סיומת)**")
-    cols_header[3].markdown("**כותרת**")
-    cols_header[4].markdown("**אמן**")
-    cols_header[5].markdown("**אלבום**")
-    cols_header[6].markdown("**אורך**")
-    cols_header[7].markdown("**גודל**")
-    cols_header[8].markdown("**פרטים**")
+    headers_text = ["מקור", "#", "שם קובץ (ללא סיומת)", "כותרת", "אמן", "אלבום", "אורך", "גודל", "פרטים"]
+    for col, text in zip(cols_header, headers_text):
+        col.markdown(f"**{text}**")
     st.markdown("<hr style='margin-top:0; margin-bottom:5px;'>", unsafe_allow_html=True)
 
     for item_idx, item in enumerate(combined_files):
         fi = item['file_info']
         source = item['source']
         folder_name_display = Path(item['folder_name']).name
-        
-        # שימוש במחלקות CSS לצבע רקע
-        row_bg_class = "album1-row-bg" if source == 1 else "album2-row-bg"
+        current_row_bg_color = color1_bg_value if source == 1 else color2_bg_value
 
         tags = fi.all_tags if fi.all_tags else {}
         track_num_display = get_tag_value(tags, ['tracknumber', 'track', 'tracknum'], '')
@@ -397,49 +376,56 @@ def display_combined_tracklist_details(f1_info: FolderInfo, f2_info: FolderInfo)
             duration_str = f"{minutes:02d}:{seconds:02d}"
 
         size_str = f"{fi.size_mb:.2f} MB" if fi.size_mb is not None else "N/A"
-
-        # הצגת שם הקובץ ללא סיומת
         filename_stem = Path(fi.filename).stem
-        max_len_filename_stem = 20 # אורך מקסימלי לשם קובץ (ללא סיומת)
-        max_len_title_artist_album = 16 # אורך מקסימלי לשאר השדות
+        
+        max_len_filename_stem = 20 
+        max_len_title_artist_album = 16
 
         filename_stem_display = (filename_stem[:max_len_filename_stem] + '…') if len(filename_stem) > max_len_filename_stem else filename_stem
-        
         title_display = (fi.title[:max_len_title_artist_album] + '…') if fi.title and len(fi.title) > max_len_title_artist_album else (fi.title or "N/A")
         artist_display = (fi.artist[:max_len_title_artist_album] + '…') if fi.artist and len(fi.artist) > max_len_title_artist_album else (fi.artist or "N/A")
         album_display = (fi.album[:max_len_title_artist_album] + '…') if fi.album and len(fi.album) > max_len_title_artist_album else (fi.album or "N/A")
+        
+        # יצירת השורה עם העמודות
+        row_cols = st.columns([1, 0.5, 2.5, 2, 1.5, 1.7, 0.7, 1.0, 0.8])
+        
+        # תוכן לכל תא, עטוף ב-div עם הסגנון הרצוי
+        contents_html = [
+            f"<span title='{item['folder_name']}'>{folder_name_display}</span>", # מקור
+            f"{track_num_display}", # #
+            f"<span class='filename-tooltip'>{filename_stem_display}<span class='tooltiptext'>{fi.filename}</span></span>", # שם קובץ
+            f"<span title='{fi.title or ''}'>{title_display}</span>", # כותרת
+            f"<span title='{fi.artist or ''}'>{artist_display}</span>", # אמן
+            f"<span title='{fi.album or ''}'>{album_display}</span>", # אלבום
+            f"{duration_str}", # אורך
+            f"{size_str}", # גודל
+        ]
 
-        # החלת המחלקה לצבע הרקע על ה-div החיצוני
-        st.markdown(f"<div class='track-row-outer-container {row_bg_class}'>", unsafe_allow_html=True)
+        for i, col_content_html in enumerate(contents_html):
+            # יישור מותאם לחלק מהעמודות
+            justify_style = "justify-content: center;" if i in [1, 6, 7] else "justify-content: flex-start;"
+            padding_style = "padding-left:5px; padding-right:5px;" if i == 0 else ""
+            
+            row_cols[i].markdown(
+                f"<div class='track-cell-common' style='background-color: {current_row_bg_color}; {justify_style} {padding_style}'>{col_content_html}</div>",
+                unsafe_allow_html=True
+            )
+        
+        # כפתור Toggle בעמודה האחרונה - לא עטוף ב-div כדי לא לקבל רקע
+        with row_cols[8]:
+             toggle_key = f"details_toggle_{f1_info.path.name}_{f2_info.path.name}_{item['original_idx']}_{source}_{item_idx}"
+             # עטיפת ה-toggle ב-div עם סגנון רקע זהה לשאר התאים, ועיצוב פנימי שלו
+             st.markdown(
+                 f"<div class='track-cell-common' style='background-color: {current_row_bg_color}; justify-content: center;'>", unsafe_allow_html=True)
+             show_details = st.toggle("", key=toggle_key, label_visibility="collapsed", help="הצג/הסתר פרטים נוספים עבור שיר זה")
+             st.markdown("</div>", unsafe_allow_html=True)
 
-        cols = st.columns([1, 0.5, 2.5, 2, 1.5, 1.7, 0.7, 1.0, 0.8])
-
-        with cols[0]:
-            st.markdown(f"<div class='track-row-main' style='padding-left:5px; padding-right:5px;'><span title='{item['folder_name']}'>{folder_name_display}</span></div>", unsafe_allow_html=True)
-        with cols[1]:
-            st.markdown(f"<div class='track-row-main' style='justify-content: center;'>{track_num_display}</div>", unsafe_allow_html=True)
-        with cols[2]: # שם קובץ (ללא סיומת)
-            st.markdown(f"<div class='track-row-main filename-tooltip'>{filename_stem_display}<span class='tooltiptext'>{fi.filename}</span></div>", unsafe_allow_html=True)
-        with cols[3]:
-            st.markdown(f"<div class='track-row-main'><span title='{fi.title or ''}'>{title_display}</span></div>", unsafe_allow_html=True)
-        with cols[4]:
-            st.markdown(f"<div class='track-row-main'><span title='{fi.artist or ''}'>{artist_display}</span></div>", unsafe_allow_html=True)
-        with cols[5]: 
-            st.markdown(f"<div class='track-row-main'><span title='{fi.album or ''}'>{album_display}</span></div>", unsafe_allow_html=True)
-        with cols[6]: 
-            st.markdown(f"<div class='track-row-main' style='justify-content: center;'>{duration_str}</div>", unsafe_allow_html=True)
-        with cols[7]: 
-            st.markdown(f"<div class='track-row-main' style='justify-content: center;'>{size_str}</div>", unsafe_allow_html=True)
-
-        toggle_key = f"details_toggle_{f1_info.path.name}_{f2_info.path.name}_{item['original_idx']}_{source}_{item_idx}"
-
-        show_details = cols[8].toggle("", key=toggle_key, label_visibility="collapsed", help="הצג/הסתר פרטים נוספים עבור שיר זה")
-
-        st.markdown("</div>", unsafe_allow_html=True) # סגירת track-row-outer-container
 
         if show_details:
-            # החלת המחלקה לצבע הרקע גם על התוכן המורחב
-            st.markdown(f"<div class='track-details-expanded-content {row_bg_class}'>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div class='track-details-expanded-content' style='background-color: {current_row_bg_color};'>", 
+                unsafe_allow_html=True
+            )
             st.markdown(f"<h6>פרטים נוספים עבור: {fi.filename} (מקור: {Path(item['folder_name']).name})</h6>", unsafe_allow_html=True)
             st.markdown(f"<p><strong>נתיב מלא:</strong> `{fi.filepath}`</p>", unsafe_allow_html=True)
             st.markdown(f"<p><strong>אלבום (מלא):</strong> {fi.album or 'N/A'}</p>", unsafe_allow_html=True)
@@ -454,6 +440,11 @@ def display_combined_tracklist_details(f1_info: FolderInfo, f2_info: FolderInfo)
             if st.checkbox("הצג את כל התגיות (JSON)", key=all_tags_key, value=False):
                 st.json(fi.all_tags)
             st.markdown(f"</div>", unsafe_allow_html=True)
+        else:
+            # הוספת div ריק קטן אם אין פרטים מורחבים, כדי לשמור על ריווח אחיד בין השורות
+            # או פשוט לא לעשות כלום אם ה-margin-bottom של השורה מספיק
+             pass
+
 
     st.markdown("---")
 
