@@ -242,9 +242,9 @@ def display_folder_tracklist_details(folder_info: FolderInfo, container):
             return
 
         for idx, file_info in enumerate(folder_info.files):
-            # Removed track_expander_key as it's not used for an expander anymore
-            
-            col1, col2, col3, col4, col5 = st.columns([3,3,3,2,1.5]) 
+
+
+            col1, col2, col3, col4, col5 = st.columns([3,3,3,2,1.5])
             col1.text(f"{file_info.filename}")
             col2.text(f"כותרת: {file_info.title or 'N/A'}")
             col3.text(f"אמן: {file_info.artist or 'N/A'}")
@@ -255,7 +255,7 @@ def display_folder_tracklist_details(folder_info: FolderInfo, container):
                 seconds = int(file_info.duration % 60)
                 duration_str = f"{minutes:02d}:{seconds:02d}"
             col4.text(f"אורך: {duration_str}")
-            
+
             show_tags_key = f"show_tags_{folder_info.path.name}_{idx}_{file_info.filename}"
             if col5.checkbox("הצג תגיות", key=show_tags_key, value=False):
                 # Display tags directly without an inner expander
@@ -386,11 +386,11 @@ def render_results_step():
         if pair_key_tuple not in st.session_state.folders_to_delete_choices:
             score_display = result.final_combined_score if result.final_combined_score is not None else \
                             (result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score)
-            
+
             default_delete_choice_val = "skip"
-            
+
             user_del_threshold = getattr(st.session_state.run_args, "user_delete_threshold", proj_config.DEFAULT_MIN_SIMILARITY_FOR_DELETE)
-            
+
             if score_display >= user_del_threshold:
                 pref_root = getattr(st.session_state.run_args, "preferred_root", None)
                 f1_is_pref = pref_root and (str(f1_info.path).startswith(pref_root) or f1_info.path == Path(pref_root))
@@ -399,14 +399,14 @@ def render_results_step():
                 f2_q = f2_info.quality_score if f2_info.quality_score is not None else -1
 
                 if f1_is_pref and not f2_is_pref:
-                    if f2_q > -1: default_delete_choice_val = f"keep_{str(f1_info.path)}" 
+                    if f2_q > -1: default_delete_choice_val = f"keep_{str(f1_info.path)}"
                 elif f2_is_pref and not f1_is_pref:
-                    if f1_q > -1: default_delete_choice_val = f"keep_{str(f2_info.path)}" 
+                    if f1_q > -1: default_delete_choice_val = f"keep_{str(f2_info.path)}"
                 elif f1_q > f2_q:
-                    default_delete_choice_val = f"keep_{str(f1_info.path)}" 
+                    default_delete_choice_val = f"keep_{str(f1_info.path)}"
                 elif f2_q > f1_q:
-                    default_delete_choice_val = f"keep_{str(f2_info.path)}" 
-            
+                    default_delete_choice_val = f"keep_{str(f2_info.path)}"
+
             st.session_state.folders_to_delete_choices[pair_key_tuple] = default_delete_choice_val
 
     col_filter1, col_filter2 = st.columns(2)
@@ -473,7 +473,7 @@ def render_results_step():
     st.subheader("בחירת פעולות לזוגות תיקיות דומות:")
 
     # Adjusted column widths for new layout
-    header_cols = st.columns([2, 0.8, 0.3, 2, 0.8, 0.8, 2.5, 1.5]) 
+    header_cols = st.columns([2, 0.8, 0.3, 2, 0.8, 0.8, 2.5, 1.5])
     header_cols[0].markdown("**תיקייה 1**")
     header_cols[1].markdown("**איכות 1**")
     header_cols[2].markdown(" ") # VS
@@ -518,27 +518,28 @@ def render_results_step():
         # Selectbox for deletion choice directly in the row
         options = ["ללא שינוי", f"מחק את '{f1_info.path.name}'", f"מחק את '{f2_info.path.name}'"]
         current_choice_val = st.session_state.folders_to_delete_choices.get(pair_key_tuple, "skip")
-        current_idx = 0 
-        if current_choice_val == f"keep_{str(f2_info.path)}": 
+        current_idx = 0
+        if current_choice_val == f"keep_{str(f2_info.path)}": # Delete f1_info.path -> select option "מחק את f1"
             current_idx = 1
-        elif current_choice_val == f"keep_{str(f1_info.path)}": 
+        elif current_choice_val == f"keep_{str(f1_info.path)}": # Delete f2_info.path -> select option "מחק את f2"
             current_idx = 2
         
-        # Use the 7th column for the selectbox
-        choice_idx = row_cols[6].selectbox(
-            "בחר:", 
-            options, 
-            index=current_idx, 
+        # *** START OF FOCUSED FIX ***
+        selected_option_value = row_cols[6].selectbox(
+            "בחר:",
+            options,
+            index=current_idx,
             key=f"delete_select_{i}_{pair_key_tuple[0]}_{pair_key_tuple[1]}",
-            label_visibility="collapsed" # Hides the "בחר:" label to save space
+            label_visibility="collapsed"
         )
 
-        if choice_idx == 1: 
+        if selected_option_value == options[1]: # User selected "מחק את '{f1_info.path.name}'"
             st.session_state.folders_to_delete_choices[pair_key_tuple] = f"keep_{str(f2_info.path)}"
-        elif choice_idx == 2: 
+        elif selected_option_value == options[2]: # User selected "מחק את '{f2_info.path.name}'"
             st.session_state.folders_to_delete_choices[pair_key_tuple] = f"keep_{str(f1_info.path)}"
-        else: 
+        else: # User selected options[0] ("ללא שינוי") or it's the default
             st.session_state.folders_to_delete_choices[pair_key_tuple] = "skip"
+        # *** END OF FOCUSED FIX ***
 
         # Button for expander in the 8th column
         is_currently_expanded = st.session_state.active_expander_pair_key == pair_key_tuple
@@ -568,15 +569,15 @@ def render_results_step():
 
                     if st.checkbox("הצג ציוני דמיון מפורטים (JSON)", key=f"detail_scores_json_{i}_{pair_key_tuple[0]}_{pair_key_tuple[1]}"):
                         st.json(result.similarity_scores)
-                    
+
                     st.markdown("---")
                     col_exp_1, col_exp_2 = st.columns(2)
                     display_folder_tracklist_details(f1_info, col_exp_1)
                     display_folder_tracklist_details(f2_info, col_exp_2)
 
-                st.markdown("---") # Visual separator after the expanded content
+                st.markdown("---")
 
-        if not is_currently_expanded: # Add divider if not expanded to separate main rows
+        if not is_currently_expanded:
             st.divider()
 
 
@@ -599,7 +600,7 @@ def render_results_step():
 
     if hasattr(st.session_state, 'run_args') and st.session_state.run_args is not None:
         st.session_state.run_args.user_delete_threshold = del_thresh_input
-    else: 
+    else:
         st.session_state.run_args = Namespace(user_delete_threshold=del_thresh_input)
 
 
@@ -637,10 +638,10 @@ def render_actions_step():
 
     for pair_key_tuple, choice in st.session_state.folders_to_delete_choices.items():
         path1_str, path2_str = pair_key_tuple
-        if choice == f"keep_{path2_str}": 
+        if choice == f"keep_{path2_str}":
             folders_to_trash_paths.append(Path(path1_str))
             kept_folders_info.append(f"נשמר: '{Path(path2_str).name}', ימחק: '{Path(path1_str).name}'")
-        elif choice == f"keep_{path1_str}": 
+        elif choice == f"keep_{path1_str}":
             folders_to_trash_paths.append(Path(path2_str))
             kept_folders_info.append(f"נשמר: '{Path(path1_str).name}', ימחק: '{Path(path2_str).name}'")
 
@@ -655,7 +656,7 @@ def render_actions_step():
         if st.button(f"אשר העברת {len(folders_to_trash_paths)} תיקיות לסל המחזור", type="primary"):
             trashed_count = 0
             failed_count = 0
-            unique_folders_to_trash = list(set(folders_to_trash_paths)) # Ensure we don't try to trash the same folder twice if it was part of multiple "delete" decisions
+            unique_folders_to_trash = list(set(folders_to_trash_paths))
 
             for folder_path_to_trash in unique_folders_to_trash:
                 folder_info_to_trash = all_folders.get(folder_path_to_trash) # Not strictly needed for deletion but good for logging context if we add it
@@ -674,8 +675,8 @@ def render_actions_step():
                     failed_count += 1
                     st.error(f"שגיאה בהעברת תיקייה '{folder_path_to_trash}' לסל המחזור: {e}")
                     logger.error(f"Streamlit UI: Error trashing {folder_path_to_trash}: {e}", exc_info=True)
-            
-            # Update kept_folders_info to reflect only unique deletions if some were duplicated
+
+
             if len(unique_folders_to_trash) < len(folders_to_trash_paths):
                  st.info(f"הערה: חלק מהתיקיות למחיקה הופיעו במספר זוגות. כל תיקייה נמחקה פעם אחת בלבד. סה\"כ נמחקו {trashed_count} תיקיות ייחודיות.")
 
