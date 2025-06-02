@@ -242,9 +242,9 @@ def display_folder_tracklist_details(folder_info: FolderInfo, container):
             return
 
         for idx, file_info in enumerate(folder_info.files):
-            track_expander_key = f"track_expander_{folder_info.path.name}_{idx}_{file_info.filename}"
+            # Removed track_expander_key as it's not used for an expander anymore
             
-            col1, col2, col3, col4, col5 = st.columns([3,3,3,2,1.5]) # Adjusted for more info
+            col1, col2, col3, col4, col5 = st.columns([3,3,3,2,1.5]) 
             col1.text(f"{file_info.filename}")
             col2.text(f"כותרת: {file_info.title or 'N/A'}")
             col3.text(f"אמן: {file_info.artist or 'N/A'}")
@@ -256,11 +256,11 @@ def display_folder_tracklist_details(folder_info: FolderInfo, container):
                 duration_str = f"{minutes:02d}:{seconds:02d}"
             col4.text(f"אורך: {duration_str}")
             
-            # Checkbox for all_tags is now part of the main row
             show_tags_key = f"show_tags_{folder_info.path.name}_{idx}_{file_info.filename}"
-            if col5.checkbox("הצג תגיות", key=show_tags_key, value=False): # Default to false
-                # Show tags in an expander for that specific track
-                with st.expander(f"תגיות עבור: {file_info.filename}", expanded=False): # Keep expander collapsed by default
+            if col5.checkbox("הצג תגיות", key=show_tags_key, value=False):
+                # Display tags directly without an inner expander
+                with st.container(): # Use a container for slight visual separation if needed
+                    st.markdown(f"###### תגיות עבור: {file_info.filename}")
                     if file_info.all_tags:
                         st.json(file_info.all_tags)
                     else:
