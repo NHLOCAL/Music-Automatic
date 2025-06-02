@@ -2,10 +2,11 @@ import streamlit as st
 from pathlib import Path
 import logging
 import sys
+import re 
 from argparse import Namespace
 from typing import List, Dict, Tuple, Set, Optional, FrozenSet, Any
 from collections import defaultdict
-
+from itertools import chain 
 
 
 try:
@@ -231,41 +232,204 @@ def perform_core_analysis(args_ns: Namespace) -> Tuple[Optional[Dict[Path, Folde
     return all_scanned_folders, display_results_list
 
 
-def display_folder_tracklist_details(folder_info: FolderInfo, container):
-    with container:
-        st.markdown(f"##### פרטי תיקייה: {folder_info.path.name}")
-        st.caption(f"`{folder_info.path}`")
-        st.write(f"מספר כולל של קבצי מוזיקה: {len(folder_info.files)}")
+def get_tag_value(tags: Dict[str, Any], key_variants: List[str], default: Any = "N/A") -> Any:
+    for key in key_variants:
+        if key in tags and tags[key] is not None:
+            tag_value_str = str(tags[key]) 
+            if any(kw in key for kw in ['tracknumber', 'discnumber', 'track', 'diskno', 'tracknum']):
+                match = re.match(r"(\d+)", tag_value_str) 
+                if match:
+                    return match.group(1)
+            return tag_value_str 
+    return default
 
-        if not folder_info.files:
-            st.write("אין קבצי מוזיקה בתיקייה זו.")
-            return
+# *** START OF MODIFIED FUNCTION ***
+def display_combined_tracklist_details(f1_info: FolderInfo, f2_info: FolderInfo):
+    st.markdown(f"##### רשימת שירים משולבת להשוואה: {f1_info.path.name} vs {f2_info.path.name}")
 
-        for idx, file_info in enumerate(folder_info.files):
+    combined_files = []
+    for fi_idx, fi in enumerate(f1_info.files):
+        combined_files.append({'file_info': fi, 'source': 1, 'folder_name': f1_info.path.name, 'original_idx': fi_idx})
+    for fi_idx, fi in enumerate(f2_info.files):
+        combined_files.append({'file_info': fi, 'source': 2, 'folder_name': f2_info.path.name, 'original_idx': fi_idx})
 
+    def sort_key(item):
+        fi = item['file_info']
+        tags = fi.all_tags if fi.all_tags else {}
+        disc_num_str = get_tag_value(tags, ['discnumber', 'diskno'], '1')
+        track_num_str = get_tag_value(tags, ['tracknumber', 'track', 'tracknum'], '0')
+        
+        try:
+            disc_num = int(disc_num_str) 
+        except ValueError:
+            disc_num = 999 
+        try:
+            track_num = int(track_num_str)
+        except ValueError:
+            track_num = 9999 
 
-            col1, col2, col3, col4, col5 = st.columns([3,3,3,2,1.5])
-            col1.text(f"{file_info.filename}")
-            col2.text(f"כותרת: {file_info.title or 'N/A'}")
-            col3.text(f"אמן: {file_info.artist or 'N/A'}")
+        return (disc_num, track_num, utils.normalize_filename_for_sort(fi.filename))
 
-            duration_str = "N/A"
-            if file_info.duration:
-                minutes = int(file_info.duration // 60)
-                seconds = int(file_info.duration % 60)
-                duration_str = f"{minutes:02d}:{seconds:02d}"
-            col4.text(f"אורך: {duration_str}")
+    combined_files.sort(key=sort_key)
 
-            show_tags_key = f"show_tags_{folder_info.path.name}_{idx}_{file_info.filename}"
-            if col5.checkbox("הצג תגיות", key=show_tags_key, value=False):
-                # Display tags directly without an inner expander
-                with st.container(): # Use a container for slight visual separation if needed
-                    st.markdown(f"###### תגיות עבור: {file_info.filename}")
-                    if file_info.all_tags:
-                        st.json(file_info.all_tags)
-                    else:
-                        st.write("אין תגיות נוספות זמינות.")
-            st.divider()
+    if not combined_files:
+        st.write("לא נמצאו קבצי מוזיקה להשוואה.")
+        return
+
+    color1_bg = "rgba(220, 235, 255, 0.6)" 
+    color2_bg = "rgba(255, 240, 220, 0.6)"  
+    
+    st.markdown("""
+    <style>
+        .track-row-outer-container {
+            margin-bottom: 3px; /* Reduced space between rows */
+        }
+        .track-row-main {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 6px 12px; /* Adjusted padding */
+            font-size: 0.9rem;
+            display: flex; /* For column alignment if not using st.columns */
+            align-items: center; /* Vertical alignment */
+        }
+        .track-row-main strong {
+            color: var(--text-color);
+        }
+        .filename-tooltip {{ 
+            position: relative;
+            display: inline-block;
+            cursor: default; /* Indicate it's hoverable */
+        }}
+        .filename-tooltip .tooltiptext {{
+            visibility: hidden;
+            width: auto; /* Auto width based on content */
+            min-width: 150px;
+            max-width: 300px; /* Max width for long names */
+            background-color: #333; /* Darker tooltip background */
+            color: #fff;
+            text-align: left; /* Align text to left */
+            border-radius: 6px;
+            padding: 5px 8px;
+            position: absolute;
+            z-index: 10; /* Ensure tooltip is on top */
+            bottom: 125%; 
+            left: 50%;
+            transform: translateX(-50%); /* Center tooltip */
+            opacity: 0;
+            transition: opacity 0.2s;
+            white-space: nowrap; /* Keep tooltip text on one line if possible */
+        }}
+        .filename-tooltip:hover .tooltiptext {{
+            visibility: visible;
+            opacity: 0.95; /* Slightly transparent */
+        }}
+        .track-details-expanded-content {{
+            margin-left: 15px; 
+            padding: 10px; 
+            border: 1px dashed #ccc; 
+            border-radius: 5px; 
+            margin-top: 0px; /* Connect to the row above */
+            margin-bottom:8px; 
+            font-size: 0.85rem;
+        }}
+        .track-details-expanded-content p {{
+            margin-bottom: 0.2rem;
+        }}
+        .track-details-expanded-content h6 {{
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }}
+         /* Style for st.toggle */
+        div[data-testid="stToggle"] label {{
+            font-size: 0.85rem; /* Make the toggle label smaller or hide if not needed */
+        }}
+         div[data-testid="stToggle"] {{
+            padding: 0;
+            margin:0;
+            display: flex;
+            justify-content: center; /* Center the toggle switch */
+            align-items: center;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+    
+    cols_header = st.columns([1, 0.6, 3, 2.5, 2, 0.8, 0.8]) # Adjusted ratios
+    cols_header[0].markdown("**מקור**")
+    cols_header[1].markdown("**#**")
+    cols_header[2].markdown("**שם קובץ**")
+    cols_header[3].markdown("**כותרת**")
+    cols_header[4].markdown("**אמן**")
+    cols_header[5].markdown("**אורך**")
+    cols_header[6].markdown("**פרטים**") # Changed from "עוד"
+    st.markdown("<hr style='margin-top:0; margin-bottom:5px;'>", unsafe_allow_html=True)
+
+    for item_idx, item in enumerate(combined_files):
+        fi = item['file_info']
+        source = item['source']
+        folder_name_display = Path(item['folder_name']).name 
+        bg_color = color1_bg if source == 1 else color2_bg
+
+        tags = fi.all_tags if fi.all_tags else {}
+        track_num_display = get_tag_value(tags, ['tracknumber', 'track', 'tracknum'], '')
+        
+        duration_str = "N/A"
+        if fi.duration:
+            minutes = int(fi.duration // 60)
+            seconds = int(fi.duration % 60)
+            duration_str = f"{minutes:02d}:{seconds:02d}"
+        
+        max_len_filename = 28
+        max_len_title_artist = 23
+        filename_display = (fi.filename[:max_len_filename] + '…') if len(fi.filename) > max_len_filename else fi.filename
+        title_display = (fi.title[:max_len_title_artist] + '…') if fi.title and len(fi.title) > max_len_title_artist else (fi.title or "N/A")
+        artist_display = (fi.artist[:max_len_title_artist-5] + '…') if fi.artist and len(fi.artist) > (max_len_title_artist-5) else (fi.artist or "N/A")
+
+        st.markdown(f"<div class='track-row-outer-container' style='background-color: {bg_color}; border-radius: 8px;'>", unsafe_allow_html=True)
+        
+        cols = st.columns([1, 0.6, 3, 2.5, 2, 0.8, 0.8]) 
+        
+        with cols[0]:
+            st.markdown(f"<div class='track-row-main' style='padding-left:5px; padding-right:5px;'><span title='{item['folder_name']}'>{folder_name_display}</span></div>", unsafe_allow_html=True)
+        with cols[1]:
+            st.markdown(f"<div class='track-row-main' style='justify-content: center;'>{track_num_display}</div>", unsafe_allow_html=True)
+        with cols[2]:
+            st.markdown(f"<div class='track-row-main filename-tooltip'>{filename_display}<span class='tooltiptext'>{fi.filename}</span></div>", unsafe_allow_html=True)
+        with cols[3]:
+            st.markdown(f"<div class='track-row-main'><span title='{fi.title or ''}'>{title_display}</span></div>", unsafe_allow_html=True)
+        with cols[4]:
+            st.markdown(f"<div class='track-row-main'><span title='{fi.artist or ''}'>{artist_display}</span></div>", unsafe_allow_html=True)
+        with cols[5]:
+            st.markdown(f"<div class='track-row-main' style='justify-content: center;'>{duration_str}</div>", unsafe_allow_html=True)
+        
+        toggle_key = f"details_toggle_{f1_info.path.name}_{f2_info.path.name}_{item['original_idx']}_{source}_{item_idx}"
+        # The toggle itself will be placed in the column
+        show_details = cols[6].toggle("", key=toggle_key, label_visibility="collapsed", help="הצג/הסתר פרטים נוספים עבור שיר זה")
+        
+        st.markdown("</div>", unsafe_allow_html=True) # Close track-row-outer-container
+
+        if show_details:
+            # הפרטים הנוספים יוצגו כאן, מחוץ למבנה ה-columns של השורה הראשית, אך בתוך ה-container החיצוני של השורה
+            # ועם אותו צבע רקע
+            st.markdown(f"<div class='track-details-expanded-content' style='background-color: {bg_color};'>", unsafe_allow_html=True)
+            st.markdown(f"<h6>פרטים נוספים עבור: {fi.filename} (מקור: {Path(item['folder_name']).name})</h6>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>נתיב מלא:</strong> `{fi.filepath}`</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>אלבום:</strong> {fi.album or 'N/A'}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>אמן אלבום:</strong> {fi.albumartist or 'N/A'}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>דיסק:</strong> {get_tag_value(tags, ['discnumber', 'diskno'])}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>ביטרייט:</strong> {fi.bitrate or 'N/A'} kbps</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>גודל:</strong> {fi.size_mb:.2f} MB</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>ז'אנר:</strong> {get_tag_value(tags, ['genre'])}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>שנה:</strong> {get_tag_value(tags, ['date', 'originalyear', 'year', 'creationdate'])}</p>", unsafe_allow_html=True)
+            
+            all_tags_key = f"all_tags_cb_{toggle_key}"
+            if st.checkbox("הצג את כל התגיות (JSON)", key=all_tags_key, value=False):
+                st.json(fi.all_tags)
+            st.markdown(f"</div>", unsafe_allow_html=True)
+            
+    st.markdown("---")
+# *** END OF MODIFIED FUNCTION ***
 
 
 def render_config_step():
@@ -421,10 +585,9 @@ def render_results_step():
     st.subheader("הערכת איכות (מקובץ לפי דמיון)")
     graph: Dict[Path, Set[Path]] = defaultdict(set)
     nodes_in_graph: Set[Path] = set()
-    for result in filtered_results: # Use filtered_results for quality groups as well
+    for result in filtered_results: 
         current_score_q = result.final_combined_score if result.final_combined_score is not None else \
                         (result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score)
-        # The check for min_similarity_display is already done when creating filtered_results
         f1_path_q, f2_path_q = result.folder1_path, result.folder2_path
         graph[f1_path_q].add(f2_path_q)
         graph[f2_path_q].add(f1_path_q)
@@ -472,11 +635,10 @@ def render_results_step():
 
     st.subheader("בחירת פעולות לזוגות תיקיות דומות:")
 
-    # Adjusted column widths for new layout
     header_cols = st.columns([2, 0.8, 0.3, 2, 0.8, 0.8, 2.5, 1.5])
     header_cols[0].markdown("**תיקייה 1**")
     header_cols[1].markdown("**איכות 1**")
-    header_cols[2].markdown(" ") # VS
+    header_cols[2].markdown(" ") 
     header_cols[3].markdown("**תיקייה 2**")
     header_cols[4].markdown("**איכות 2**")
     header_cols[5].markdown("**דמיון**")
@@ -515,16 +677,14 @@ def render_results_step():
         if result.is_identical_by_hash:
             row_cols[5].caption("(זהים!)")
 
-        # Selectbox for deletion choice directly in the row
         options = ["ללא שינוי", f"מחק את '{f1_info.path.name}'", f"מחק את '{f2_info.path.name}'"]
         current_choice_val = st.session_state.folders_to_delete_choices.get(pair_key_tuple, "skip")
         current_idx = 0
-        if current_choice_val == f"keep_{str(f2_info.path)}": # Delete f1_info.path -> select option "מחק את f1"
+        if current_choice_val == f"keep_{str(f2_info.path)}": 
             current_idx = 1
-        elif current_choice_val == f"keep_{str(f1_info.path)}": # Delete f2_info.path -> select option "מחק את f2"
+        elif current_choice_val == f"keep_{str(f1_info.path)}": 
             current_idx = 2
         
-        # *** START OF FOCUSED FIX ***
         selected_option_value = row_cols[6].selectbox(
             "בחר:",
             options,
@@ -533,15 +693,13 @@ def render_results_step():
             label_visibility="collapsed"
         )
 
-        if selected_option_value == options[1]: # User selected "מחק את '{f1_info.path.name}'"
+        if selected_option_value == options[1]: 
             st.session_state.folders_to_delete_choices[pair_key_tuple] = f"keep_{str(f2_info.path)}"
-        elif selected_option_value == options[2]: # User selected "מחק את '{f2_info.path.name}'"
+        elif selected_option_value == options[2]: 
             st.session_state.folders_to_delete_choices[pair_key_tuple] = f"keep_{str(f1_info.path)}"
-        else: # User selected options[0] ("ללא שינוי") or it's the default
+        else: 
             st.session_state.folders_to_delete_choices[pair_key_tuple] = "skip"
-        # *** END OF FOCUSED FIX ***
 
-        # Button for expander in the 8th column
         is_currently_expanded = st.session_state.active_expander_pair_key == pair_key_tuple
         button_label = "סגור" if is_currently_expanded else "פתח פרטים"
         if row_cols[7].button(button_label, key=f"details_btn_{i}_{pair_key_tuple[0]}_{pair_key_tuple[1]}"):
@@ -552,13 +710,13 @@ def render_results_step():
             st.rerun()
 
         if is_currently_expanded:
-            with st.container(): # Use a full-width container for the expander content
-                st.markdown("---") # Visual separator for the expanded content
+            with st.container(): 
+                st.markdown("---") 
                 with st.expander(f"פרטי השוואה ורשימות שירים עבור: {f1_info.path.name} ו- {f2_info.path.name}", expanded=True):
                     st.markdown("**פרטי דמיון:**")
                     if result.ml_similarity_score is not None:
                         st.write(f"  - ציון דמיון ML: {result.ml_similarity_score:.4f}")
-                    if result.weighted_score is not None: # Always show algorithmic as it's the base for non-ML/Gemini
+                    if result.weighted_score is not None: 
                         st.write(f"  - ציון דמיון אלגוריתמי (גולמי): {result.weighted_score:.2f}%")
 
                     if result.gemini_verdict:
@@ -571,10 +729,7 @@ def render_results_step():
                         st.json(result.similarity_scores)
 
                     st.markdown("---")
-                    col_exp_1, col_exp_2 = st.columns(2)
-                    display_folder_tracklist_details(f1_info, col_exp_1)
-                    display_folder_tracklist_details(f2_info, col_exp_2)
-
+                    display_combined_tracklist_details(f1_info, f2_info) 
                 st.markdown("---")
 
         if not is_currently_expanded:
@@ -659,7 +814,7 @@ def render_actions_step():
             unique_folders_to_trash = list(set(folders_to_trash_paths))
 
             for folder_path_to_trash in unique_folders_to_trash:
-                folder_info_to_trash = all_folders.get(folder_path_to_trash) # Not strictly needed for deletion but good for logging context if we add it
+                folder_info_to_trash = all_folders.get(folder_path_to_trash) 
                 try:
                     if folder_path_to_trash.exists() and folder_path_to_trash.is_dir():
                         from send2trash import send2trash
