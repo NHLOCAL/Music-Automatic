@@ -1,0 +1,6 @@
+Performance Metrics for model: LightGBM
+Run Timestamp: 20250601_022535
+
+RMSE: 5.6353
+MAE: 2.1772
+R2_score: 0.9446
