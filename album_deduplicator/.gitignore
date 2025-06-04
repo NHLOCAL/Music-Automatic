@@ -1,2 +1,3 @@
 data/comparison_results_cache.json
 data/**
+repomix-output.*
