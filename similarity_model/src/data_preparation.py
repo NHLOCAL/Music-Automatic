@@ -9,25 +9,43 @@ from itertools import combinations
 from sklearn.model_selection import train_test_split
 import numpy as np
 import re
+import sys
 
-from music_dup_lib import config as app_config
-from music_dup_lib import utils
-from music_dup_lib.models import FolderInfo, FolderComparisonResult, FileInfo
-from music_dup_lib.core.data_store import DataStore
-from music_dup_lib.core.comparison_engine import ComparisonEngine
+# --- הגדרת נתיבים ---
+# נניח שקובץ זה נמצא ב: similarity_model/src/data_preparation.py
+# נתיב לשורש פרויקט similarity_model
+SIMILARITY_MODEL_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# נתיב לשורש הריפו (התיקייה שמכילה את similarity_model ו- album_deduplicator)
+REPO_ROOT = SIMILARITY_MODEL_PROJECT_ROOT.parent
+
+# הוספת נתיב הריפו הראשי ל-sys.path כדי לאפשר ייבוא מ-album_deduplicator
+# זה מאפשר למצוא את 'album_deduplicator' כחבילה ברמה העליונה
+sys.path.insert(0, str(REPO_ROOT))
+
+# --- ייבואים מ-album_deduplicator ---
+from album_deduplicator.music_dup_lib import config as app_config # זה ה-config של album_deduplicator
+from album_deduplicator.music_dup_lib import utils
+from album_deduplicator.music_dup_lib.models import FolderInfo, FolderComparisonResult, FileInfo
+from album_deduplicator.music_dup_lib.core.data_store import DataStore
+from album_deduplicator.music_dup_lib.core.comparison_engine import ComparisonEngine
 
 try:
-    from music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
+    from album_deduplicator.music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
     GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
     if not GEMINI_AVAILABLE:
+        # שים לב: GEMINI_API_KEY_ENV_VAR עדיין מגיע מ-app_config של album_deduplicator
         logging.warning(f"Gemini API Key ({app_config.GEMINI_API_KEY_ENV_VAR}) not found. Gemini labeling will be limited.")
 except ImportError:
-    logging.warning("Could not import GeminiAnalyzer. Gemini labeling disabled.")
+    logging.warning("Could not import GeminiAnalyzer from album_deduplicator.music_dup_lib.external. Gemini labeling disabled.")
     GeminiAnalyzer = None
     GEMINI_AVAILABLE = False
 
-TRAIN_DATASET_FILE = Path("similarity_model/data/album_pair_features_train.csv")
-TEST_DATASET_FILE = Path("similarity_model/data/album_pair_features_test.csv")
+# --- קבועים של פרויקט similarity_model ---
+DATA_DIR = SIMILARITY_MODEL_PROJECT_ROOT / "data"
+LOGS_DIR_SIM_MODEL = SIMILARITY_MODEL_PROJECT_ROOT / "logs" # לוגים ספציפיים ל-similarity_model
+
+TRAIN_DATASET_FILE = DATA_DIR / "album_pair_features_train.csv"
+TEST_DATASET_FILE = DATA_DIR / "album_pair_features_test.csv"
 TEST_SPLIT_RATIO = 0.2
 DATASET_RANDOM_STATE = 42
 
@@ -40,7 +58,7 @@ DEFINITE_DIFFERENT_LABEL = 2.0
 MAX_LOW_SIM_PAIRS_FROM_SAMPLING = 10000
 MAX_GEMINI_CANDIDATES_FROM_SAMPLING = 1000
 
-logger = logging.getLogger("DatasetBuilder")
+logger = logging.getLogger("SimilarityModel.DatasetBuilder") # שם לוגר ספציפי יותר
 
 def calculate_jaccard_index(set1: Set[str], set2: Set[str]) -> float:
     if not set1 and not set2: return 1.0
@@ -60,12 +78,11 @@ def _calculate_folder_stats(folder_info: FolderInfo) -> Dict[str, float]:
     stats: Dict[str, Optional[float]] = {
         "avg_duration": None, "std_duration": None, "min_duration": None, "max_duration": None, "total_duration": None,
         "std_bitrate": None, "min_bitrate": None, "max_bitrate": None,
-        "avg_other_file_size_bytes": None, "total_other_file_size_bytes": None, # New for other files
+        "avg_other_file_size_bytes": None, "total_other_file_size_bytes": None,
     }
     if not folder_info.files and not folder_info.other_files:
         return {k: 0.0 for k in stats.keys()}
 
-    # Music file stats
     if folder_info.files:
         durations = [f.duration for f in folder_info.files if f.duration is not None and f.duration > 0]
         bitrates = [f.bitrate for f in folder_info.files if f.bitrate is not None and f.bitrate > 0]
@@ -82,20 +99,17 @@ def _calculate_folder_stats(folder_info: FolderInfo) -> Dict[str, float]:
             stats["min_bitrate"] = float(np.min(bitrates))
             stats["max_bitrate"] = float(np.max(bitrates))
 
-    # Other file stats
     if folder_info.other_files:
         other_file_sizes = [f.get('size_bytes', 0) for f in folder_info.other_files if f.get('size_bytes', 0) > 0]
         if other_file_sizes:
             stats["avg_other_file_size_bytes"] = float(np.mean(other_file_sizes))
             stats["total_other_file_size_bytes"] = float(np.sum(other_file_sizes))
 
-
     final_stats: Dict[str, float] = {}
     for key in ["avg_duration", "std_duration", "min_duration", "max_duration", "total_duration",
                 "std_bitrate", "min_bitrate", "max_bitrate",
-                "avg_other_file_size_bytes", "total_other_file_size_bytes"]: # Added new keys
+                "avg_other_file_size_bytes", "total_other_file_size_bytes"]:
         final_stats[key] = stats.get(key, 0.0) if stats.get(key) is not None else 0.0
-
     return final_stats
 
 def extract_features_for_pair(
@@ -105,7 +119,6 @@ def extract_features_for_pair(
 ) -> Optional[Dict[str, any]]:
     features = {}
     if not folder1_info or not folder2_info: return None
-
 
     f1_avg_bitrate = folder1_info.avg_bitrate if folder1_info.avg_bitrate is not None else 0.0
     f2_avg_bitrate = folder2_info.avg_bitrate if folder2_info.avg_bitrate is not None else 0.0
@@ -128,19 +141,18 @@ def extract_features_for_pair(
     features['f2_generic_title_score'] = f2_gen_title_score
     features['diff_generic_title_score'] = abs(f1_gen_title_score - f2_gen_title_score)
 
-
     folder1_stats = _calculate_folder_stats(folder1_info)
     folder2_stats = _calculate_folder_stats(folder2_info)
 
     for stat_key in ["avg_duration", "std_duration", "min_duration", "max_duration", "total_duration",
                      "std_bitrate", "min_bitrate", "max_bitrate",
-                     "avg_other_file_size_bytes", "total_other_file_size_bytes"]: # Added other file stats keys
+                     "avg_other_file_size_bytes", "total_other_file_size_bytes"]:
         s1_val = folder1_stats[stat_key]
         s2_val = folder2_stats[stat_key]
         features[f'f1_{stat_key}'] = s1_val
         features[f'f2_{stat_key}'] = s2_val
         features[f'diff_{stat_key}'] = abs(s1_val - s2_val)
-        if stat_key == "total_duration": # Could add similar for total_other_file_size_bytes
+        if stat_key == "total_duration":
             if s1_val == 0 and s2_val == 0:
                 features['ratio_total_duration'] = 1.0
             else:
@@ -151,7 +163,6 @@ def extract_features_for_pair(
             else:
                 features['ratio_total_other_file_size_bytes'] = min(s1_val,s2_val) / max(1.0, s1_val, s2_val)
 
-
     f1_parent_name = folder1_info.parent_folder_name
     f2_parent_name = folder2_info.parent_folder_name
     features['f1_parent_folder_name_len'] = len(f1_parent_name) if f1_parent_name else 0
@@ -159,7 +170,6 @@ def extract_features_for_pair(
     features['diff_parent_folder_name_len'] = abs(features['f1_parent_folder_name_len'] - features['f2_parent_folder_name_len'])
     features['parent_folder_names_match'] = 1.0 if f1_parent_name and f1_parent_name == f2_parent_name else 0.0
     features['jaccard_parent_folder_names'] = calculate_word_jaccard_index(f1_parent_name, f2_parent_name)
-
 
     quality_related_fields = {
         'quality_score': (folder1_info.quality_score, folder2_info.quality_score),
@@ -175,7 +185,6 @@ def extract_features_for_pair(
         features[f'f2_{field}'] = v2
         features[f'diff_{field}'] = abs(v1 - v2)
 
-    # --- Features for "other files" (New Section) ---
     f1_other_files_details: List[Dict[str, Any]] = folder1_info.other_files
     f2_other_files_details: List[Dict[str, Any]] = folder2_info.other_files
 
@@ -193,7 +202,6 @@ def extract_features_for_pair(
 
     features['jaccard_other_file_names'] = calculate_jaccard_index(f1_other_files_names, f2_other_files_names)
 
-    # Compare hashes and sizes of common "other" files
     common_other_file_names = f1_other_files_names.intersection(f2_other_files_names)
     other_files_hash_match_count = 0
     other_files_size_similarity_sum = 0.0
@@ -205,19 +213,15 @@ def extract_features_for_pair(
             of2 = f2_other_map[name]
             if of1.get('hash') and of2.get('hash') and of1['hash'] == of2['hash']:
                 other_files_hash_match_count += 1
-
             s1, s2 = of1.get('size_bytes', 0), of2.get('size_bytes', 0)
             if s1 > 0 and s2 > 0:
                 ratio = min(s1, s2) / max(s1, s2)
-                other_files_size_similarity_sum += 1.0 if ratio >= 0.95 else ratio * ratio # Similar to music file size
-            elif s1 == 0 and s2 == 0: # both zero size
+                other_files_size_similarity_sum += 1.0 if ratio >= 0.95 else ratio * ratio
+            elif s1 == 0 and s2 == 0:
                 other_files_size_similarity_sum += 1.0
-            # If one is zero and other not, or one/both missing size, effectively 0 similarity for that file
-
     num_common_other_files = len(common_other_file_names)
     features['other_files_common_hash_ratio'] = other_files_hash_match_count / num_common_other_files if num_common_other_files > 0 else 0.0
     features['other_files_common_avg_size_similarity'] = other_files_size_similarity_sum / num_common_other_files if num_common_other_files > 0 else 0.0
-    # --- End Features for "other files" ---
 
     if comparison_result:
         sim_scores = comparison_result.similarity_scores
@@ -227,14 +231,11 @@ def extract_features_for_pair(
         ]
         for key in comp_feature_keys:
             features[f'comp_{key}_similarity'] = sim_scores.get(key, 0.0)
-
         features['comp_other_files_similarity'] = sim_scores.get('other_files_similarity', 0.0)
-
         add_meta_details = sim_scores.get('additional_metadata_details', {})
         if add_meta_details:
             features['comp_avg_add_meta_similarity'] = sum(add_meta_details.values()) / len(add_meta_details) if add_meta_details else 0.0
             features['comp_count_high_add_meta_similarity'] = sum(1 for v in add_meta_details.values() if v >= 0.8)
-
             for meta_key, meta_sim_score in add_meta_details.items():
                 safe_meta_key = re.sub(r'[^a-zA-Z0-9_]', '_', meta_key.lower())
                 features[f'comp_add_meta_sim_{safe_meta_key}'] = meta_sim_score
@@ -251,15 +252,13 @@ def extract_features_for_pair(
         ]
         for k_comp in comp_keys_to_zero:
             features[k_comp] = 0.0
-            
-        # Also zero out the new "other files" features if no comparison_result
         features['other_files_common_hash_ratio'] = 0.0
         features['other_files_common_avg_size_similarity'] = 0.0
-        # The f1/f2_num_other_files, diff, ratio, jaccard are calculated from FolderInfo directly, so they remain.
-
     return features
 
 def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
+    # This function uses the FileInfo model from album_deduplicator.music_dup_lib.models
+    # No changes needed here other than ensuring the import is correct.
     return FileInfo(
         filename=data.get("filename", "unknown.mp3"), filepath=Path(data.get("filepath", "unknown.mp3")),
         extension=data.get("extension", ".mp3"), size_mb=float(data.get("size_mb", 0.0)),
@@ -274,12 +273,14 @@ def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
     )
 
 def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> FolderInfo:
+    # This function uses the FolderInfo model from album_deduplicator.music_dup_lib.models
+    # No changes needed here other than ensuring the import is correct.
     return FolderInfo(
         path=Path(path_str),
         folder_name=folder_dict.get('folder_name', Path(path_str).name),
         parent_folder_name=folder_dict.get('parent_folder_name', Path(path_str).parent.name),
         files=[_file_info_from_dict(f_dict) for f_dict in folder_dict.get('files',[])],
-        other_files=folder_dict.get('other_files', []), # Ensure this is loaded
+        other_files=folder_dict.get('other_files', []),
         album_art_hash=folder_dict.get('album_art_hash'),
         file_hashes_present=folder_dict.get('file_hashes_present', False),
         avg_bitrate=folder_dict.get('avg_bitrate', 0.0),
@@ -296,16 +297,29 @@ def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> Folder
     )
 
 def build_dataset(args):
-    utils.setup_logging(args.log_level, app_config.LOGS_DIR / "dataset_builder")
-    logger.info("Starting dataset construction for ML model.")
+    # הגדרת לוגינג עבור סקריפט זה, יישמר בתיקיית הלוגים של similarity_model
+    LOGS_DIR_SIM_MODEL.mkdir(parents=True, exist_ok=True)
+    utils.setup_logging(args.log_level, LOGS_DIR_SIM_MODEL / "dataset_builder")
+    logger.info("Starting dataset construction for ML model (within similarity_model project).")
 
+    # DataStore עדיין ינסה לטעון ולשמור קבצים בהתאם ל-config של album_deduplicator.
+    # זה אומר שהוא יחפש music_data.json ו- comparison_results_cache.json
+    # בנתיב album_deduplicator/data/ כברירת מחדל. זה תקין כי אלו נתונים גולמיים של הסריקה.
     data_store = DataStore()
-    comparison_engine = ComparisonEngine(enable_hashing=app_config.ENABLE_HASHING)
+    
+    # ודא ש-app_config (מהספרייה החיצונית) מוגדר כראוי
+    if not hasattr(app_config, 'ENABLE_HASHING'):
+        logger.warning("app_config from album_deduplicator.music_dup_lib.config is missing ENABLE_HASHING. Defaulting to True for ComparisonEngine.")
+        enable_hashing_for_engine = True
+    else:
+        enable_hashing_for_engine = app_config.ENABLE_HASHING
+
+    comparison_engine = ComparisonEngine(enable_hashing=enable_hashing_for_engine)
     gemini_analyzer = None
     gemini_actually_available = GEMINI_AVAILABLE and not args.disable_gemini
     if gemini_actually_available:
         try:
-            gemini_analyzer = GeminiAnalyzer()
+            gemini_analyzer = GeminiAnalyzer() # ישתמש ב-config של album_deduplicator
             logger.info("Gemini Analyzer initialized.")
         except ValueError as e:
             logger.error(f"Failed to initialize Gemini Analyzer: {e}. Gemini labeling will be skipped.")
@@ -314,9 +328,11 @@ def build_dataset(args):
         logger.warning("Gemini analysis is disabled by flag or due to API key/module issues.")
 
     all_music_folders: Dict[Path, FolderInfo] = {}
+    # data_store.load_data() יטען מ- album_deduplicator/data/music_data.json
     cached_music_data = data_store.load_data()
     if not cached_music_data:
-        logger.error("Music data cache (music_data.json) is empty. Run main scanner first.")
+        logger.error(f"Music data cache (expected at {app_config.DATA_DIR / app_config.MUSIC_DATA_CACHE_FILE}) is empty. "
+                     "Run main scanner from album_deduplicator project first.")
         return
     for path_str, folder_data_dict in cached_music_data.items():
         try:
@@ -326,12 +342,19 @@ def build_dataset(args):
     logger.info(f"Loaded {len(all_music_folders)} FolderInfo objects.")
     if not all_music_folders: return
 
+    # data_store.load_comparison_results() יטען מ- album_deduplicator/data/comparison_results_cache.json
     existing_comparison_results_str_keys: Dict[FrozenSet[str], FolderComparisonResult] = data_store.load_comparison_results()
     logger.info(f"Loaded {len(existing_comparison_results_str_keys)} existing comparison results from cache.")
 
     dataset_rows: List[Dict[str, any]] = []
     processed_pairs: Set[FrozenSet[str]] = set()
     gemini_candidates_new: List[Tuple[FolderInfo, FolderInfo, FolderComparisonResult]] = []
+
+    # ודא שקיימים פרמטרי קונפיגורציה רלוונטיים ב-app_config
+    # אם הם לא קיימים, הגדר ערכי ברירת מחדל כדי שהקוד לא ייכשל
+    filter_pairs_by_file_count_ml = getattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML', True)
+    filter_pairs_by_file_count_ml_gemini = getattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI', True)
+    gemini_api_delay = getattr(app_config, 'GEMINI_API_DELAY_SECONDS', 1.0) # ברירת מחדל של שנייה אחת
 
     logger.info("Processing pairs from existing comparison cache...")
     for pair_key_str, comp_res in existing_comparison_results_str_keys.items():
@@ -345,7 +368,7 @@ def build_dataset(args):
         folder1 = all_music_folders[f1p]
         folder2 = all_music_folders[f2p]
 
-        if len(folder1.files) != len(folder2.files) and app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML:
+        if len(folder1.files) != len(folder2.files) and filter_pairs_by_file_count_ml:
             logger.debug(f"Skipping cached pair {f1p.name}-{f2p.name} due to different file counts "
                          f"({len(folder1.files)} vs {len(folder2.files)}) and "
                          f"FILTER_PAIRS_BY_FILE_COUNT_FOR_ML is True. Not adding to dataset.")
@@ -353,12 +376,9 @@ def build_dataset(args):
             continue
 
         processed_pairs.add(pair_key_str)
-
-        # MODIFIED: Use final_combined_score instead of weighted_score
         current_algorithmic_score = comp_res.final_combined_score if comp_res.final_combined_score is not None else comp_res.weighted_score
         if comp_res.final_combined_score is None:
              logger.warning(f"final_combined_score is None for cached pair {f1p.name}-{f2p.name}. Falling back to weighted_score ({comp_res.weighted_score}).")
-
 
         label = None
         label_source = "unknown"
@@ -406,7 +426,6 @@ def build_dataset(args):
 
         idx1, idx2 = random.sample(range(num_total_folders), 2)
         f1p_path_obj, f2p_path_obj = all_folder_paths_list[idx1], all_folder_paths_list[idx2]
-
         current_pair_key_str = frozenset({str(f1p_path_obj), str(f2p_path_obj)})
 
         if current_pair_key_str in processed_pairs:
@@ -416,7 +435,7 @@ def build_dataset(args):
         folder1 = all_music_folders[f1p_path_obj]
         folder2 = all_music_folders[f2p_path_obj]
 
-        if len(folder1.files) != len(folder2.files) and app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML:
+        if len(folder1.files) != len(folder2.files) and filter_pairs_by_file_count_ml:
             logger.debug(f"Skipping sampled pair {f1p_path_obj.name}-{f2p_path_obj.name} due to different file counts "
                          f"({len(folder1.files)} vs {len(folder2.files)}) and "
                          f"FILTER_PAIRS_BY_FILE_COUNT_FOR_ML is True. Not adding to dataset.")
@@ -432,11 +451,9 @@ def build_dataset(args):
                 label_source = "algo_no_comparison_result_sampled"
                 low_sim_pairs_count += 1
         else:
-            # MODIFIED: Use final_combined_score instead of weighted_score
             current_algorithmic_score = fresh_comp_res.final_combined_score if fresh_comp_res.final_combined_score is not None else fresh_comp_res.weighted_score
             if fresh_comp_res.final_combined_score is None:
                 logger.warning(f"final_combined_score is None for sampled pair {f1p_path_obj.name}-{f2p_path_obj.name}. Falling back to weighted_score ({fresh_comp_res.weighted_score}).")
-
 
             if current_algorithmic_score >= HIGH_CERTAINTY_THRESHOLD:
                 label = DEFINITE_DUPLICATE_LABEL
@@ -446,10 +463,10 @@ def build_dataset(args):
                     label = DEFINITE_DIFFERENT_LABEL
                     label_source = "algo_low_certainty_sampled"
                     low_sim_pairs_count += 1
-            else: 
+            else:
                 if gemini_actually_available and new_gemini_candidates_count < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
                     gemini_candidates_new.append((folder1, folder2, fresh_comp_res))
-                    existing_comparison_results_str_keys[current_pair_key_str] = fresh_comp_res # Store it for potential Gemini run
+                    existing_comparison_results_str_keys[current_pair_key_str] = fresh_comp_res
                     new_gemini_candidates_count += 1
                 else:
                     label_source = "gemini_range_no_gemini_available_sampled"
@@ -473,32 +490,30 @@ def build_dataset(args):
         logger.info(f"Running Gemini analysis on {len(gemini_candidates_new)} new candidate pairs...")
         gemini_api_calls = 0
         for f1_info, f2_info, comp_res_for_gemini in gemini_candidates_new:
-            if len(f1_info.files) != len(f2_info.files) and app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI:
+            if len(f1_info.files) != len(f2_info.files) and filter_pairs_by_file_count_ml_gemini:
                 logger.warning(f"Skipping Gemini for {f1_info.path.name} vs {f2_info.path.name} "
                                f"due to different file counts ({len(f1_info.files)} vs {len(f2_info.files)}) "
                                f"and FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI is True.")
                 continue
 
             f1p_path_obj, f2p_path_obj = f1_info.path, f2_info.path
-            # MODIFIED: Use final_combined_score for context to Gemini
             algo_score = comp_res_for_gemini.final_combined_score if comp_res_for_gemini.final_combined_score is not None else comp_res_for_gemini.weighted_score
             if comp_res_for_gemini.final_combined_score is None:
                  logger.warning(f"final_combined_score is None for Gemini candidate pair {f1p_path_obj.name}-{f2p_path_obj.name} when sending to Gemini. Falling back to weighted_score ({comp_res_for_gemini.weighted_score}).")
 
             logger.info(f"Gemini ({gemini_api_calls+1}/{len(gemini_candidates_new)}): {f1p_path_obj.name} vs {f2p_path_obj.name} (Algo Score (final_combined): {algo_score:.2f})")
 
-            time.sleep(app_config.GEMINI_API_DELAY_SECONDS)
+            time.sleep(gemini_api_delay) # שימוש במשתנה שהוגדר
             verdict, gemini_sim_score, reason_or_error = gemini_analyzer.analyze_pair(f1_info, f2_info, algo_score)
             gemini_api_calls += 1
 
             label = None
             label_source = "gemini_new_run_failed"
-
             current_pair_key_str_for_gemini = frozenset({str(f1p_path_obj), str(f2p_path_obj)})
             target_comp_res_obj = existing_comparison_results_str_keys.get(current_pair_key_str_for_gemini)
             if not target_comp_res_obj:
                 logger.error(f"Consistency issue: comp_res object not found in cache for Gemini pair {f1p_path_obj} - {f2p_path_obj}")
-                target_comp_res_obj = comp_res_for_gemini # Use the one we have, though it's odd
+                target_comp_res_obj = comp_res_for_gemini
 
             if gemini_sim_score is not None and ("ERROR" not in reason_or_error.upper() if reason_or_error else True and verdict is not None):
                 label = gemini_sim_score
@@ -514,7 +529,6 @@ def build_dataset(args):
                 target_comp_res_obj.gemini_verdict = None
                 target_comp_res_obj.gemini_similarity_score = None
                 target_comp_res_obj.gemini_reason = None
-
             existing_comparison_results_str_keys[current_pair_key_str_for_gemini] = target_comp_res_obj
 
             if label is not None:
@@ -531,14 +545,14 @@ def build_dataset(args):
     if not dataset_rows:
         logger.warning("No data rows were generated for the dataset. Exiting.")
         if args.update_comparison_cache and existing_comparison_results_str_keys:
-            logger.info(f"Updating comparison_results_cache.json with {len(existing_comparison_results_str_keys)} entries (even if dataset is empty)...")
-            data_store.save_comparison_results(existing_comparison_results_str_keys)
-            logger.info("Comparison cache updated.")
+            logger.info(f"Updating comparison_results_cache.json (at {app_config.DATA_DIR}) with {len(existing_comparison_results_str_keys)} entries...")
+            data_store.save_comparison_results(existing_comparison_results_str_keys) # ישמור ל-album_deduplicator/data
+            logger.info("Comparison cache (at album_deduplicator/data) updated.")
         return
 
     final_df = pd.DataFrame(dataset_rows)
     final_df.dropna(subset=['target_label'], inplace=True)
-    final_df.fillna(0.0, inplace=True) # Crucial: ensure all features have numeric values
+    final_df.fillna(0.0, inplace=True)
 
     logger.info(f"Total dataset rows before split: {final_df.shape[0]}, columns: {final_df.shape[1]}.")
     if final_df.shape[0] > 0:
@@ -547,10 +561,10 @@ def build_dataset(args):
         logger.info(f"Label source distribution (full dataset):\n{final_df['label_source'].value_counts(dropna=False)}")
 
     if final_df.shape[0] < 2:
-        logger.warning("Dataset has less than 2 rows. Cannot split into training and testing sets. Saving all to train file if any.")
+        logger.warning("Dataset has less than 2 rows. Cannot split. Saving all to train file if any.")
         if final_df.shape[0] == 1:
             try:
-                TRAIN_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True)
+                TRAIN_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True) # DATA_DIR של similarity_model
                 final_df.to_csv(TRAIN_DATASET_FILE, index=False, encoding='utf-8')
                 logger.info(f"Single row dataset saved to: {TRAIN_DATASET_FILE}")
             except Exception as e:
@@ -561,52 +575,45 @@ def build_dataset(args):
         logger.info(f"Splitting dataset into training ({1-TEST_SPLIT_RATIO:.0%}) and testing ({TEST_SPLIT_RATIO:.0%}).")
         try:
             train_df, test_df = train_test_split(
-                final_df,
-                test_size=TEST_SPLIT_RATIO,
-                random_state=DATASET_RANDOM_STATE,
-                shuffle=True
+                final_df, test_size=TEST_SPLIT_RATIO, random_state=DATASET_RANDOM_STATE, shuffle=True
             )
-        except ValueError as e: # Should not happen if target_label is present
+        except ValueError as e:
             logger.warning(f"Could not stratify during train-test split (Reason: {e}). Performing non-stratified split.")
             train_df, test_df = train_test_split(
-                final_df,
-                test_size=TEST_SPLIT_RATIO,
-                random_state=DATASET_RANDOM_STATE,
-                shuffle=True
+                final_df, test_size=TEST_SPLIT_RATIO, random_state=DATASET_RANDOM_STATE, shuffle=True
             )
-
         logger.info(f"Training set shape: {train_df.shape}")
         logger.info(f"Testing set shape: {test_df.shape}")
-
         try:
-            TRAIN_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True)
+            TRAIN_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True) # DATA_DIR של similarity_model
             train_df.to_csv(TRAIN_DATASET_FILE, index=False, encoding='utf-8')
             logger.info(f"Training dataset successfully saved to: {TRAIN_DATASET_FILE}")
 
-            TEST_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True)
+            TEST_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True) # DATA_DIR של similarity_model
             test_df.to_csv(TEST_DATASET_FILE, index=False, encoding='utf-8')
             logger.info(f"Testing dataset successfully saved to: {TEST_DATASET_FILE}")
         except Exception as e:
             logger.error(f"Error saving train/test datasets: {e}", exc_info=True)
 
     if args.update_comparison_cache and existing_comparison_results_str_keys:
-        logger.info(f"Updating comparison_results_cache.json with {len(existing_comparison_results_str_keys)} entries...")
-        data_store.save_comparison_results(existing_comparison_results_str_keys)
-        logger.info("Comparison cache updated.")
+        logger.info(f"Updating comparison_results_cache.json (at {app_config.DATA_DIR}) with {len(existing_comparison_results_str_keys)} entries...")
+        data_store.save_comparison_results(existing_comparison_results_str_keys) # ישמור ל-album_deduplicator/data
+        logger.info("Comparison cache (at album_deduplicator/data) updated.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build a training dataset for music duplicate detection ML model, using Gemini for labeling.")
     parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         default="INFO", help="Set the logging level.")
     parser.add_argument("-d", "--disable-gemini", action="store_true",
-                        help="Completely disable new Gemini API calls, even if API key is present. Will only use cached Gemini results if available.")
+                        help="Completely disable new Gemini API calls, even if API key is present.")
     parser.add_argument("-u", "--update-comparison-cache", action="store_true",
-                        help="Update the comparison_results_cache.json file with any new Gemini results or new comparisons made during dataset creation.")
+                        help="Update the comparison_results_cache.json file (in album_deduplicator/data) with new Gemini results or comparisons.")
     cli_args = parser.parse_args()
 
-    if not hasattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML'):
-        app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML = True
-    if not hasattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI'):
-        app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI = True
+    # אין צורך להוסיף את אלה ל-app_config כאן, הם נטענים מ-getattr למעלה
+    # if not hasattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML'):
+    #     app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML = True
+    # if not hasattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI'):
+    #     app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI = True
 
     build_dataset(cli_args)
