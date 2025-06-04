@@ -1,0 +1,5 @@
+rapidfuzz
+jibrish_to_hebrew
+joblib
+pandas
+numpy
