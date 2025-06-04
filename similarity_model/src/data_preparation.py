@@ -12,8 +12,8 @@ import re
 import sys
 
 # --- הגדרת נתיבים ---
-# נניח שקובץ זה נמצא ב: similarity_model/src/data_preparation.py
-# נתיב לשורש פרויקט similarity_model
+# נניח שקובץ זה נמצא ב: album_similarity_model/src/data_preparation.py
+# נתיב לשורש פרויקט album_similarity_model
 SIMILARITY_MODEL_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # נתיב לשורש הריפו (התיקייה שמכילה את similarity_model ו- album_deduplicator)
 REPO_ROOT = SIMILARITY_MODEL_PROJECT_ROOT.parent
@@ -23,24 +23,27 @@ REPO_ROOT = SIMILARITY_MODEL_PROJECT_ROOT.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 # --- ייבואים מ-album_deduplicator ---
-from album_deduplicator.music_dup_lib import config as app_config # זה ה-config של album_deduplicator
+# app_config יהיה album_deduplicator.music_dup_lib.config
+from album_deduplicator.music_dup_lib import config as app_config
 from album_deduplicator.music_dup_lib import utils
 from album_deduplicator.music_dup_lib.models import FolderInfo, FolderComparisonResult, FileInfo
 from album_deduplicator.music_dup_lib.core.data_store import DataStore
 from album_deduplicator.music_dup_lib.core.comparison_engine import ComparisonEngine
 
 try:
+    # GeminiAnalyzer ו- GEMINI_API_KEY מגיעים מהספרייה album_deduplicator
     from album_deduplicator.music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
     GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
     if not GEMINI_AVAILABLE:
-        # שים לב: GEMINI_API_KEY_ENV_VAR עדיין מגיע מ-app_config של album_deduplicator
+        # GEMINI_API_KEY_ENV_VAR עדיין מגיע מ-app_config של album_deduplicator
         logging.warning(f"Gemini API Key ({app_config.GEMINI_API_KEY_ENV_VAR}) not found. Gemini labeling will be limited.")
 except ImportError:
     logging.warning("Could not import GeminiAnalyzer from album_deduplicator.music_dup_lib.external. Gemini labeling disabled.")
-    GeminiAnalyzer = None
+    GeminiAnalyzer = None # type: ignore
     GEMINI_AVAILABLE = False
 
 # --- קבועים של פרויקט similarity_model ---
+# DATA_DIR זה הוא של פרויקט similarity_model, ישמש לשמירת קבצי ה-CSV של ה-dataset
 DATA_DIR = SIMILARITY_MODEL_PROJECT_ROOT / "data"
 LOGS_DIR_SIM_MODEL = SIMILARITY_MODEL_PROJECT_ROOT / "logs" # לוגים ספציפיים ל-similarity_model
 
@@ -233,7 +236,7 @@ def extract_features_for_pair(
             features[f'comp_{key}_similarity'] = sim_scores.get(key, 0.0)
         features['comp_other_files_similarity'] = sim_scores.get('other_files_similarity', 0.0)
         add_meta_details = sim_scores.get('additional_metadata_details', {})
-        if add_meta_details:
+        if add_meta_details and isinstance(add_meta_details, dict): # Ensure it's a dict
             features['comp_avg_add_meta_similarity'] = sum(add_meta_details.values()) / len(add_meta_details) if add_meta_details else 0.0
             features['comp_count_high_add_meta_similarity'] = sum(1 for v in add_meta_details.values() if v >= 0.8)
             for meta_key, meta_sim_score in add_meta_details.items():
@@ -242,7 +245,17 @@ def extract_features_for_pair(
         else:
             features['comp_avg_add_meta_similarity'] = 0.0
             features['comp_count_high_add_meta_similarity'] = 0.0
-    else:
+            # Ensure all expected additional metadata sim features are present, even if 0
+            expected_add_meta_sim_tags = [ # This should ideally come from a shared constant or ML model's metadata
+                'length', 'date', 'tracknumber', 'genre', 'media', 'composer', 'encodedby',
+                'discnumber', 'organization', 'grouping', 'bpm', 'copyright', 'barcode',
+                'conductor', 'website', 'version', 'compilation', 'titlesort', 'albumsort',
+                'lyricist', 'isrc', 'author', 'originaldate'
+            ]
+            for meta_tag in expected_add_meta_sim_tags:
+                features[f'comp_add_meta_sim_{meta_tag}'] = 0.0
+
+    else: # No comparison_result, so all comp_ features are 0
         comp_keys_to_zero = [
             'comp_file_hash_similarity', 'comp_file_size_similarity', 'comp_filename_similarity',
             'comp_title_similarity', 'comp_album_similarity', 'comp_artist_similarity',
@@ -250,15 +263,23 @@ def extract_features_for_pair(
             'comp_duration_similarity', 'comp_other_files_similarity',
             'comp_avg_add_meta_similarity', 'comp_count_high_add_meta_similarity'
         ]
+        expected_add_meta_sim_tags = [ # Re-list for safety if comp_result is None
+            'length', 'date', 'tracknumber', 'genre', 'media', 'composer', 'encodedby',
+            'discnumber', 'organization', 'grouping', 'bpm', 'copyright', 'barcode',
+            'conductor', 'website', 'version', 'compilation', 'titlesort', 'albumsort',
+            'lyricist', 'isrc', 'author', 'originaldate'
+        ]
+        for meta_tag in expected_add_meta_sim_tags:
+            comp_keys_to_zero.append(f'comp_add_meta_sim_{meta_tag}')
+
         for k_comp in comp_keys_to_zero:
             features[k_comp] = 0.0
+        # These might have been calculated above even if comp_result is None, but let's ensure they're reset if comp_result is the authoritative source for them
         features['other_files_common_hash_ratio'] = 0.0
         features['other_files_common_avg_size_similarity'] = 0.0
     return features
 
 def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
-    # This function uses the FileInfo model from album_deduplicator.music_dup_lib.models
-    # No changes needed here other than ensuring the import is correct.
     return FileInfo(
         filename=data.get("filename", "unknown.mp3"), filepath=Path(data.get("filepath", "unknown.mp3")),
         extension=data.get("extension", ".mp3"), size_mb=float(data.get("size_mb", 0.0)),
@@ -273,8 +294,6 @@ def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
     )
 
 def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> FolderInfo:
-    # This function uses the FolderInfo model from album_deduplicator.music_dup_lib.models
-    # No changes needed here other than ensuring the import is correct.
     return FolderInfo(
         path=Path(path_str),
         folder_name=folder_dict.get('folder_name', Path(path_str).name),
@@ -299,15 +318,13 @@ def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> Folder
 def build_dataset(args):
     # הגדרת לוגינג עבור סקריפט זה, יישמר בתיקיית הלוגים של similarity_model
     LOGS_DIR_SIM_MODEL.mkdir(parents=True, exist_ok=True)
-    utils.setup_logging(args.log_level, LOGS_DIR_SIM_MODEL / "dataset_builder")
+    utils.setup_logging(args.log_level, LOGS_DIR_SIM_MODEL / "dataset_builder.log") # Changed to .log
     logger.info("Starting dataset construction for ML model (within similarity_model project).")
 
-    # DataStore עדיין ינסה לטעון ולשמור קבצים בהתאם ל-config של album_deduplicator.
-    # זה אומר שהוא יחפש music_data.json ו- comparison_results_cache.json
-    # בנתיב album_deduplicator/data/ כברירת מחדל. זה תקין כי אלו נתונים גולמיים של הסריקה.
+    # DataStore (from album_deduplicator) will use album_deduplicator's config (app_config)
+    # to locate its data files (e.g., album_deduplicator/data/music_data.json).
     data_store = DataStore()
-    
-    # ודא ש-app_config (מהספרייה החיצונית) מוגדר כראוי
+
     if not hasattr(app_config, 'ENABLE_HASHING'):
         logger.warning("app_config from album_deduplicator.music_dup_lib.config is missing ENABLE_HASHING. Defaulting to True for ComparisonEngine.")
         enable_hashing_for_engine = True
@@ -319,19 +336,24 @@ def build_dataset(args):
     gemini_actually_available = GEMINI_AVAILABLE and not args.disable_gemini
     if gemini_actually_available:
         try:
-            gemini_analyzer = GeminiAnalyzer() # ישתמש ב-config של album_deduplicator
+            gemini_analyzer = GeminiAnalyzer() # Uses album_deduplicator's config internally
             logger.info("Gemini Analyzer initialized.")
-        except ValueError as e:
+        except ValueError as e: # GeminiAnalyzer raises ValueError if API key is missing
             logger.error(f"Failed to initialize Gemini Analyzer: {e}. Gemini labeling will be skipped.")
+            gemini_actually_available = False
+        except Exception as e: # Catch any other init errors
+            logger.error(f"Unexpected error initializing Gemini Analyzer: {e}. Gemini labeling will be skipped.", exc_info=True)
             gemini_actually_available = False
     else:
         logger.warning("Gemini analysis is disabled by flag or due to API key/module issues.")
 
     all_music_folders: Dict[Path, FolderInfo] = {}
-    # data_store.load_data() יטען מ- album_deduplicator/data/music_data.json
+    # data_store.load_data() will load from album_deduplicator/data/music_data.json
+    # This path is determined by app_config.DATA_DIR within DataStore's logic.
+    music_data_cache_path = app_config.DATA_DIR / app_config.MUSIC_DATA_CACHE_FILE
     cached_music_data = data_store.load_data()
     if not cached_music_data:
-        logger.error(f"Music data cache (expected at {app_config.DATA_DIR / app_config.MUSIC_DATA_CACHE_FILE}) is empty. "
+        logger.error(f"Music data cache (expected at {music_data_cache_path}) is empty. "
                      "Run main scanner from album_deduplicator project first.")
         return
     for path_str, folder_data_dict in cached_music_data.items():
@@ -342,7 +364,7 @@ def build_dataset(args):
     logger.info(f"Loaded {len(all_music_folders)} FolderInfo objects.")
     if not all_music_folders: return
 
-    # data_store.load_comparison_results() יטען מ- album_deduplicator/data/comparison_results_cache.json
+    # data_store.load_comparison_results() will load from album_deduplicator/data/comparison_results_cache.json
     existing_comparison_results_str_keys: Dict[FrozenSet[str], FolderComparisonResult] = data_store.load_comparison_results()
     logger.info(f"Loaded {len(existing_comparison_results_str_keys)} existing comparison results from cache.")
 
@@ -350,11 +372,9 @@ def build_dataset(args):
     processed_pairs: Set[FrozenSet[str]] = set()
     gemini_candidates_new: List[Tuple[FolderInfo, FolderInfo, FolderComparisonResult]] = []
 
-    # ודא שקיימים פרמטרי קונפיגורציה רלוונטיים ב-app_config
-    # אם הם לא קיימים, הגדר ערכי ברירת מחדל כדי שהקוד לא ייכשל
     filter_pairs_by_file_count_ml = getattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML', True)
     filter_pairs_by_file_count_ml_gemini = getattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI', True)
-    gemini_api_delay = getattr(app_config, 'GEMINI_API_DELAY_SECONDS', 1.0) # ברירת מחדל של שנייה אחת
+    gemini_api_delay = getattr(app_config, 'GEMINI_API_DELAY_SECONDS', 1.0)
 
     logger.info("Processing pairs from existing comparison cache...")
     for pair_key_str, comp_res in existing_comparison_results_str_keys.items():
@@ -466,6 +486,7 @@ def build_dataset(args):
             else:
                 if gemini_actually_available and new_gemini_candidates_count < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
                     gemini_candidates_new.append((folder1, folder2, fresh_comp_res))
+                    # Add to existing_comparison_results_str_keys so it can be updated by Gemini if needed
                     existing_comparison_results_str_keys[current_pair_key_str] = fresh_comp_res
                     new_gemini_candidates_count += 1
                 else:
@@ -503,17 +524,19 @@ def build_dataset(args):
 
             logger.info(f"Gemini ({gemini_api_calls+1}/{len(gemini_candidates_new)}): {f1p_path_obj.name} vs {f2p_path_obj.name} (Algo Score (final_combined): {algo_score:.2f})")
 
-            time.sleep(gemini_api_delay) # שימוש במשתנה שהוגדר
+            time.sleep(gemini_api_delay)
             verdict, gemini_sim_score, reason_or_error = gemini_analyzer.analyze_pair(f1_info, f2_info, algo_score)
             gemini_api_calls += 1
 
             label = None
             label_source = "gemini_new_run_failed"
             current_pair_key_str_for_gemini = frozenset({str(f1p_path_obj), str(f2p_path_obj)})
+            # Retrieve the canonical FolderComparisonResult object to update
             target_comp_res_obj = existing_comparison_results_str_keys.get(current_pair_key_str_for_gemini)
             if not target_comp_res_obj:
-                logger.error(f"Consistency issue: comp_res object not found in cache for Gemini pair {f1p_path_obj} - {f2p_path_obj}")
-                target_comp_res_obj = comp_res_for_gemini
+                # This case should ideally not happen if logic is correct (sampled pairs added to existing_comparison_results_str_keys)
+                logger.error(f"Consistency issue: comp_res object not found in cache for Gemini pair {f1p_path_obj} - {f2p_path_obj}. Using the one passed to Gemini call.")
+                target_comp_res_obj = comp_res_for_gemini # Fallback, but it might not be the one in the main cache
 
             if gemini_sim_score is not None and ("ERROR" not in reason_or_error.upper() if reason_or_error else True and verdict is not None):
                 label = gemini_sim_score
@@ -529,7 +552,9 @@ def build_dataset(args):
                 target_comp_res_obj.gemini_verdict = None
                 target_comp_res_obj.gemini_similarity_score = None
                 target_comp_res_obj.gemini_reason = None
+            # Ensure the potentially updated object is back in the main cache if it was retrieved and modified
             existing_comparison_results_str_keys[current_pair_key_str_for_gemini] = target_comp_res_obj
+
 
             if label is not None:
                 features = extract_features_for_pair(f1_info, f2_info, target_comp_res_obj)
@@ -545,14 +570,18 @@ def build_dataset(args):
     if not dataset_rows:
         logger.warning("No data rows were generated for the dataset. Exiting.")
         if args.update_comparison_cache and existing_comparison_results_str_keys:
-            logger.info(f"Updating comparison_results_cache.json (at {app_config.DATA_DIR}) with {len(existing_comparison_results_str_keys)} entries...")
-            data_store.save_comparison_results(existing_comparison_results_str_keys) # ישמור ל-album_deduplicator/data
-            logger.info("Comparison cache (at album_deduplicator/data) updated.")
+            comparison_cache_path = app_config.DATA_DIR / app_config.COMPARISON_RESULTS_CACHE_FILE
+            logger.info(f"Updating comparison_results_cache.json (at {comparison_cache_path}) with {len(existing_comparison_results_str_keys)} entries...")
+            data_store.save_comparison_results(existing_comparison_results_str_keys)
+            logger.info(f"Comparison cache (at {comparison_cache_path}) updated.")
         return
 
     final_df = pd.DataFrame(dataset_rows)
-    final_df.dropna(subset=['target_label'], inplace=True)
+    final_df.dropna(subset=['target_label'], inplace=True) # Ensure target_label is not NaN
+    # Fill all other NaNs with 0.0 AFTER dropping rows with NaN target_label
+    # This is important because features can legitimately be 0.0
     final_df.fillna(0.0, inplace=True)
+
 
     logger.info(f"Total dataset rows before split: {final_df.shape[0]}, columns: {final_df.shape[1]}.")
     if final_df.shape[0] > 0:
@@ -560,11 +589,13 @@ def build_dataset(args):
         logger.info(f"Target label statistics (full dataset):\n{final_df['target_label'].describe(percentiles=[.02, .1, .25, .5, .75, .9, .98])}")
         logger.info(f"Label source distribution (full dataset):\n{final_df['label_source'].value_counts(dropna=False)}")
 
+    # Ensure DATA_DIR (for similarity_model) exists before saving
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
     if final_df.shape[0] < 2:
         logger.warning("Dataset has less than 2 rows. Cannot split. Saving all to train file if any.")
         if final_df.shape[0] == 1:
             try:
-                TRAIN_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True) # DATA_DIR של similarity_model
                 final_df.to_csv(TRAIN_DATASET_FILE, index=False, encoding='utf-8')
                 logger.info(f"Single row dataset saved to: {TRAIN_DATASET_FILE}")
             except Exception as e:
@@ -574,10 +605,18 @@ def build_dataset(args):
     else:
         logger.info(f"Splitting dataset into training ({1-TEST_SPLIT_RATIO:.0%}) and testing ({TEST_SPLIT_RATIO:.0%}).")
         try:
+            # Try to stratify if target_label has enough unique values for both splits
+            # This requires at least 2 samples per class if stratifying
+            # If target_label is continuous, stratification might not be directly applicable or sklearn might handle it
+            # For regression-like targets, simple shuffle split is common.
+            # If target_label is categorical-like (e.g., binned scores), stratification could be useful.
+            # Given the nature of similarity scores (0-100), direct stratification by raw score is not typical.
+            # If it were classes, stratify=final_df['target_label'] would be used.
+            # For now, using shuffle split. If stratification is needed, target would need to be binned.
             train_df, test_df = train_test_split(
                 final_df, test_size=TEST_SPLIT_RATIO, random_state=DATASET_RANDOM_STATE, shuffle=True
             )
-        except ValueError as e:
+        except ValueError as e: # This might occur if stratification fails due to too few samples in a class
             logger.warning(f"Could not stratify during train-test split (Reason: {e}). Performing non-stratified split.")
             train_df, test_df = train_test_split(
                 final_df, test_size=TEST_SPLIT_RATIO, random_state=DATASET_RANDOM_STATE, shuffle=True
@@ -585,20 +624,19 @@ def build_dataset(args):
         logger.info(f"Training set shape: {train_df.shape}")
         logger.info(f"Testing set shape: {test_df.shape}")
         try:
-            TRAIN_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True) # DATA_DIR של similarity_model
             train_df.to_csv(TRAIN_DATASET_FILE, index=False, encoding='utf-8')
             logger.info(f"Training dataset successfully saved to: {TRAIN_DATASET_FILE}")
 
-            TEST_DATASET_FILE.parent.mkdir(parents=True, exist_ok=True) # DATA_DIR של similarity_model
             test_df.to_csv(TEST_DATASET_FILE, index=False, encoding='utf-8')
             logger.info(f"Testing dataset successfully saved to: {TEST_DATASET_FILE}")
         except Exception as e:
             logger.error(f"Error saving train/test datasets: {e}", exc_info=True)
 
     if args.update_comparison_cache and existing_comparison_results_str_keys:
-        logger.info(f"Updating comparison_results_cache.json (at {app_config.DATA_DIR}) with {len(existing_comparison_results_str_keys)} entries...")
-        data_store.save_comparison_results(existing_comparison_results_str_keys) # ישמור ל-album_deduplicator/data
-        logger.info("Comparison cache (at album_deduplicator/data) updated.")
+        comparison_cache_path = app_config.DATA_DIR / app_config.COMPARISON_RESULTS_CACHE_FILE
+        logger.info(f"Updating comparison_results_cache.json (at {comparison_cache_path}) with {len(existing_comparison_results_str_keys)} entries...")
+        data_store.save_comparison_results(existing_comparison_results_str_keys)
+        logger.info(f"Comparison cache (at {comparison_cache_path}) updated.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build a training dataset for music duplicate detection ML model, using Gemini for labeling.")
@@ -609,11 +647,5 @@ if __name__ == "__main__":
     parser.add_argument("-u", "--update-comparison-cache", action="store_true",
                         help="Update the comparison_results_cache.json file (in album_deduplicator/data) with new Gemini results or comparisons.")
     cli_args = parser.parse_args()
-
-    # אין צורך להוסיף את אלה ל-app_config כאן, הם נטענים מ-getattr למעלה
-    # if not hasattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML'):
-    #     app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML = True
-    # if not hasattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI'):
-    #     app_config.FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI = True
 
     build_dataset(cli_args)

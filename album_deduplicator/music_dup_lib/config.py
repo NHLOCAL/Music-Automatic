@@ -1,44 +1,47 @@
-# album_deduplicator/music_dup_lib/config.py
 import logging
 from pathlib import Path
 
-# --- הגדרות נתיבים ---
-# PROJECT_ROOT_ALBUM_DEDUP מתייחס לתיקיית השורש של פרויקט album_deduplicator
-# מחושב יחסית למיקום קובץ זה (album_deduplicator/music_dup_lib/config.py)
-PROJECT_ROOT_ALBUM_DEDUP = Path(__file__).resolve().parent.parent
+# Path to the music_dup_lib directory itself
+# e.g., /path/to/repo/album_deduplicator/music_dup_lib/
+MUSIC_DUP_LIB_ROOT = Path(__file__).resolve().parent
 
-DATA_DIR = PROJECT_ROOT_ALBUM_DEDUP / "data"
-DATA_DIR.mkdir(exist_ok=True) # ודא שהתיקייה קיימת
+# Path to the root of the album_deduplicator project
+# e.g., /path/to/repo/album_deduplicator/
+ALBUM_DEDUP_PROJECT_ROOT = MUSIC_DUP_LIB_ROOT.parent
 
-LOGS_DIR = PROJECT_ROOT_ALBUM_DEDUP / "logs"
-LOGS_DIR.mkdir(exist_ok=True) # ודא שהתיקייה קיימת
+# DATA_DIR and LOGS_DIR are now relative to the album_deduplicator project root
+DATA_DIR = ALBUM_DEDUP_PROJECT_ROOT / "data"
+DATA_DIR.mkdir(exist_ok=True)
 
-# --- שמות קבצים (ללא נתיב DATA_DIR, הם ישולבו עם DATA_DIR בקוד שמשתמש בהם) ---
-# כאשר ניגשים לקבצים אלו, יש להשתמש ב: DATA_DIR / MUSIC_DATA_CACHE_FILE
-MUSIC_DATA_CACHE_FILE = "music_data.json"
-COMPARISON_RESULTS_CACHE_FILE = "comparison_results_cache.json"
-ARTIST_CSV_FILE = "singer-list.csv"
+LOGS_DIR = ALBUM_DEDUP_PROJECT_ROOT / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
 
-# הערה: ML_MODEL_FILE כאן כנראה מתייחס למודל ישן או לשימוש פנימי של album_deduplicator.
-# פרויקט similarity_model מנהל את המודלים שלו בנפרד.
-# אם אין בו שימוש, ניתן להסיר. אם יש, הקוד שמשתמש בו צריך לעשות DATA_DIR / ML_MODEL_FILE.
-ML_MODEL_FILE = "lgbm_regressor_model.joblib"
+# Filenames for cache files (will be combined with DATA_DIR by DataStore etc.)
+MUSIC_DATA_CACHE_FILENAME = "music_data.json"
+COMPARISON_RESULTS_CACHE_FILENAME = "comparison_results_cache.json"
 
-# --- הגדרות סריקה ועיבוד קבצים ---
+# Actual Path objects for direct use if needed, constructed with DATA_DIR
+MUSIC_DATA_CACHE_FILE = DATA_DIR / MUSIC_DATA_CACHE_FILENAME
+COMPARISON_RESULTS_CACHE_FILE = DATA_DIR / COMPARISON_RESULTS_CACHE_FILENAME
+
+ARTIST_CSV_FILENAME = "singer-list.csv"
+ARTIST_CSV_FILE = DATA_DIR / ARTIST_CSV_FILENAME # Full path
+
+ML_MODEL_FILENAME = "lgbm_regressor_model.joblib"
+ML_MODEL_FILE = DATA_DIR / ML_MODEL_FILENAME # Full path
+
 ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
 LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
 IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini',
                  'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg', 'cover.png', 'תמונה.jpg'}
 ALBUM_ART_FILES = {'cd cover.jpg', 'album cover.jpg', 'albumartsmall.jpg',
                    'cover.jpg', 'folder.jpg', 'cover.png', 'תמונה.jpg'}
-MIN_FILES_PER_FOLDER = 3
 
-# --- הגדרות Hashing ---
+MIN_FILES_PER_FOLDER = 3
 ENABLE_HASHING = True
 HASH_CHUNK_SIZE = 4096
 HASH_NUM_RANDOM_CHUNKS = 2
 
-# --- הגדרות השוואה ודמיון ---
 MINIMAL_DISPLAY_SIMILARITY = 40.0
 GENERIC_NAME_SIMILARITY_THRESHOLD = 0.7
 GENERIC_NAME_REDUCTION_FACTOR = 0.5
@@ -56,14 +59,12 @@ SIMILARITY_WEIGHTS = {
     'album_art_hash': 0.8,
     'duration': 1.0,
     'other_files_similarity': 0.15,
-    'additional_metadata_field_weight': 0.2
+    'additional_metadata_field_weight': 0.2 # Weight for each *individual* additional metadata field match
 }
 
-# משקולות לשילוב ציון אלגוריתמי עם ציון Gemini
 GEMINI_SCORE_WEIGHT = 0.7
-ALGORITHMIC_SCORE_WEIGHT = 0.3
+ALGORITHMIC_SCORE_WEIGHT = 0.3 # Can be algo or ML score, depending on what's used as primary
 
-# --- הגדרות איכות אלבום ---
 QUALITY_WEIGHTS = {
     'hebrew_metadata': 2.0,
     'metadata_completeness': 2.0,
@@ -72,34 +73,34 @@ QUALITY_WEIGHTS = {
     'non_repetitive_names': 1.0,
     'consistent_artist': 1.5,
     'consistent_album': 1.5,
-    'lossless_format': 2.0,
-    'has_lyrics': 1.0
+    'lossless_format': 2.0, # Score based on lossless_ratio
+    'has_lyrics': 1.0 # Score based on lyrics_ratio
 }
+HIGH_BITRATE_TARGET = 320  # kbps
+MID_BITRATE_TARGET = 128   # kbps
+BITRATE_SCORE_TOLERANCE = 192 # For 128kbps target, how far can it be to still get some score
 
-HIGH_BITRATE_TARGET = 320
-MID_BITRATE_TARGET = 128
-BITRATE_SCORE_TOLERANCE = 192 # Bitrate values above this (up to HIGH_BITRATE_TARGET) will get a linearly increasing score
-
-# --- הגדרות פעולות על קבצים ---
 MIN_SIMILARITY_FOR_MERGE = 80.0
 DEFAULT_MIN_SIMILARITY_FOR_DELETE = 85.0
 
-# --- הגדרות לוגינג ---
 DEFAULT_LOG_LEVEL = "INFO"
 LOG_FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
 
-# --- הגדרות ביצועים ---
-MAX_WORKERS = None  # None ישתמש ב- os.cpu_count()
+MAX_WORKERS = None # os.cpu_count() will be used by default if None
 LRU_CACHE_SIZE = 10000
-
-# --- הגדרות תיקון ג'יבריש ---
 JIBRISH_FIX_LANGUAGE = "heb"
 
 # --- הגדרות Gemini ---
 GEMINI_API_KEY_ENV_VAR = "GEMINI_API_KEY" # שם משתנה הסביבה
-# קובץ ההנחיות ל-Gemini, נמצא יחסית למיקום קובץ זה, בתיקיית 'external'
-GEMINI_SYSTEM_INST_FILE = Path(__file__).resolve().parent / "external" / "gemini_system_instruction.txt"
-GEMINI_MODEL_NAME = "gemini-1.5-flash-latest" # היה "gemini-1.5-flash-preview-05-20" לפני כן, שונה ל-latest.
-DEFAULT_GEMINI_SIMILARITY_RANGE = "40-90" # טווח ציונים אלגוריתמיים שיועבר ל-Gemini כברירת מחדל
-GEMINI_API_DELAY_SECONDS = 0.5 # השהייה בין קריאות ל-Gemini API (כדי למנוע rate limiting)
-GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE = 95.0 # סף דמיון גבוה ש-Gemini צריך להחזיר כדי שתיקייה תיחשב כנציגה טובה.
+# קובץ ההנחיות ל-Gemini, נמצא יחסית למיקום קובץ זה, בתיקיית 'external' של music_dup_lib
+GEMINI_SYSTEM_INST_FILE = MUSIC_DUP_LIB_ROOT / "external" / "gemini_system_instruction.txt"
+GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-05-20" # "gemini-2.5-flash-lite"
+DEFAULT_GEMINI_SIMILARITY_RANGE = "40-90" # Min-Max % for sending pairs to Gemini
+GEMINI_API_DELAY_SECONDS = 0.5 # Delay between API calls (seconds)
+GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE = 95.0
+
+# --- הגדרות עבור data_preparation.py (אם משתמשים ב-config זה כמקור) ---
+# These might be used if data_preparation.py imports this config and needs these values.
+# If data_preparation.py defines its own, these are just for reference or album_deduplicator's internal use.
+FILTER_PAIRS_BY_FILE_COUNT_FOR_ML = True # Filter pairs if music file counts differ, for ML dataset features
+FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI = True # Filter pairs for Gemini labeling if music file counts differ
