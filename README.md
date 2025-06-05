@@ -1,14 +1,55 @@
-# Music-Automatic
- Streamlined sorting and reorganization of music folders on the computer through advanced automation
+# Music-Automatic: אוטומציה לניהול ספריית המוזיקה שלך
 
-**Plans to carry out**:
-- Automatic conversion of corrupted metadata✅
-- Search and identify duplicate music folders and clean them
-- Removing duplicate songs with smart detection
-(in double singles - removal of the lower quality copy)
-- Adding a name by title and vice versa, with a priority check
-(names that contain the word "רצועה" instead of a song name for example)
-- Overview with recommendations for implementation
-- Search for video files that take up space
-- Search for files with a high bit rate, with an option to shrink
-- Converting files with an undefined name in English (for example: "track") to a corresponding name in Hebrew (such as: "רצועה")✅
+פרויקט זה נועד לספק כלים אוטומטיים לניהול, ארגון וניקוי של ספריות מוזיקה דיגיטליות גדולות. הוא מורכב ממספר מודולים, כל אחד עם התמחות ספציפית, הפועלים יחד כדי לשפר את חוויית ההאזנה שלך ולשמור על ספריית המוזיקה שלך מסודרת ויעילה.
+
+## 🌟 תכונות עיקריות (כללי)
+
+*   **ארגון קבצים ותיקיות:** כלים לתיקון שמות, מחיקת תיקיות ריקות ומיזוג תיקיות אמן.
+*   **זיהוי וטיפול בכפילויות:** מודול מתקדם לאיתור אלבומים כפולים או דומים מאוד, עם אפשרויות למיזוג מידע או מחיקה חכמה.
+*   **שיפור מטא-דאטה:** תיקון קידוד פגום (ג'יבריש), השלמת מידע חסר.
+*   **ניתוח איכות:** הערכת איכות אלבומים על בסיס פרמטרים מגוונים.
+*   **ממשקים גמישים:** אפשרות להפעלה דרך שורת הפקודה (CLI) או ממשק משתמש גרפי (Web UI).
+*   **שילוב למידת מכונה ו-AI:** שימוש במודל ML ייעודי וב-Gemini API לשיפור דיוק הזיהוי וההשוואה.
+
+## 📂 מבנה הפרויקט
+
+הפרויקט מחולק לשלוש ספריות עיקריות:
+
+1.  **`music_organizer/`**:
+    *   מכיל סקריפטים לביצוע פעולות תחזוקה בסיסיות על קבצי מוזיקה ותיקיות.
+    *   [למידע נוסף, קרא את ה-README של Music Organizer](./music_organizer/README.md)
+
+2.  **`album_deduplicator/`**:
+    *   המודול המרכזי לזיהוי, ניתוח וטיפול באלבומי מוזיקה כפולים או דומים. כולל CLI, Web UI (מבוסס Streamlit), ומנוע השוואה מתוחכם.
+    *   [למידע נוסף, קרא את ה-README של Album Deduplicator](./album_deduplicator/README.md)
+
+3.  **`similarity_model/`**:
+    *   מכיל את הקוד והנתונים הקשורים למודל למידת המכונה (LightGBM) המשמש לחיזוי דמיון בין אלבומים. כולל סקריפטים להכנת נתונים, אימון, הערכה ובדיקת המודל.
+    *   [למידע נוסף, קרא את ה-README של Similarity Model](./similarity_model/README.md)
+
+## 🚀 תוכניות לעתיד (מתוך `README.md` המקורי)
+
+*   ✅ המרה אוטומטית של מטאדאטה פגום
+*   חיפוש וזיהוי תיקיות מוזיקה כפולות וניקויין
+*   הסרת שירים כפולים עם זיהוי חכם (בסינגלים כפולים - הסרה של העותק הפחות איכותי)
+*   הוספת שם לפי כותרת ולהיפך, עם בדיקת עדיפות (שמות שמכילים את המילה "רצועה" במקום שם שיר למשל)
+*   סקירה כללית עם המלצות לביצוע
+*   חיפוש קבצי וידאו שתופסים מקום
+*   חיפוש קבצים בעלי קצב סיביות גבוה, עם אופציה לכיווץ
+*   ✅ המרת קבצים עם שם לא מוגדר באנגלית (למשל: "track") לשם מתאים בעברית (כגון: "רצועה")
+
+## ⚙️ התקנה כללית
+
+דרישות ספציפיות לכל מודול מפורטות בקובצי ה-README המתאימים. באופן כללי, תזדקק ל-Python (מומלץ 3.9 ומעלה) ולמנהל חבילות כמו `pip`.
+
+```bash
+# דוגמה כללית לשכפול הריפו
+git clone <repository_url>
+cd Music-Automatic
+```
+
+לאחר מכן, עקוב אחר הוראות ההתקנה בכל ספריית משנה.
+
+## 📄 רישיון
+
+פרויקט זה מופץ תחת רישיון MIT. ראה קובץ `LICENSE` לפרטים מלאים.
