@@ -1,0 +1,8 @@
+mutagen
+eyed3
+jibrish_to_hebrew
+streamlit
+rapidfuzz
+joblib
+pandas
+numpy
