@@ -44,7 +44,6 @@
 דרישות ספציפיות לכל מודול מפורטות בקובצי ה-README המתאימים. באופן כללי, תזדקק ל-Python (מומלץ 3.10 ומעלה) ולמנהל חבילות כמו `pip`.
 
 ```bash
-# דוגמה כללית לשכפול הריפו
 git clone https://github.com/NHLOCAL/Music-Automatic.git
 cd Music-Automatic
 ```
