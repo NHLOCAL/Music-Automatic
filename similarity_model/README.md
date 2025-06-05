@@ -26,7 +26,7 @@
 
 ## ⚙️ דרישות והתקנה
 
-1.  **Python:** מומלץ Python 3.9 ומעלה.
+1.  **Python:** מומלץ Python 3.10 ומעלה.
 2.  **ספריות Python:** התקן את הדרישות מקובץ `requirements.txt` שבספרייה זו:
     ```bash
     pip install -r requirements.txt
