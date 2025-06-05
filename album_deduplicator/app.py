@@ -1,521 +1,892 @@
-import gradio as gr
-import sys
-import os
-import logging
+import streamlit as st
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional, Generator, Set, Any
+import logging
+import sys
+import re 
+from argparse import Namespace
+from typing import List, Dict, Tuple, Set, Optional, FrozenSet, Any
 from collections import defaultdict
-import json
-import re
-
-
-script_dir = Path(__file__).parent
-lib_path = script_dir / 'music_dup_lib'
-sys.path.insert(0, str(script_dir.parent))
-sys.path.insert(0, str(script_dir))
+from itertools import chain 
 
 
 try:
-    from music_dup_lib import config, utils
-    from music_dup_lib.models import FolderInfo, FileInfo, FolderComparisonResult
+    from music_dup_lib import config as proj_config
+    from music_dup_lib import utils
+    from music_dup_lib.models import FolderInfo, FolderComparisonResult, FileInfo
     from music_dup_lib.core.data_store import DataStore
     from music_dup_lib.core.file_processor import FileProcessor
     from music_dup_lib.core.folder_scanner import FolderScanner
     from music_dup_lib.core.comparison_engine import ComparisonEngine
     from music_dup_lib.core.quality_analyzer import QualityAnalyzer
     from music_dup_lib.core.action_handler import ActionHandler
+    from music_dup_lib.external.ml_similarity_model import MLSimilarityModel
+
+
     try:
         from music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
-
-        from music_dup_lib.utils import _select_representatives # Assuming this is still in utils for app.py context
         GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
     except ImportError:
-        GeminiAnalyzer = None; GEMINI_AVAILABLE = False; GEMINI_API_KEY = None; _select_representatives = None
+        GeminiAnalyzer = None
+        GEMINI_AVAILABLE = False
+        GEMINI_API_KEY = None
+
 except ImportError as e:
-    print(f"Error importing music_dup_lib components: {e}\nSearch path: {sys.path}")
-    sys.exit(1)
-except AttributeError as ae:
-     print(f"Attribute error during import: {ae}. Check function locations (e.g., _select_representatives).")
-     sys.exit(1)
+    st.error(f"שגיאה בייבוא מודולים מהפרויקט: {e}\n"
+             f"ודא שהקובץ app.py נמצא בתיקיית השורש של הפרויקט ושהמודולים זמינים.")
+    st.stop()
 
 
-log_dir = Path("logs"); log_dir.mkdir(exist_ok=True)
-log_file = log_dir / "webui_app.log"
-if not logging.getLogger().hasHandlers():
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
-                        handlers=[logging.FileHandler(log_file, encoding='utf-8'), logging.StreamHandler()])
+
+if not logging.getLogger(__name__).handlers:
+    utils.setup_logging("INFO", proj_config.LOGS_DIR)
 logger = logging.getLogger(__name__)
-if hasattr(utils, 'setup_logging'): utils.setup_logging("INFO", config.LOGS_DIR)
-else: logger.warning("utils.setup_logging function not found.")
 
 
-def escape_markdown_chars(text: str) -> str:
-
-    if not isinstance(text, str): return str(text)
-    escape_chars = r"([\\`*_\[\]{}()#+-.!])"
-    return re.sub(escape_chars, r"\\\1", text)
-
-
-def _file_info_from_dict(data: Dict[str, Any]) -> FileInfo:
-    d = data.copy(); d['filepath'] = Path(d['filepath'])
-    d.setdefault('all_tags', {}); d.setdefault('metadata_complete', False)
-    d.setdefault('has_lyrics', False); d.setdefault('is_lossless', False)
-    return FileInfo(**d)
-def _folder_info_from_dict(data: Dict[str, Any]) -> FolderInfo:
-    d = data.copy(); d['path'] = Path(d['path'])
-    d['files'] = [_file_info_from_dict(fi) for fi in d.get("files", [])]
-    d['unique_artists'] = set(d.get("unique_artists", [])); d['unique_albums'] = set(d.get("unique_albums", []))
-    d.setdefault('album_art_hash', None); d.setdefault('file_hashes_present', False); d.setdefault('avg_bitrate', 0.0)
-    d.setdefault('generic_filename_score', 0.0); d.setdefault('generic_title_score', 0.0)
-    d.setdefault('hebrew_metadata_ratio', 0.0); d.setdefault('metadata_completeness_ratio', 0.0)
-    d.setdefault('lossless_ratio', 0.0); d.setdefault('lyrics_ratio', 0.0)
-    d.setdefault('quality_score', None); d.setdefault('quality_breakdown', {})
-    return FolderInfo(**d)
-def _comparison_result_from_dict(data: Dict[str, Any]) -> FolderComparisonResult:
-    d = data.copy(); d['folder1_path'] = Path(d['folder1_path']); d['folder2_path'] = Path(d['folder2_path'])
-    d.setdefault('similarity_scores', {}); d.setdefault('weighted_score', 0.0); d.setdefault('is_identical_by_hash', False)
-    d.setdefault('gemini_verdict', None); d.setdefault('gemini_confidence', None)
-    d.setdefault('gemini_reason', None); d.setdefault('gemini_error', None)
-    return FolderComparisonResult(**d)
+def init_session_state():
+    if "current_step" not in st.session_state:
+        st.session_state.current_step = "config"
+    if "all_scanned_folders" not in st.session_state:
+        st.session_state.all_scanned_folders = None
+    if "comparison_results" not in st.session_state:
+        st.session_state.comparison_results = None
+    if "action_handler" not in st.session_state:
+        st.session_state.action_handler = None
+    if "folders_to_delete_choices" not in st.session_state:
+        st.session_state.folders_to_delete_choices = {}
+    if "active_expander_pair_key" not in st.session_state:
+        st.session_state.active_expander_pair_key = None
+    if "run_args" not in st.session_state:
+        st.session_state.run_args = Namespace()
 
 
-def update_preferred_root_dropdown(folder_paths_str: str):
-    if not folder_paths_str or not folder_paths_str.strip():
-        return gr.update(choices=["אין תיקיות קלט"], value="אין תיקיות קלט", interactive=False)
-    
-    path_candidates = [p.strip() for p in folder_paths_str.replace(';', ',').split(',') if p.strip()]
-    valid_folder_paths = []
-    for path_str in path_candidates:
-        try:
-            p = Path(path_str)
-            if p.exists() and p.is_dir():
-                valid_folder_paths.append(str(p.resolve()))
-        except Exception:
-            pass # Ignore invalid paths for dropdown population
-    
-    choices = ["ללא העדפה"] + sorted(list(set(valid_folder_paths)))
-    if not valid_folder_paths:
-        return gr.update(choices=["אין תיקיות קלט תקינות"], value="אין תיקיות קלט תקינות", interactive=False)
-    
-    return gr.update(choices=choices, value="ללא העדפה", interactive=True)
 
+def perform_core_analysis(args_ns: Namespace) -> Tuple[Optional[Dict[Path, FolderInfo]], Optional[List[FolderComparisonResult]]]:
+    st.write("תהליך הניתוח מתחיל (זה עשוי לקחת זמן)...")
+    logger.info(f"Streamlit UI: Starting analysis with args: {vars(args_ns)}")
 
-def step1_submit(folder_paths_str: str, preferred_root_selection: str, force_rescan, disable_hash, bitrate_pref, enable_gemini, gemini_range, log_level):
-    logger.info("Step 1 submitted")
-    if not folder_paths_str or not folder_paths_str.strip(): raise gr.Error("חובה להזין לפחות נתיב תיקיית שורש אחת.")
-    path_candidates = [p.strip() for p in folder_paths_str.replace(';', ',').split(',') if p.strip()]
-    if not path_candidates: raise gr.Error("חובה להזין לפחות נתיב תיקיית שורש אחת.")
-
-    valid_folder_paths, invalid_paths = [], []
-    for path_str in path_candidates:
-        try:
-            p = Path(path_str)
-            if p.exists() and p.is_dir(): valid_folder_paths.append(str(p.resolve()))
-            elif not p.exists(): invalid_paths.append(f"'{path_str}' (לא קיים)")
-            else: invalid_paths.append(f"'{path_str}' (אינו תיקייה)")
-        except Exception as e: invalid_paths.append(f"'{path_str}' (נתיב לא תקין: {e})")
-
-    if invalid_paths:
-        error_msg = "הנתיבים הבאים אינם תקינים:\n" + "\n".join([f"- {inv}" for inv in invalid_paths])
-        if not valid_folder_paths: raise gr.Error(error_msg + "\nלא נמצאו נתיבי תיקיות תקינים.")
-        else: gr.Warning("התעלמו מחלק מהנתיבים שהוזנו כי אינם תקינים."); logger.warning(f"Invalid paths ignored: {invalid_paths}")
-    if not valid_folder_paths: raise gr.Error("לא נמצאו נתיבי תיקיות תקינים.")
-
-    final_preferred_root = None
-    if preferred_root_selection and preferred_root_selection != "ללא העדפה" and preferred_root_selection in valid_folder_paths:
-        final_preferred_root = preferred_root_selection
-        logger.info(f"Preferred root folder selected: {final_preferred_root}")
-    elif preferred_root_selection and preferred_root_selection != "ללא העדפה":
-        logger.warning(f"Selected preferred root '{preferred_root_selection}' is not among valid input folders or is invalid. No preference will be applied.")
-
-
-    logger.info(f"Valid folders: {valid_folder_paths}, Options: ForceRescan={force_rescan}, DisableHash={disable_hash}, Bitrate={bitrate_pref}, Gemini={enable_gemini}, Range={gemini_range}, LogLevel={log_level}, PreferredRoot={final_preferred_root}")
-    if hasattr(utils, 'setup_logging'): utils.setup_logging(log_level, config.LOGS_DIR); logger.info(f"Log level set: {log_level}")
-
-    run_config = {"folders": valid_folder_paths, "force_rescan": force_rescan, "disable_hash": disable_hash, "bitrate": bitrate_pref,
-                  "gemini_analysis": enable_gemini,
-                  "gemini_range": gemini_range, "log_level": log_level,
-                  "preferred_root": final_preferred_root}
-
-    return {step1_block: gr.update(visible=False), step2_block: gr.update(visible=True), step3_block: gr.update(visible=False),
-            step4_block: gr.update(visible=False), step5_block: gr.update(visible=False), step6_block: gr.update(visible=False),
-            status_textbox: gr.update(value="מתחיל ניתוח..."), run_config_state: run_config, analysis_results_state: None}
-
-def run_analysis_process(run_config: Optional[Dict]) -> Generator[Tuple[str, Optional[Dict]], None, None]:
-    if not run_config: yield ("שגיאה: חסרה קונפיגורציה.", {"error": "Missing config."}); return
-    logger.info("Starting analysis process via UI..."); yield ("מתחיל אתחול...", None)
-    try:
-        root_paths = [Path(p) for p in run_config['folders']]
-        data_store = DataStore(config.MUSIC_DATA_CACHE_FILE)
-        enable_hashing = not run_config['disable_hash']
-        file_processor = FileProcessor(enable_hashing=enable_hashing)
-        folder_scanner = FolderScanner(file_processor, data_store, force_rescan=run_config['force_rescan'])
-        comparison_engine = ComparisonEngine(enable_hashing=enable_hashing)
-        quality_analyzer = QualityAnalyzer(preferred_bitrate=run_config['bitrate'])
-        
-        # preferred_root for ActionHandler will be passed later if needed
-        # action_handler initialized in steps that use it
-
-        scan_desc = "סורק תיקיות..."; yield (scan_desc, None)
-        all_scanned_folders: Dict[Path, FolderInfo] = folder_scanner.scan_folders(root_paths)
-        if not all_scanned_folders: yield ("לא נמצאו תיקיות תקינות.", {"error": "No valid folders."}); return
-        num_folders = len(all_scanned_folders)
-
-        quality_desc = f"מחשב איכות ({num_folders} תיקיות)..."; yield (quality_desc, None)
-        for i, folder_info in enumerate(all_scanned_folders.values()):
-            quality_analyzer.calculate_quality(folder_info)
-            if (i + 1) % 10 == 0 or i == num_folders - 1: yield (f"חישוב איכות... ({i+1}/{num_folders})", None)
-        yield ("חישוב איכות הושלם.", None)
-
-        compare_desc = "משווה תיקיות..."; yield (compare_desc, None)
-        comparison_results: List[FolderComparisonResult] = comparison_engine.find_similar_folders(all_scanned_folders)
-        num_pairs = len([r for r in comparison_results if r.weighted_score >= config.MINIMAL_DISPLAY_SIMILARITY])
-        yield (f"השוואה הסתיימה ({num_pairs} זוגות מעל רף).", None)
-
-        if run_config.get('gemini_analysis', False) and _select_representatives is not None: # Check _select_representatives
-            gemini_desc = "מתחיל ניתוח Gemini..."; yield (gemini_desc, None)
+    if args_ns.clear_comparison_cache:
+        if proj_config.COMPARISON_RESULTS_CACHE_FILE.exists():
             try:
-                if GeminiAnalyzer:
-                    gemini_analyzer = GeminiAnalyzer()
-                    min_sim, max_sim = map(float, run_config['gemini_range'].split('-'))
-                    representative_map = _select_representatives(all_scanned_folders, comparison_results, config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE)
-                    pairs_to_analyze, skipped_rep, skipped_dup = [], 0, 0; processed_representative_pairs = set()
-                    candidate_results = [r for r in comparison_results if min_sim <= r.weighted_score <= max_sim and not r.is_identical_by_hash]
-                    for result in candidate_results:
-                         f1_p, f2_p = result.folder1_path, result.folder2_path
-                         if f1_p not in representative_map or f2_p not in representative_map: continue
-                         rep1, rep2 = representative_map[f1_p], representative_map[f2_p]
-                         if rep1 == rep2: skipped_rep += 1; continue
-                         canonical_rep_pair = tuple(sorted((str(rep1), str(rep2))))
-                         if canonical_rep_pair in processed_representative_pairs: skipped_dup += 1; continue
-                         pairs_to_analyze.append(result); processed_representative_pairs.add(canonical_rep_pair)
+                proj_config.COMPARISON_RESULTS_CACHE_FILE.unlink()
+                st.toast(f"Cleared comparison cache: {proj_config.COMPARISON_RESULTS_CACHE_FILE}")
+                logger.info(f"Streamlit UI: Cleared comparison cache: {proj_config.COMPARISON_RESULTS_CACHE_FILE}")
+            except Exception as e:
+                st.error(f"Error clearing comparison cache: {e}")
+                logger.error(f"Streamlit UI: Error clearing comparison cache: {e}")
 
-                    num_gemini_pairs = len(pairs_to_analyze)
-                    logger.info(f"Gemini will analyze {num_gemini_pairs} pairs (skipped {skipped_rep} same-rep, {skipped_dup} duplicate-rep).")
-                    yield(f"נמצאו {num_gemini_pairs} זוגות ל-Gemini...", None)
-                    pairs_to_analyze.sort(key=lambda x: x.weighted_score, reverse=True)
-                    import time
-                    for i, result in enumerate(pairs_to_analyze):
-                        f1, f2 = all_scanned_folders.get(result.folder1_path), all_scanned_folders.get(result.folder2_path)
-                        if not f1 or not f2: continue
-                        yield (f"Gemini: מעבד {i+1}/{num_gemini_pairs}...", None)
-                        verdict, conf, reason_or_error = gemini_analyzer.analyze_pair(f1, f2, result.weighted_score)
-                        is_error = reason_or_error and any(e in reason_or_error for e in ["API_ERROR", "PARSE_ERROR", "TIMEOUT", "UNEXPECTED"])
-                        is_invalid = verdict is None and not is_error
-                        if is_error or is_invalid: result.gemini_error = reason_or_error; result.gemini_verdict = None; result.gemini_confidence = None; result.gemini_reason = None
-                        else: result.gemini_verdict = verdict; result.gemini_confidence = conf; result.gemini_reason = reason_or_error; result.gemini_error = None
-                        time.sleep(config.GEMINI_API_DELAY_SECONDS)
-                yield ("ניתוח Gemini הושלם.", None)
-            except Exception as gemini_err: logger.error(f"Gemini failed: {gemini_err}", exc_info=True); yield (f"שגיאה ב-Gemini: {gemini_err}", None)
+    data_store = DataStore(
+        music_cache_file=proj_config.MUSIC_DATA_CACHE_FILE,
+        comparison_cache_file=proj_config.COMPARISON_RESULTS_CACHE_FILE
+    )
+    enable_hashing = not args_ns.disable_hash
+    file_processor = FileProcessor(enable_hashing=enable_hashing)
+    folder_scanner = FolderScanner(file_processor, data_store, force_rescan=args_ns.force_rescan)
+    comparison_engine = ComparisonEngine(enable_hashing=enable_hashing)
+    quality_analyzer = QualityAnalyzer(preferred_bitrate=args_ns.bitrate)
 
-        logger.info("Analysis process finished successfully.")
-        def folder_info_to_dict(fi: FolderInfo): d=fi.__dict__.copy(); d['path']=str(d['path']); d['files']=[file_info_to_dict(f) for f in d.get('files',[])]; d['unique_artists']=sorted(list(d.get('unique_artists',set()))); d['unique_albums']=sorted(list(d.get('unique_albums',set()))); return d
-        def file_info_to_dict(fi: FileInfo): d=fi.__dict__.copy(); d['filepath']=str(d['filepath']); d['all_tags']={k:str(v) if isinstance(v,Path) else v for k,v in d.get('all_tags',{}).items()}; return d
-        def comparison_to_dict(cr: FolderComparisonResult): d=cr.__dict__.copy(); d['folder1_path']=str(d['folder1_path']); d['folder2_path']=str(d['folder2_path']); d['similarity_scores']['additional_metadata_details'] = str(d['similarity_scores'].get('additional_metadata_details','')); return d
+    ml_similarity_model = None
+    if args_ns.ml_scoring:
+        ml_similarity_model = MLSimilarityModel()
+        if not ml_similarity_model.model_loaded:
+            st.warning("ML scoring requested but model failed to load. Proceeding without ML scoring.")
+            logger.warning("Streamlit UI: ML scoring requested but model failed to load.")
+
+    gemini_analyzer_instance = None
+    if args_ns.gemini_analysis and GEMINI_AVAILABLE and GeminiAnalyzer:
         try:
-            final_results = {"all_folders": {str(p): folder_info_to_dict(fi) for p, fi in all_scanned_folders.items()},
-                             "comparison_results": [comparison_to_dict(r) for r in comparison_results]}
-            yield ("ניתוח הושלם!", final_results)
-        except Exception as final_err: logger.error(f"Result prep failed: {final_err}", exc_info=True); yield (f"שגיאה בסיום: {final_err}", {"error": f"Final err: {final_err}"})
+            gemini_analyzer_instance = GeminiAnalyzer()
+        except ValueError as e:
+            st.error(f"Failed to initialize Gemini Analyzer: {e}. Check API Key.")
+            logger.error(f"Streamlit UI: Failed to initialize Gemini: {e}")
+            args_ns.gemini_analysis = False
+        except Exception as e:
+            st.error(f"Unexpected error initializing Gemini: {e}")
+            logger.error(f"Streamlit UI: Unexpected error initializing Gemini: {e}", exc_info=True)
+            args_ns.gemini_analysis = False
 
-    except Exception as e: logger.error(f"Analysis error: {e}", exc_info=True); yield (f"שגיאה קריטית: {e}", {"error": str(e)})
 
-def analysis_complete_update(results: Optional[Dict]):
-    if results and "error" not in results:
-        logger.info("Analysis complete, moving to step 3")
-        processed_pairs = format_comparison_results(results.get("comparison_results", []), results.get("all_folders", {}))
-        return {step2_block: gr.update(visible=False), step3_block: gr.update(visible=True),
-                step3_pairs_table: gr.update(value=processed_pairs), analysis_results_state: results}
-    else:
-        logger.error("Analysis failed or returned error.")
-        error_msg = results.get("error", "Unknown error") if results else "Unknown error"
-        return {status_textbox: gr.update(value=f"הניתוח נכשל: {error_msg}\nבדוק לוגים."), step3_block: gr.update(visible=False)}
+    with st.spinner("סורק תיקיות..."):
+        root_paths = [Path(p) for p in args_ns.folders]
+        all_scanned_folders: Dict[Path, FolderInfo] = folder_scanner.scan_folders(root_paths)
 
-def format_comparison_results(results_list: List[Dict], all_folders_dict: Dict[str, Dict]) -> List[Tuple]:
-    formatted = []
-    if not isinstance(results_list, list): logger.error(f"Invalid results_list: {type(results_list)}"); return []
-    if not isinstance(all_folders_dict, dict): logger.error(f"Invalid all_folders_dict: {type(all_folders_dict)}"); all_folders_dict = {}
-    for r in results_list:
-         if not isinstance(r, dict): continue
-         f1_path_str, f2_path_str = r.get("folder1_path", "N/A"), r.get("folder2_path", "N/A")
-         try: f1_path, f2_path = Path(f1_path_str if f1_path_str else "N/A"), Path(f2_path_str if f2_path_str else "N/A")
-         except Exception: f1_path, f2_path = Path(f"INVALID({f1_path_str})"), Path(f"INVALID({f2_path_str})")
-         score = r.get("weighted_score", 0.0)
-         f1_info, f2_info = all_folders_dict.get(f1_path_str), all_folders_dict.get(f2_path_str)
-         q1, q2 = (f1_info.get("quality_score") if isinstance(f1_info,dict) else None), (f2_info.get("quality_score") if isinstance(f2_info,dict) else None)
-         q1_str, q2_str = (f"{q1:.2f}%" if q1 is not None else "N/A"), (f"{q2:.2f}%" if q2 is not None else "N/A")
-         verdict, conf = r.get("gemini_verdict", "-"), r.get("gemini_confidence")
-         gemini_str = f"{verdict} ({conf:.1f}%)" if verdict and conf is not None else verdict if verdict else "-"
-         if r.get("gemini_error"): gemini_str = f"Error: {str(r['gemini_error'])[:30]}..."
-         formatted.append((f1_path.name, q1_str, f2_path.name, q2_str, f"{score:.2f}%", gemini_str))
-    try: formatted.sort(key=lambda x: float(str(x[4]).replace('%','')), reverse=True)
-    except Exception as sort_err: logger.error(f"Sort error: {sort_err}")
-    return formatted
+    if not all_scanned_folders:
+        st.warning("לא נמצאו תיקיות מוזיקה תקינות.")
+        return None, None
 
-def step3_next():
-    logger.info("Moving from step 3 to step 4"); return {step3_block: gr.update(visible=False), step4_block: gr.update(visible=True)}
+    st.toast(f"סריקת תיקיות הסתיימה. נמצאו {len(all_scanned_folders)} תיקיות לעיבוד.")
 
-def format_quality_results(analysis_results: Optional[Dict]) -> str:
-    if not analysis_results or not isinstance(analysis_results, dict) or \
-       'all_folders' not in analysis_results or 'comparison_results' not in analysis_results:
-        logger.warning("format_quality_results: missing/invalid analysis results."); return "שגיאה: נתוני ניתוח חסרים."
-    all_folders_dict, comparison_results_list = analysis_results.get('all_folders',{}), analysis_results.get('comparison_results',[])
-    if not isinstance(all_folders_dict,dict) or not all_folders_dict: return "אין נתוני תיקיות."
-    if not isinstance(comparison_results_list,list): logger.warning("comparison_results not list"); comparison_results_list=[]
+    cached_comparison_results_map: Dict[FrozenSet[str], FolderComparisonResult] = {}
+    if not (args_ns.force_rescan or args_ns.clear_comparison_cache):
+        cached_comparison_results_map = data_store.load_comparison_results()
 
-    logger.info(f"Formatting quality results for {len(all_folders_dict)} folders.")
-    try:
-        all_folders_info = {Path(p): _folder_info_from_dict(d) for p, d in all_folders_dict.items()}
-        comparison_results = [_comparison_result_from_dict(r) for r in comparison_results_list if isinstance(r,dict)]
-    except Exception as e: logger.error(f"Quality format obj reconstruct error: {e}", exc_info=True); return f"שגיאה בשחזור אובייקטים: {e}"
+    with st.spinner("משווה בין תיקיות..."):
+        comparison_results: List[FolderComparisonResult] = comparison_engine.find_similar_folders(all_scanned_folders)
 
-    markdown_output = "## סקירת איכות (מקובץ לפי דמיון)\n\n"
-    try:
-        graph: Dict[Path, Set[Path]] = defaultdict(set); nodes_in_graph: Set[Path] = set()
-        threshold = config.MINIMAL_DISPLAY_SIMILARITY
+    if args_ns.ml_scoring and ml_similarity_model and ml_similarity_model.model_loaded:
+        with st.spinner("מחשב ציוני דמיון עם מודל ML..."):
+            for result in comparison_results:
+                f1_info = all_scanned_folders.get(result.folder1_path)
+                f2_info = all_scanned_folders.get(result.folder2_path)
+                if f1_info and f2_info:
+                    ml_score = ml_similarity_model.predict_similarity_for_pair(f1_info, f2_info, result)
+                    if ml_score is not None:
+                        result.ml_similarity_score = ml_score
+
+    folders_for_quality_analysis: Set[Path] = set()
+    if comparison_results:
         for result in comparison_results:
-            if not hasattr(result,'folder1_path') or not hasattr(result,'folder2_path'): continue
-            f1_p, f2_p = result.folder1_path, result.folder2_path
-            if result.weighted_score >= threshold and f1_p in all_folders_info and f2_p in all_folders_info:
-                 graph[f1_p].add(f2_p); graph[f2_p].add(f1_p); nodes_in_graph.add(f1_p); nodes_in_graph.add(f2_p)
+            folders_for_quality_analysis.add(result.folder1_path)
+            folders_for_quality_analysis.add(result.folder2_path)
 
-        all_folder_paths = set(all_folders_info.keys()); single_paths = all_folder_paths - nodes_in_graph
-        processed_nodes: Set[Path] = set(); group_count = 0; groups_found = False
-        sorted_nodes = sorted(list(nodes_in_graph), key=str)
+    if folders_for_quality_analysis:
+        with st.spinner("מחשב ציוני איכות לתיקיות..."):
+            for folder_path in folders_for_quality_analysis:
+                if folder_info := all_scanned_folders.get(folder_path):
+                    quality_analyzer.calculate_quality(folder_info)
 
-        for start_node in sorted_nodes:
-            if start_node not in processed_nodes:
-                component_paths: Set[Path] = set(); stack = [start_node]; visited_in_comp: Set[Path] = set()
-                while stack:
-                    curr = stack.pop()
-                    if curr not in visited_in_comp and curr in nodes_in_graph and curr in all_folders_info:
-                        visited_in_comp.add(curr); processed_nodes.add(curr); component_paths.add(curr)
-                        neighbors = graph.get(curr, set()); valid_neighbors = {n for n in neighbors if n in all_folders_info}
-                        stack.extend(valid_neighbors - visited_in_comp)
-                if len(component_paths) > 1:
-                    groups_found = True; group_count += 1; markdown_output += f"### קבוצה {group_count}:\n"
-                    comp_folders = [all_folders_info[p] for p in component_paths if p in all_folders_info and all_folders_info[p].quality_score is not None]
-                    if not comp_folders: markdown_output += "*   (אין תיקיות עם איכות)\n\n"; continue
-                    comp_sorted = sorted(comp_folders, key=lambda f: f.quality_score, reverse=True)
-                    for i, folder in enumerate(comp_sorted):
-                        q, q_str = folder.quality_score, f"{folder.quality_score:.2f}%"
-                        clr = "green" if i==0 else "orange" if q>50 else "red"
-                        marker = "👑 **(הטובה ביותר)**" if i==0 else ""
+    if args_ns.gemini_analysis and gemini_analyzer_instance:
+        with st.spinner("מבצע ניתוח עם Gemini API..."):
+            try:
+                min_sim_str, max_sim_str = args_ns.gemini_range.split('-')
+                min_sim_g = float(min_sim_str)
+                max_sim_g = float(max_sim_str)
+            except ValueError:
+                st.error(f"Invalid Gemini range: {args_ns.gemini_range}. Skipping Gemini.")
+                args_ns.gemini_analysis = False
 
-                        safe_name = escape_markdown_chars(folder.path.name)
-                        markdown_output += f"*   {marker} <span style='color:{clr}; font-weight:bold;'>{q_str}</span> - '{safe_name}'\n"
-                        if folder.quality_breakdown:
-                             bd = ", ".join([f"{k}: {v:.1f}" for k, v in sorted(folder.quality_breakdown.items())])
-                             markdown_output += f"    *   <small>פירוט: [{bd}]</small>\n"
-                    markdown_output += "\n"
+            if args_ns.gemini_analysis:
+                pairs_for_gemini = [
+                    r for r in comparison_results
+                    if min_sim_g <= (r.ml_similarity_score if r.ml_similarity_score is not None else r.weighted_score) <= max_sim_g
+                    and not r.is_identical_by_hash
+                ]
+                st.write(f"שולח {len(pairs_for_gemini)} זוגות לניתוח Gemini...")
 
-        if not groups_found and not single_paths: markdown_output += "*לא נמצאו קבוצות/בודדים.*\n"
-        elif not groups_found: markdown_output += "*לא נמצאו קבוצות דמיון.*\n"
+                for i, result in enumerate(pairs_for_gemini):
+                    f1 = all_scanned_folders.get(result.folder1_path)
+                    f2 = all_scanned_folders.get(result.folder2_path)
+                    if not f1 or not f2: continue
 
-        if single_paths:
-            markdown_output += f"\n### תיקיות בודדות:\n"
-            singles = [all_folders_info[p] for p in single_paths if p in all_folders_info]
-            sorted_singles = sorted(singles, key=lambda f: (f.quality_score is not None, f.quality_score if f.quality_score is not None else -1), reverse=True)
-            if not sorted_singles: markdown_output += "*   (אין תיקיות בודדות)\n"
-            else:
-                 for folder in sorted_singles:
-                    q = folder.quality_score if folder.quality_score is not None else -1.0
-                    q_str = f"{q:.2f}%" if q>=0 else "N/A "
-                    clr = "green" if q>75 else "orange" if q>50 else "red" if q>=0 else "grey"
+                    cache_key_g = frozenset({str(result.folder1_path), str(result.folder2_path)})
+                    if cached_comparison_results_map and cache_key_g in cached_comparison_results_map:
+                        cached_res_g = cached_comparison_results_map[cache_key_g]
+                        if cached_res_g.gemini_verdict is not None and cached_res_g.gemini_error is None:
+                            result.gemini_verdict = cached_res_g.gemini_verdict
+                            result.gemini_similarity_score = cached_res_g.gemini_similarity_score
+                            result.gemini_reason = cached_res_g.gemini_reason
+                            result.gemini_error = None
+                            st.text(f"Gemini (cache): {f1.path.name} vs {f2.path.name} -> {result.gemini_verdict}")
+                            continue
 
-                    safe_name = escape_markdown_chars(folder.path.name)
-                    markdown_output += f"*   <span style='color:{clr};'>{q_str}</span> - '{safe_name}'\n"
-                    if folder.quality_breakdown:
-                        bd = ", ".join([f"{k}: {v:.1f}" for k, v in sorted(folder.quality_breakdown.items())])
-                        markdown_output += f"    *   <small>פירוט: [{bd}]</small>\n"
-    except Exception as format_err: logger.error(f"Quality format error: {format_err}", exc_info=True); markdown_output += f"\n**שגיאה בעיצוב:** {format_err}"
-    return markdown_output
+                    current_score_for_gemini = result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score
+                    st.text(f"Gemini ({i+1}/{len(pairs_for_gemini)}): {f1.path.name} vs {f2.path.name}")
+                    verdict, gemini_sim, reason_err = gemini_analyzer_instance.analyze_pair(f1, f2, current_score_for_gemini)
 
-def step4_next(analysis_results: Optional[Dict], run_config: Optional[Dict]):
-    logger.info("Moving from step 4 to step 5")
-    to_delete_markdown = "טוען רשימת מחיקה..."
-    if not analysis_results or not isinstance(analysis_results, dict) or not run_config:
-        to_delete_markdown = "שגיאה: נתוני ניתוח או תצורה חסרים."
-    else:
+                    is_err = reason_err and ("API_ERROR" in reason_err or "PARSE_ERROR" in reason_err)
+                    if is_err:
+                        result.gemini_error = reason_err
+                    else:
+                        result.gemini_verdict = verdict
+                        result.gemini_similarity_score = gemini_sim
+                        result.gemini_reason = reason_err
+                st.toast("ניתוח Gemini הסתיים.")
+
+    for result in comparison_results:
+        alg_component = result.weighted_score
+        if args_ns.ml_scoring and result.ml_similarity_score is not None:
+            alg_component = result.ml_similarity_score
+
+        if result.gemini_verdict is not None and \
+           result.gemini_similarity_score is not None and \
+           result.gemini_error is None:
+            try:
+                gemini_score_val = float(result.gemini_similarity_score)
+                gemini_score_val = min(max(gemini_score_val, 0.0), 100.0)
+                result.final_combined_score = (alg_component * proj_config.ALGORITHMIC_SCORE_WEIGHT) + \
+                                              (gemini_score_val * proj_config.GEMINI_SCORE_WEIGHT)
+                result.final_combined_score = min(max(result.final_combined_score, 0.0), 100.0)
+            except (ValueError, TypeError):
+                result.final_combined_score = alg_component
+        else:
+            result.final_combined_score = alg_component
+
+    if comparison_results:
+        data_store.save_comparison_results(comparison_results)
+
+    display_results_list = sorted(
+        comparison_results,
+        key=lambda x: x.final_combined_score if x.final_combined_score is not None else \
+                      (x.ml_similarity_score if x.ml_similarity_score is not None else x.weighted_score),
+        reverse=True
+    )
+
+
+
+
+    st.session_state.action_handler = ActionHandler(
+        all_scanned_folders,
+        file_processor,
+        preferred_root_path=Path(args_ns.preferred_root) if args_ns.preferred_root else None
+    )
+
+    return all_scanned_folders, display_results_list
+
+
+def get_tag_value(tags: Dict[str, Any], key_variants: List[str], default: Any = "N/A") -> Any:
+    for key in key_variants:
+        if key in tags and tags[key] is not None:
+            tag_value_str = str(tags[key]) 
+            if any(kw in key for kw in ['tracknumber', 'discnumber', 'track', 'diskno', 'tracknum']):
+                match = re.match(r"(\d+)", tag_value_str) 
+                if match:
+                    return match.group(1)
+            return tag_value_str 
+    return default
+
+def display_combined_tracklist_details(f1_info: FolderInfo, f2_info: FolderInfo):
+    st.markdown(f"##### רשימת שירים משולבת להשוואה: {f1_info.path.name} vs {f2_info.path.name}")
+
+    combined_files = []
+    for fi_idx, fi in enumerate(f1_info.files):
+        combined_files.append({'file_info': fi, 'source': 1, 'folder_name': f1_info.path.name, 'original_idx': fi_idx})
+    for fi_idx, fi in enumerate(f2_info.files):
+        combined_files.append({'file_info': fi, 'source': 2, 'folder_name': f2_info.path.name, 'original_idx': fi_idx})
+
+    def sort_key(item):
+        fi = item['file_info']
+        tags = fi.all_tags if fi.all_tags else {}
+        disc_num_str = get_tag_value(tags, ['discnumber', 'diskno'], '1')
+        track_num_str = get_tag_value(tags, ['tracknumber', 'track', 'tracknum'], '0')
+
         try:
-            all_folders_dict, comp_list = analysis_results.get('all_folders',{}), analysis_results.get('comparison_results',[])
-            if not isinstance(all_folders_dict,dict) or not isinstance(comp_list,list): raise ValueError("Bad state structure.")
-            all_folders_info = {Path(p): _folder_info_from_dict(d) for p, d in all_folders_dict.items()}
-            comp_results = [_comparison_result_from_dict(r) for r in comp_list if isinstance(r,dict)]
-            default_threshold = config.DEFAULT_MIN_SIMILARITY_FOR_DELETE
-            file_processor = FileProcessor(enable_hashing=True) # Hashing should be consistent with earlier steps
-            
-            preferred_root_str = run_config.get("preferred_root")
-            preferred_root_path_obj = Path(preferred_root_str) if preferred_root_str else None
-            
-            action_handler = ActionHandler(all_folders_info, file_processor, preferred_root_path=preferred_root_path_obj)
-            folders_to_del_pairs = action_handler.identify_folders_to_delete(comp_results, default_threshold)
+            disc_num = int(disc_num_str)
+        except ValueError:
+            disc_num = 999
+        try:
+            track_num = int(track_num_str)
+        except ValueError:
+            track_num = 9999
 
-            if folders_to_del_pairs:
-                 to_delete_markdown = f"**מועמדים למחיקה (סף תצוגה: {default_threshold}%):**\n\n"
-                 if preferred_root_path_obj:
-                     to_delete_markdown += f"*תיקייה ראשית מועדפת לשמירה: `{escape_markdown_chars(str(preferred_root_path_obj))}`*\n\n"
+        return (disc_num, track_num, utils.normalize_filename_for_sort(fi.filename))
 
-                 grouped: Dict[Path, List[FolderInfo]] = defaultdict(list)
-                 for del_f, keep_f in folders_to_del_pairs: grouped[keep_f.path].append(del_f)
-                 sorted_keep_paths = sorted(grouped.keys(), key=str)
-                 for keep_path in sorted_keep_paths:
-                      if keep_path not in all_folders_info: continue
-                      keep_info = all_folders_info[keep_path]; keep_q = keep_info.quality_score
-                      keep_q_str = f"{keep_q:.2f}%" if keep_q is not None else "N/A"
+    combined_files.sort(key=sort_key)
 
-                      safe_keep_name = escape_markdown_chars(keep_info.path.name)
-                      to_delete_markdown += f"*   **<span style='color:green;'>ישמר:</span>** '{safe_keep_name}' (איכות: {keep_q_str})\n"
-                      trash_list = sorted(grouped[keep_path], key=lambda f: str(f.path))
-                      for del_folder in trash_list:
-                           del_q = del_folder.quality_score; del_q_str = f"{del_q:.2f}%" if del_q is not None else "N/A"
+    if not combined_files:
+        st.write("לא נמצאו קבצי מוזיקה להשוואה.")
+        return
 
-                           safe_del_name = escape_markdown_chars(del_folder.path.name)
-                           to_delete_markdown += f"    *   **<span style='color:red;'>למחיקה:</span>** '{safe_del_name}' (איכות: {del_q_str})\n"
-                      to_delete_markdown += "\n"
-                 to_delete_markdown += "***\n*שים לב: הרשימה להמחשה. המחיקה תתבצע לפי הסף מהסליידר והעדפת תיקיית השורש (אם נבחרה).* "
-            else: to_delete_markdown = f"לא נמצאו מועמדים למחיקה (סף תצוגה: {default_threshold}%)."
-        except Exception as prep_err: logger.error(f"Step 5 prep error: {prep_err}", exc_info=True); to_delete_markdown = f"שגיאה בהכנת רשימה: {prep_err}"
+    # הגדרת צבעי רקע ישירות לשימוש
+    color1_bg_value = "rgba(220, 235, 255, 0.7)" # כחלחל בהיר עם קצת יותר אטימות
+    color2_bg_value = "rgba(255, 245, 220, 0.7)" # כתמתם בהיר עם קצת יותר אטימות
 
-    return {step4_block: gr.update(visible=False), step5_block: gr.update(visible=True), step5_to_delete_display: to_delete_markdown}
+    st.markdown(f"""
+    <style>
+        .track-cell-common {{ /* סגנונות משותפים לכל התאים */
+            border: 1px solid #d0d0d0 !important; /* גבול מעט כהה יותר */
+            border-radius: 6px !important;
+            padding: 6px 8px !important; /* ריווח פנימי אחיד */
+            font-size: 0.88rem !important;
+            display: flex !important;
+            align-items: center !important;
+            height: 42px !important; /* גובה קבוע לתא, נסה להתאים לפי הצורך */
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }}
+        /* אין צורך במחלקות צבע רקע נפרדות אם נשתמש בסגנון inline מחושב */
 
-def step5_perform_actions(analysis_results: Optional[Dict], run_config: Optional[Dict], delete_threshold: float, confirm_delete: bool) -> Generator[Tuple[str, Optional[Dict]], None, None]:
-    logger.info(f"Step 5: Threshold={delete_threshold}, Confirmed={confirm_delete}"); status = ["מתחיל ביצוע..."]
-    if not confirm_delete: error="חובה לאשר מחיקה."; logger.error(error); status.append(error); yield ("\n".join(status), {"error": error, "final_message": error}); return
-    if not analysis_results or not isinstance(analysis_results, dict) or not run_config:
-        error="נתוני ניתוח או תצורה חסרים."; logger.error(error); status.append(error); yield ("\n".join(status), {"error": error, "final_message": error}); return
-    yield ("\n".join(status), None)
-    try:
-        all_folders_dict, comp_list = analysis_results.get('all_folders',{}), analysis_results.get('comparison_results',[])
-        if not isinstance(all_folders_dict,dict) or not isinstance(comp_list,list): raise ValueError("Bad state structure.")
-        all_folders_info = {Path(p): _folder_info_from_dict(d) for p, d in all_folders_dict.items()}
-        comp_results = [_comparison_result_from_dict(r) for r in comp_list if isinstance(r,dict)]
+        .filename-tooltip {{
+            position: relative;
+            display: inline-block; /* או block אם רוצים שיתפוס את כל רוחב התא */
+            cursor: default;
+            width: 100%; /* כדי שה-tooltip יתייחס לרוחב התא */
+        }}
+        .filename-tooltip .tooltiptext {{
+            visibility: hidden;
+            width: auto;
+            min-width: 150px;
+            max-width: 350px;
+            background-color: #282828;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 6px 10px;
+            position: absolute;
+            z-index: 100 !important;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            white-space: normal; 
+            word-wrap: break-word; 
+        }}
+        .filename-tooltip:hover .tooltiptext {{
+            visibility: visible;
+            opacity: 0.98;
+        }}
+        .track-details-expanded-content {{ 
+            /* הרקע יוחל ישירות ב-HTML עם משתנה הצבע */
+            margin-left: 15px !important;
+            padding: 12px !important;
+            border: 1px dashed #b0b0b0 !important;
+            border-radius: 5px !important;
+            margin-top: 1px !important; /* רווח מינימלי מהשורה */
+            margin-bottom: 8px !important;
+            font-size: 0.85rem !important;
+        }}
+        .track-details-expanded-content p {{ margin-bottom: 0.3rem !important; }}
+        .track-details-expanded-content h6 {{ margin-top: 0 !important; margin-bottom: 0.6rem !important; font-size: 0.9rem !important; font-weight: bold !important; }}
         
-        preferred_root_str = run_config.get("preferred_root")
-        preferred_root_path_obj = Path(preferred_root_str) if preferred_root_str else None
-        logger.info(f"ActionHandler initialized with preferred_root: {preferred_root_path_obj}")
+        /* עיצוב כפתור ה-Toggle שיהיה קטן יותר וממורכז בתא שלו */
+        div[data-testid="stToggle"] {{
+            width: 100%;
+            height: 100%;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 0 !important; margin: 0 !important;
+        }}
+        div[data-testid="stToggle"] label {{ 
+             /* הסתרת הטקסט של ה-toggle אם לא רצוי */
+            display: none !important; 
+        }}
+    </style>
+    """, unsafe_allow_html=True)
 
-        file_processor = FileProcessor(enable_hashing=True) # Consistent hashing
-        action_handler = ActionHandler(all_folders_info, file_processor, preferred_root_path=preferred_root_path_obj)
+    cols_header = st.columns([1, 0.5, 2.5, 2, 1.5, 1.7, 0.7, 1.0, 0.8])
+    headers_text = ["מקור", "#", "שם קובץ (ללא סיומת)", "כותרת", "אמן", "אלבום", "אורך", "גודל", "פרטים"]
+    for col, text in zip(cols_header, headers_text):
+        col.markdown(f"**{text}**")
+    st.markdown("<hr style='margin-top:0; margin-bottom:5px;'>", unsafe_allow_html=True)
 
-        status.append(f"מזהה תיקיות למחיקה (סף: {delete_threshold}%)..."); yield ("\n".join(status), None)
-        folders_to_del_pairs = action_handler.identify_folders_to_delete(comp_results, delete_threshold)
-        if not folders_to_del_pairs: status.append("לא זוהו תיקיות למחיקה."); logger.info(status[-1]); yield ("\n".join(status), {"final_message": status[-1]}); return
+    for item_idx, item in enumerate(combined_files):
+        fi = item['file_info']
+        source = item['source']
+        folder_name_display = Path(item['folder_name']).name
+        current_row_bg_color = color1_bg_value if source == 1 else color2_bg_value
 
-        trashed, failed = 0, 0; folders_to_trash = [p[0] for p in folders_to_del_pairs]; total = len(folders_to_trash)
-        status.append(f"מתחיל העברה לאשפה ({total} תיקיות)..."); yield ("\n".join(status), None); logger.warning(f"Trashing {total} folders...")
-        try: from send2trash import send2trash
-        except ImportError: error="send2trash חסרה."; logger.critical(error); status.append(error); yield ("\n".join(status), {"error":error,"final_message":error}); return
+        tags = fi.all_tags if fi.all_tags else {}
+        track_num_display = get_tag_value(tags, ['tracknumber', 'track', 'tracknum'], '')
 
-        for i, folder in enumerate(folders_to_trash):
-             if not hasattr(folder,'path') or not isinstance(folder.path,Path): logger.error(f"Invalid folder obj: {folder}"); failed+=1; status.append("דילוג: אובייקט לא תקין."); continue
-             action_str=f"מעביר ({i+1}/{total}): '{folder.path.name}'..."; yield ("\n".join(status[-5:]+[action_str]), None)
-             try:
-                 if folder.path.exists() and folder.path.is_dir(): send2trash(str(folder.path)); logger.warning(f"Trashed: {folder.path}"); trashed+=1
-                 elif not folder.path.exists(): logger.warning(f"Skip missing: {folder.path}")
-                 else: logger.warning(f"Skip non-dir: {folder.path}"); failed+=1
-             except Exception as trash_err: failed+=1; logger.error(f"Trash error '{folder.path}': {trash_err}", exc_info=True); status.append(f"שגיאה במחיקת {folder.path.name}!")
+        duration_str = "N/A"
+        if fi.duration:
+            minutes = int(fi.duration // 60)
+            seconds = int(fi.duration % 60)
+            duration_str = f"{minutes:02d}:{seconds:02d}"
 
-        final = f"העברה לאשפה הסתיימה. הועברו: {trashed}, נכשלו: {failed}."; status.append(final); logger.info(final)
-        yield ("\n".join(status), {"final_message": final})
-    except Exception as action_err: logger.error(f"Action error: {action_err}", exc_info=True); final_err=f"שגיאה: {action_err}"; status.append(final_err); yield ("\n".join(status), {"error":final_err, "final_message":final_err})
+        size_str = f"{fi.size_mb:.2f} MB" if fi.size_mb is not None else "N/A"
+        filename_stem = Path(fi.filename).stem
+        
+        max_len_filename_stem = 20 
+        max_len_title_artist_album = 16
 
-def action_complete_update(action_results: Optional[Dict]):
-    final_msg = "הפעולות הושלמו (סטטוס לא ברור)."
-    if isinstance(action_results, dict):
-        if "error" in action_results: final_msg = f"**הפעולה נכשלה:**\n{action_results.get('final_message', 'שגיאה לא ידועה')}"
-        else: final_msg = action_results.get("final_message", "הפעולות הושלמו.")
-    return {step5_block: gr.update(visible=False), step6_block: gr.update(visible=True),
-            step6_final_message: final_msg, step5_status_area: gr.update(visible=False)}
+        filename_stem_display = (filename_stem[:max_len_filename_stem] + '…') if len(filename_stem) > max_len_filename_stem else filename_stem
+        title_display = (fi.title[:max_len_title_artist_album] + '…') if fi.title and len(fi.title) > max_len_title_artist_album else (fi.title or "N/A")
+        artist_display = (fi.artist[:max_len_title_artist_album] + '…') if fi.artist and len(fi.artist) > max_len_title_artist_album else (fi.artist or "N/A")
+        album_display = (fi.album[:max_len_title_artist_album] + '…') if fi.album and len(fi.album) > max_len_title_artist_album else (fi.album or "N/A")
+        
+        # יצירת השורה עם העמודות
+        row_cols = st.columns([1, 0.5, 2.5, 2, 1.5, 1.7, 0.7, 1.0, 0.8])
+        
+        # תוכן לכל תא, עטוף ב-div עם הסגנון הרצוי
+        contents_html = [
+            f"<span title='{item['folder_name']}'>{folder_name_display}</span>", # מקור
+            f"{track_num_display}", # #
+            f"<span class='filename-tooltip'>{filename_stem_display}<span class='tooltiptext'>{fi.filename}</span></span>", # שם קובץ
+            f"<span title='{fi.title or ''}'>{title_display}</span>", # כותרת
+            f"<span title='{fi.artist or ''}'>{artist_display}</span>", # אמן
+            f"<span title='{fi.album or ''}'>{album_display}</span>", # אלבום
+            f"{duration_str}", # אורך
+            f"{size_str}", # גודל
+        ]
 
-def restart_app():
-    logger.info("Restarting UI state")
-    defs = {"bitrate": "128", "log": "INFO", "gemini_range": config.DEFAULT_GEMINI_SIMILARITY_RANGE, "del_thresh": config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}
-    return { step1_block: gr.update(visible=True), step2_block: gr.update(visible=False), step3_block: gr.update(visible=False), step4_block: gr.update(visible=False), step5_block: gr.update(visible=False), step6_block: gr.update(visible=False),
-             run_config_state: None, analysis_results_state: None,
-             step1_folder_input: gr.update(value=""), step1_force_rescan: gr.update(value=False), step1_disable_hash: gr.update(value=False),
-             step1_bitrate_pref: gr.update(value=defs["bitrate"]), step1_log_level: gr.update(value=defs["log"]),
-             step1_enable_gemini: gr.update(value=False), step1_gemini_range: gr.update(value=defs["gemini_range"], visible=False),
-             step1_preferred_root_dd: gr.update(choices=["טען תיקיות קלט"], value="טען תיקיות קלט", interactive=False),
-             status_textbox: gr.update(value=""), step3_pairs_table: gr.update(value=None), step4_quality_display: gr.update(value=""),
-             step5_delete_threshold: gr.update(value=defs["del_thresh"]), step5_to_delete_display: gr.update(value=""),
-             step5_confirm_checkbox: gr.update(value=False), step5_action_button: gr.update(interactive=False),
-             step6_final_message: gr.update(value=""), step5_status_area: gr.update(value="", visible=False) }
-
-
-with gr.Blocks(theme=gr.themes.Soft(primary_hue=gr.themes.colors.blue, secondary_hue=gr.themes.colors.sky), title="Music Duplicate Detector") as demo:
-    gr.Markdown("# איתור כפילויות מוזיקה - ממשק Web")
-    run_config_state = gr.State(None); analysis_results_state = gr.State(None)
-
-    with gr.Column(visible=True) as step1_block:
-        gr.Markdown("## שלב 1: הגדרות וקלט")
-        step1_folder_input = gr.Textbox(label="הזן נתיב מלא לתיקיות שורש (מופרדים בפסיק/נקודה-פסיק)", placeholder="לדוגמה: C:\\Music, D:\\Temp", interactive=True, elem_id="folder_input")
-        step1_preferred_root_dd = gr.Dropdown(label="תיקיית שורש מועדפת (לשמירה במקרה של כפילות)", choices=["טען תיקיות קלט"], value="טען תיקיות קלט", interactive=False)
-        step1_folder_input.change(update_preferred_root_dropdown, inputs=step1_folder_input, outputs=step1_preferred_root_dd)
-
-        with gr.Row(): step1_force_rescan=gr.Checkbox(label="אלץ סריקה מחדש",value=False); step1_disable_hash=gr.Checkbox(label="השבת Hash",value=False)
-        with gr.Row(): step1_bitrate_pref=gr.Dropdown(["128","high"],label="Bitrate מועדף",value="128"); step1_log_level=gr.Dropdown(["DEBUG","INFO","WARNING","ERROR"],label="רמת לוג",value="INFO")
-        with gr.Accordion("הגדרות Gemini (אופציונלי)", open=False):
-            lbl = "אפשר Gemini (זמין בכל מקרה)"
-            step1_enable_gemini = gr.Checkbox(label=lbl, value=False, interactive=True)
-            step1_gemini_range = gr.Textbox(label="טווח ל-Gemini (%)", value=config.DEFAULT_GEMINI_SIMILARITY_RANGE, visible=False)
-            step1_enable_gemini.change(lambda x: gr.update(visible=x), inputs=step1_enable_gemini, outputs=step1_gemini_range)
-        step1_button = gr.Button("הבא: התחל ניתוח", variant="primary")
-
-    with gr.Column(visible=False) as step2_block:
-        gr.Markdown("## שלב 2: ניתוח בתהליך..."); status_textbox=gr.Textbox(label="סטטוס",interactive=False,lines=8,show_copy_button=True)
-    with gr.Column(visible=False) as step3_block:
-        gr.Markdown("## שלב 3: סקירת זוגות דומים"); gr.Markdown("ממוין לפי ציון דמיון יורד.")
-        step3_pairs_table=gr.DataFrame(headers=["תיקיה 1","איכות 1","תיקיה 2","איכות 2","דמיון","Gemini"], datatype=["str"]*6, row_count=(10,"dynamic"), col_count=(6,"fixed"), interactive=False, wrap=True)
-        step3_next_button=gr.Button("הבא: סקירת איכות",variant="secondary")
-    with gr.Column(visible=False) as step4_block:
-        gr.Markdown("## שלב 4: סקירת איכות וקבוצות"); step4_quality_display=gr.Markdown("טוען סקירת איכות...")
-        step4_next_button=gr.Button("הבא: אישור מחיקה",variant="secondary")
-    with gr.Column(visible=False) as step5_block:
-        gr.Markdown("## שלב 5: אישור והעברה לאשפה"); gr.Markdown("בחר סף דמיון למחיקה. תיקיות עם דמיון >= סף ואיכות נמוכה יותר (או כאלו שאינן בתיקיית השורש המועדפת) יועברו לאשפה.")
-        step5_delete_threshold=gr.Slider(config.MINIMAL_DISPLAY_SIMILARITY, 100, value=config.DEFAULT_MIN_SIMILARITY_FOR_DELETE, step=1, label="סף דמיון למחיקה (%)")
-        gr.Markdown("---"); step5_to_delete_display=gr.Markdown("טוען רשימת מחיקה..."); gr.Markdown("---")
-        step5_confirm_checkbox=gr.Checkbox(label="⚠️ אשר העברה לאשפה של התיקיות לפי הסף הנבחר והעדפת תיקיית השורש.",value=False)
-        step5_action_button=gr.Button("אשר והעבר לאשפה!",variant="stop",interactive=False)
-        step5_confirm_checkbox.change(lambda x:gr.update(interactive=x),inputs=step5_confirm_checkbox,outputs=step5_action_button)
-        step5_status_area=gr.Textbox(label="סטטוס פעולות",interactive=False,lines=5,visible=False)
-    with gr.Column(visible=False) as step6_block:
-        gr.Markdown("## שלב 6: סיום"); step6_final_message=gr.Markdown("הפעולות הושלמו.")
-        step6_log_path=gr.Textbox(label="קובץ לוג:",value=str(log_file.resolve()),interactive=False,show_copy_button=True)
-        step6_restart_button=gr.Button("התחל מחדש",variant="primary")
+        for i, col_content_html in enumerate(contents_html):
+            # יישור מותאם לחלק מהעמודות
+            justify_style = "justify-content: center;" if i in [1, 6, 7] else "justify-content: flex-start;"
+            padding_style = "padding-left:5px; padding-right:5px;" if i == 0 else ""
+            
+            row_cols[i].markdown(
+                f"<div class='track-cell-common' style='background-color: {current_row_bg_color}; {justify_style} {padding_style}'>{col_content_html}</div>",
+                unsafe_allow_html=True
+            )
+        
+        # כפתור Toggle בעמודה האחרונה - לא עטוף ב-div כדי לא לקבל רקע
+        with row_cols[8]:
+             toggle_key = f"details_toggle_{f1_info.path.name}_{f2_info.path.name}_{item['original_idx']}_{source}_{item_idx}"
+             # עטיפת ה-toggle ב-div עם סגנון רקע זהה לשאר התאים, ועיצוב פנימי שלו
+             st.markdown(
+                 f"<div class='track-cell-common' style='background-color: {current_row_bg_color}; justify-content: center;'>", unsafe_allow_html=True)
+             show_details = st.toggle("", key=toggle_key, label_visibility="collapsed", help="הצג/הסתר פרטים נוספים עבור שיר זה")
+             st.markdown("</div>", unsafe_allow_html=True)
 
 
-    step1_btn_out = [step1_block, step2_block, step3_block, step4_block, step5_block, step6_block, status_textbox, run_config_state, analysis_results_state]
-    step1_button.click(step1_submit,
-                       inputs=[step1_folder_input, step1_preferred_root_dd, step1_force_rescan, step1_disable_hash, step1_bitrate_pref, step1_enable_gemini, step1_gemini_range, step1_log_level],
-                       outputs=step1_btn_out)\
-        .then(run_analysis_process, inputs=[run_config_state], outputs=[status_textbox, analysis_results_state], show_progress="full")\
-        .then(analysis_complete_update, inputs=[analysis_results_state], outputs=[step2_block, step3_block, step3_pairs_table, analysis_results_state])
+        if show_details:
+            st.markdown(
+                f"<div class='track-details-expanded-content' style='background-color: {current_row_bg_color};'>", 
+                unsafe_allow_html=True
+            )
+            st.markdown(f"<h6>פרטים נוספים עבור: {fi.filename} (מקור: {Path(item['folder_name']).name})</h6>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>נתיב מלא:</strong> `{fi.filepath}`</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>אלבום (מלא):</strong> {fi.album or 'N/A'}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>אמן אלבום:</strong> {fi.albumartist or 'N/A'}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>דיסק:</strong> {get_tag_value(tags, ['discnumber', 'diskno'])}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>ביטרייט:</strong> {fi.bitrate or 'N/A'} kbps</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>גודל (מלא):</strong> {fi.size_mb:.2f} MB</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>ז'אנר:</strong> {get_tag_value(tags, ['genre'])}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p><strong>שנה:</strong> {get_tag_value(tags, ['date', 'originalyear', 'year', 'creationdate'])}</p>", unsafe_allow_html=True)
 
-    step3_next_button.click(step3_next, None, [step3_block, step4_block])\
-        .then(format_quality_results, [analysis_results_state], [step4_quality_display])
+            all_tags_key = f"all_tags_cb_{toggle_key}"
+            if st.checkbox("הצג את כל התגיות (JSON)", key=all_tags_key, value=False):
+                st.json(fi.all_tags)
+            st.markdown(f"</div>", unsafe_allow_html=True)
+        else:
+            # הוספת div ריק קטן אם אין פרטים מורחבים, כדי לשמור על ריווח אחיד בין השורות
+            # או פשוט לא לעשות כלום אם ה-margin-bottom של השורה מספיק
+             pass
 
-    step4_next_button.click(step4_next, [analysis_results_state, run_config_state], [step4_block, step5_block, step5_to_delete_display])
 
-    step5_action_button.click(lambda: gr.update(visible=True,value="מתחיל פעולות..."), outputs=step5_status_area)\
-        .then(step5_perform_actions, inputs=[analysis_results_state, run_config_state, step5_delete_threshold, step5_confirm_checkbox], outputs=[step5_status_area, analysis_results_state], show_progress="full")\
-        .then(action_complete_update, [analysis_results_state], [step5_block, step6_block, step6_final_message, step5_status_area])
+    st.markdown("---")
 
-    restart_outputs = [step1_block, step2_block, step3_block, step4_block, step5_block, step6_block, run_config_state, analysis_results_state,
-                       step1_folder_input, step1_force_rescan, step1_disable_hash, step1_bitrate_pref, step1_log_level, step1_enable_gemini, step1_gemini_range,
-                       step1_preferred_root_dd,
-                       status_textbox, step3_pairs_table, step4_quality_display, step5_delete_threshold, step5_to_delete_display, step5_confirm_checkbox,
-                       step5_action_button, step6_final_message, step5_status_area]
-    step6_restart_button.click(restart_app, None, restart_outputs)
 
+def render_config_step():
+    st.header("שלב 1: הגדרות וסריקה")
+
+    default_folders = "\n".join(st.session_state.get("prev_folders", []))
+    folders_str = st.text_area("הזן נתיבי תיקיות לשורש (כל נתיב בשורה נפרדת):", value=default_folders, height=100)
+
+    st.sidebar.subheader("אפשרויות סריקה וניתוח")
+    log_level = st.sidebar.selectbox("רמת לוג:", ["DEBUG", "INFO", "WARNING", "ERROR"], index=1, help="רמת הפירוט של הלוגים שיישמרו.")
+    preferred_root_str = st.sidebar.text_input("תיקיית שורש מועדפת (אופציונלי):", help="נתיב לתיקיית שורש שתועדף במקרה של כפילות. חייב להיות אחת מתיקיות הקלט.")
+
+    with st.sidebar.expander("אפשרויות מתקדמות"):
+        bitrate_pref = st.sidebar.selectbox("ביטרייט מועדף (לאיכות):", ["128", "high"], index=0)
+        disable_hash = st.sidebar.checkbox("בטל האשינג (סריקה מהירה יותר, פחות מדויק)", value=False)
+        force_rescan = st.sidebar.checkbox("אלץ סריקה מחדש של מטא-דאטה (מתעלם מקאש נתוני מוזיקה)", value=False)
+        clear_cache = st.sidebar.checkbox("נקה קאש תוצאות השוואה ו-Gemini לפני הרצה", value=False)
+
+        enable_ml_scoring = st.sidebar.checkbox(f"הפעל ניקוד דמיון עם מודל ML מקומי", value=True, help=f"דורש קובץ מודל '{proj_config.ML_MODEL_FILE.name}' בתיקיית data.")
+
+        gemini_tooltip = f"דורש מפתח '{proj_config.GEMINI_API_KEY_ENV_VAR}' בסביבה וספריות 'google-generativeai', 'requests', 'Pillow'."
+        enable_gemini = st.sidebar.checkbox(f"הפעל ניתוח עם Gemini API", value=False, help=gemini_tooltip, disabled=not GEMINI_AVAILABLE)
+        gemini_range = st.sidebar.text_input("טווח דמיון ל-Gemini (min-max %):", value=proj_config.DEFAULT_GEMINI_SIMILARITY_RANGE, help="טווח דמיון (מבוסס ציון אלגוריתמי/ML) לשליחת זוגות ל-Gemini.")
+
+    if st.button("התחל ניתוח", type="primary"):
+        input_folder_paths = [p.strip() for p in folders_str.split("\n") if p.strip()]
+        st.session_state.prev_folders = input_folder_paths
+
+        if not input_folder_paths:
+            st.error("יש להזין לפחות תיקיית שורש אחת.")
+            return
+
+        valid_folders = []
+        invalid_paths = []
+        for folder_str in input_folder_paths:
+            p = Path(folder_str)
+            try:
+                if p.is_dir():
+                    valid_folders.append(p.resolve())
+                else:
+                    invalid_paths.append(folder_str)
+            except Exception:
+                invalid_paths.append(folder_str)
+
+        if invalid_paths:
+            st.error(f"הנתיבים הבאים אינם תיקיות תקינות: {', '.join(invalid_paths)}")
+            if not valid_folders:
+                return
+            st.warning("הניתוח ימשיך עם התיקיות התקינות בלבד.")
+
+        args_ns = Namespace(
+            folders=[str(p) for p in valid_folders],
+            log_level=log_level,
+            preferred_root=str(Path(preferred_root_str).resolve()) if preferred_root_str else None,
+            bitrate=bitrate_pref,
+            disable_hash=disable_hash,
+            force_rescan=force_rescan,
+            clear_comparison_cache=clear_cache,
+            ml_scoring=enable_ml_scoring and proj_config.ML_MODEL_FILE.exists(),
+            gemini_analysis=enable_gemini and GEMINI_AVAILABLE,
+            gemini_range=gemini_range
+        )
+
+        if args_ns.preferred_root:
+            pref_root_path_obj = Path(args_ns.preferred_root)
+            if not pref_root_path_obj.is_dir():
+                st.error(f"נתיב השורש המועדף '{args_ns.preferred_root}' אינו תיקייה תקינה.")
+                return
+            if not any(pref_root_path_obj == Path(f_str).resolve() for f_str in args_ns.folders):
+                st.error(f"נתיב השורש המועדף '{args_ns.preferred_root}' חייב להיות אחת מתיקיות הקלט.")
+                return
+
+        if args_ns.ml_scoring and not proj_config.ML_MODEL_FILE.exists():
+            st.warning(f"ML scoring was enabled, but model file '{proj_config.ML_MODEL_FILE}' not found. Disabling.")
+            args_ns.ml_scoring = False
+
+        if args_ns.gemini_analysis and not GEMINI_AVAILABLE:
+            st.warning(f"Gemini analysis was enabled, but API key or libraries are missing. Disabling.")
+            args_ns.gemini_analysis = False
+
+        st.session_state.run_args = args_ns
+
+        all_folders, comparison_res = perform_core_analysis(args_ns)
+
+        if all_folders and comparison_res is not None:
+            st.session_state.all_scanned_folders = all_folders
+            st.session_state.comparison_results = comparison_res
+            st.session_state.current_step = "results"
+            st.rerun()
+        elif all_folders is None and comparison_res is None:
+             st.warning("לא נמצאו תיקיות מוזיקה תקינות באף אחד מהנתיבים שסופקו.")
+        else:
+            st.error("אירעה שגיאה במהלך הניתוח. בדוק את הלוגים לפרטים נוספים.")
+
+def render_results_step():
+    st.header("שלב 2: הצגת תוצאות ובחירת פעולות")
+
+    all_folders = st.session_state.all_scanned_folders
+    comparison_results = st.session_state.comparison_results
+
+    if not comparison_results:
+        st.info("לא נמצאו תיקיות דומות באופן משמעותי על פי ההגדרות.")
+        if st.button("התחל סריקה חדשה"):
+            st.session_state.current_step = "config"
+            st.rerun()
+        return
+
+    st.subheader(f"נמצאו {len(comparison_results)} זוגות תיקיות עם דמיון פוטנציאלי:")
+
+    for i, result in enumerate(comparison_results):
+        pair_key_tuple = (str(result.folder1_path), str(result.folder2_path))
+        f1_info = all_folders.get(result.folder1_path)
+        f2_info = all_folders.get(result.folder2_path)
+
+        if not f1_info or not f2_info:
+            continue
+
+        if pair_key_tuple not in st.session_state.folders_to_delete_choices:
+            score_display = result.final_combined_score if result.final_combined_score is not None else \
+                            (result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score)
+
+            default_delete_choice_val = "skip"
+
+            user_del_threshold = getattr(st.session_state.run_args, "user_delete_threshold", proj_config.DEFAULT_MIN_SIMILARITY_FOR_DELETE)
+
+            if score_display >= user_del_threshold:
+                pref_root = getattr(st.session_state.run_args, "preferred_root", None)
+                f1_is_pref = pref_root and (str(f1_info.path).startswith(pref_root) or f1_info.path == Path(pref_root))
+                f2_is_pref = pref_root and (str(f2_info.path).startswith(pref_root) or f2_info.path == Path(pref_root))
+                f1_q = f1_info.quality_score if f1_info.quality_score is not None else -1
+                f2_q = f2_info.quality_score if f2_info.quality_score is not None else -1
+
+                if f1_is_pref and not f2_is_pref:
+                    if f2_q > -1: default_delete_choice_val = f"keep_{str(f1_info.path)}"
+                elif f2_is_pref and not f1_is_pref:
+                    if f1_q > -1: default_delete_choice_val = f"keep_{str(f2_info.path)}"
+                elif f1_q > f2_q:
+                    default_delete_choice_val = f"keep_{str(f1_info.path)}"
+                elif f2_q > f1_q:
+                    default_delete_choice_val = f"keep_{str(f2_info.path)}"
+
+            st.session_state.folders_to_delete_choices[pair_key_tuple] = default_delete_choice_val
+
+    col_filter1, col_filter2 = st.columns(2)
+    min_similarity_display = col_filter1.slider("הצג זוגות עם דמיון משולב מינימלי:", 0, 100, int(proj_config.MINIMAL_DISPLAY_SIMILARITY), 5)
+
+    filtered_results = [
+        r for r in comparison_results
+        if (r.final_combined_score if r.final_combined_score is not None else \
+            (r.ml_similarity_score if r.ml_similarity_score is not None else r.weighted_score)) >= min_similarity_display
+    ]
+
+    st.subheader("הערכת איכות (מקובץ לפי דמיון)")
+    graph: Dict[Path, Set[Path]] = defaultdict(set)
+    nodes_in_graph: Set[Path] = set()
+    for result in filtered_results: 
+        current_score_q = result.final_combined_score if result.final_combined_score is not None else \
+                        (result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score)
+        f1_path_q, f2_path_q = result.folder1_path, result.folder2_path
+        graph[f1_path_q].add(f2_path_q)
+        graph[f2_path_q].add(f1_path_q)
+        nodes_in_graph.add(f1_path_q)
+        nodes_in_graph.add(f2_path_q)
+
+    if not nodes_in_graph:
+        st.write("אין קבוצות תיקיות דומות להצגת איכות (לאחר סינון).")
+    else:
+        processed_nodes_q: Set[Path] = set()
+        group_count_q = 0
+        sorted_nodes_q = sorted(list(nodes_in_graph), key=lambda p: str(p))
+
+        for start_node_q in sorted_nodes_q:
+            if start_node_q not in processed_nodes_q:
+                group_count_q += 1
+                component_paths_q: Set[Path] = set()
+                stack_q = [start_node_q]
+                visited_in_comp_q: Set[Path] = set()
+                while stack_q:
+                    current_path_q = stack_q.pop()
+                    if current_path_q not in visited_in_comp_q and current_path_q in nodes_in_graph:
+                        visited_in_comp_q.add(current_path_q)
+                        processed_nodes_q.add(current_path_q)
+                        component_paths_q.add(current_path_q)
+                        neighbors_q = graph.get(current_path_q, set())
+                        stack_q.extend(list(neighbors_q - visited_in_comp_q))
+
+                if len(component_paths_q) > 1:
+                    with st.expander(f"קבוצת דמיון {group_count_q}", expanded=True):
+                        component_folders_q = sorted(
+                            [all_folders[p] for p in component_paths_q if p in all_folders and all_folders[p].quality_score is not None],
+                            key=lambda f_q: (f_q.quality_score is not None, f_q.quality_score), reverse=True
+                        )
+                        if component_folders_q:
+                            for i_q, folder_q_item in enumerate(component_folders_q):
+                                quality_fq = folder_q_item.quality_score if folder_q_item.quality_score is not None else -1.0
+                                q_str_fq = f"{quality_fq:.2f}%" if quality_fq >= 0 else "N/A"
+                                marker_fq = "👑 (האיכותי ביותר בקבוצה)" if i_q == 0 and quality_fq >=0 else ""
+                                st.markdown(f"  {marker_fq} **{q_str_fq}** - '{folder_q_item.path.name}' (`{folder_q_item.path}`)")
+                        else:
+                            st.write("  אין תיקיות עם ציון איכות בקבוצה זו.")
+    st.markdown("---")
+
+
+    st.subheader("בחירת פעולות לזוגות תיקיות דומות:")
+
+    header_cols = st.columns([2, 0.8, 0.3, 2, 0.8, 0.8, 2.5, 1.5])
+    header_cols[0].markdown("**תיקייה 1**")
+    header_cols[1].markdown("**איכות 1**")
+    header_cols[2].markdown(" ") 
+    header_cols[3].markdown("**תיקייה 2**")
+    header_cols[4].markdown("**איכות 2**")
+    header_cols[5].markdown("**דמיון**")
+    header_cols[6].markdown("**פעולת מחיקה**")
+    header_cols[7].markdown("**פרטים**")
+    st.divider()
+
+    for i, result in enumerate(filtered_results):
+        f1_info = all_folders.get(result.folder1_path)
+        f2_info = all_folders.get(result.folder2_path)
+
+        if not f1_info or not f2_info:
+            st.warning(f"מידע חסר עבור הזוג: {result.folder1_path.name} ו-{result.folder2_path.name}")
+            continue
+
+        pair_key_tuple = (str(result.folder1_path), str(result.folder2_path))
+
+        score_display = result.final_combined_score if result.final_combined_score is not None else \
+                        (result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score)
+
+        row_cols = st.columns([2, 0.8, 0.3, 2, 0.8, 0.8, 2.5, 1.5])
+
+        row_cols[0].markdown(f"{f1_info.path.name}")
+        row_cols[0].caption(f"`{f1_info.path}`")
+        q1_str = f"{f1_info.quality_score:.1f}%" if f1_info.quality_score is not None else "N/A"
+        row_cols[1].markdown(q1_str)
+
+        row_cols[2].markdown("<p style='text-align: center; font-weight: bold;'>VS</p>", unsafe_allow_html=True)
+
+        row_cols[3].markdown(f"{f2_info.path.name}")
+        row_cols[3].caption(f"`{f2_info.path}`")
+        q2_str = f"{f2_info.quality_score:.1f}%" if f2_info.quality_score is not None else "N/A"
+        row_cols[4].markdown(q2_str)
+
+        row_cols[5].markdown(f"**{score_display:.1f}%**")
+        if result.is_identical_by_hash:
+            row_cols[5].caption("(זהים!)")
+
+        options = ["ללא שינוי", f"מחק את '{f1_info.path.name}'", f"מחק את '{f2_info.path.name}'"]
+        current_choice_val = st.session_state.folders_to_delete_choices.get(pair_key_tuple, "skip")
+        current_idx = 0
+        if current_choice_val == f"keep_{str(f2_info.path)}": 
+            current_idx = 1
+        elif current_choice_val == f"keep_{str(f1_info.path)}": 
+            current_idx = 2
+        
+        selected_option_value = row_cols[6].selectbox(
+            "בחר:",
+            options,
+            index=current_idx,
+            key=f"delete_select_{i}_{pair_key_tuple[0]}_{pair_key_tuple[1]}",
+            label_visibility="collapsed"
+        )
+
+        if selected_option_value == options[1]: 
+            st.session_state.folders_to_delete_choices[pair_key_tuple] = f"keep_{str(f2_info.path)}"
+        elif selected_option_value == options[2]: 
+            st.session_state.folders_to_delete_choices[pair_key_tuple] = f"keep_{str(f1_info.path)}"
+        else: 
+            st.session_state.folders_to_delete_choices[pair_key_tuple] = "skip"
+
+        is_currently_expanded = st.session_state.active_expander_pair_key == pair_key_tuple
+        button_label = "סגור" if is_currently_expanded else "פתח פרטים"
+        if row_cols[7].button(button_label, key=f"details_btn_{i}_{pair_key_tuple[0]}_{pair_key_tuple[1]}"):
+            if is_currently_expanded:
+                st.session_state.active_expander_pair_key = None
+            else:
+                st.session_state.active_expander_pair_key = pair_key_tuple
+            st.rerun()
+
+        if is_currently_expanded:
+            with st.container(): 
+                st.markdown("---") 
+                with st.expander(f"פרטי השוואה ורשימות שירים עבור: {f1_info.path.name} ו- {f2_info.path.name}", expanded=True):
+                    st.markdown("**פרטי דמיון:**")
+                    if result.ml_similarity_score is not None:
+                        st.write(f"  - ציון דמיון ML: {result.ml_similarity_score:.4f}")
+                    if result.weighted_score is not None: 
+                        st.write(f"  - ציון דמיון אלגוריתמי (גולמי): {result.weighted_score:.2f}%")
+
+                    if result.gemini_verdict:
+                        st.write(f"  - Gemini ורדיקט: {result.gemini_verdict} (דמיון Gemini: {result.gemini_similarity_score:.1f}%)")
+                        st.caption(f"  - Gemini נימוק: {result.gemini_reason}")
+                    if result.gemini_error:
+                        st.warning(f"  - Gemini שגיאה: {result.gemini_error}")
+
+                    if st.checkbox("הצג ציוני דמיון מפורטים (JSON)", key=f"detail_scores_json_{i}_{pair_key_tuple[0]}_{pair_key_tuple[1]}"):
+                        st.json(result.similarity_scores)
+
+                    st.markdown("---")
+                    display_combined_tracklist_details(f1_info, f2_info) 
+                st.markdown("---")
+
+        if not is_currently_expanded:
+            st.divider()
+
+
+    st.markdown("---")
+    st.subheader("סיכום ובצוע פעולות")
+
+
+    default_del_thresh_val = proj_config.DEFAULT_MIN_SIMILARITY_FOR_DELETE
+    if hasattr(st.session_state, 'run_args') and st.session_state.run_args is not None:
+        default_del_thresh_val = getattr(st.session_state.run_args, "user_delete_threshold", proj_config.DEFAULT_MIN_SIMILARITY_FOR_DELETE)
+
+
+    del_thresh_input = st.number_input(
+        f"סף דמיון מינימלי להצעת מחיקה אוטומטית:",
+        min_value=0.0, max_value=100.0,
+        value=float(default_del_thresh_val),
+        step=1.0,
+        help=f"ערך זה משפיע על ההצעות האוטומטיות למחיקה. ברירת מחדל מהגדרות: {proj_config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}%"
+    )
+
+    if hasattr(st.session_state, 'run_args') and st.session_state.run_args is not None:
+        st.session_state.run_args.user_delete_threshold = del_thresh_input
+    else:
+        st.session_state.run_args = Namespace(user_delete_threshold=del_thresh_input)
+
+
+    if st.button("בצע פעולות נבחרות", type="primary"):
+        st.session_state.current_step = "actions"
+        st.rerun()
+
+    if st.button("התחל סריקה חדשה"):
+        st.session_state.current_step = "config"
+        st.session_state.all_scanned_folders = None
+        st.session_state.comparison_results = None
+        st.session_state.folders_to_delete_choices = {}
+        st.session_state.active_expander_pair_key = None
+        st.rerun()
+
+
+def render_actions_step():
+    st.header("שלב 3: ביצוע פעולות")
+    action_handler = st.session_state.action_handler
+    all_folders = st.session_state.all_scanned_folders
+
+    if not action_handler or not all_folders:
+        st.error("שגיאה: מידע נדרש לביצוע פעולות אינו זמין.")
+        if st.button("חזור להגדרות"):
+            st.session_state.current_step = "config"
+            st.rerun()
+        return
+
+    st.info("פונקציונליות המיזוג מושבתת כרגע בממשק הגרפי.")
+
+
+    folders_to_trash_paths: List[Path] = []
+    kept_folders_info: List[str] = []
+
+
+    for pair_key_tuple, choice in st.session_state.folders_to_delete_choices.items():
+        path1_str, path2_str = pair_key_tuple
+        if choice == f"keep_{path2_str}":
+            folders_to_trash_paths.append(Path(path1_str))
+            kept_folders_info.append(f"נשמר: '{Path(path2_str).name}', ימחק: '{Path(path1_str).name}'")
+        elif choice == f"keep_{path1_str}":
+            folders_to_trash_paths.append(Path(path2_str))
+            kept_folders_info.append(f"נשמר: '{Path(path1_str).name}', ימחק: '{Path(path2_str).name}'")
+
+    if folders_to_trash_paths:
+        st.subheader(f"מבצע מחיקה עבור {len(folders_to_trash_paths)} תיקיות...")
+
+        st.warning("התיקיות הבאות יועברו לסל המחזור:")
+        for p_info in kept_folders_info:
+            st.write(f"  - {p_info}")
+
+
+        if st.button(f"אשר העברת {len(folders_to_trash_paths)} תיקיות לסל המחזור", type="primary"):
+            trashed_count = 0
+            failed_count = 0
+            unique_folders_to_trash = list(set(folders_to_trash_paths))
+
+            for folder_path_to_trash in unique_folders_to_trash:
+                folder_info_to_trash = all_folders.get(folder_path_to_trash) 
+                try:
+                    if folder_path_to_trash.exists() and folder_path_to_trash.is_dir():
+                        from send2trash import send2trash
+                        send2trash(str(folder_path_to_trash))
+                        st.write(f"הועבר לסל המחזור: {folder_path_to_trash}")
+                        logger.warning(f"Streamlit UI: Moved to trash: {folder_path_to_trash}")
+                        trashed_count += 1
+                    elif not folder_path_to_trash.exists():
+                         st.warning(f"תיקייה לא נמצאה, דילוג על מחיקה: {folder_path_to_trash}")
+                    else:
+                         st.warning(f"הנתיב אינו תיקייה, דילוג על מחיקה: {folder_path_to_trash}")
+                except Exception as e:
+                    failed_count += 1
+                    st.error(f"שגיאה בהעברת תיקייה '{folder_path_to_trash}' לסל המחזור: {e}")
+                    logger.error(f"Streamlit UI: Error trashing {folder_path_to_trash}: {e}", exc_info=True)
+
+
+            if len(unique_folders_to_trash) < len(folders_to_trash_paths):
+                 st.info(f"הערה: חלק מהתיקיות למחיקה הופיעו במספר זוגות. כל תיקייה נמחקה פעם אחת בלבד. סה\"כ נמחקו {trashed_count} תיקיות ייחודיות.")
+
+
+            st.success(f"פעולת העברה לסל המחזור הסתיימה. הועברו בהצלחה {trashed_count} תיקיות.")
+            if failed_count > 0:
+                st.error(f"{failed_count} תיקיות לא הועברו לסל המחזור.")
+            logger.info(f"Streamlit UI: Trash process finished. Moved: {trashed_count}, Failed: {failed_count}")
+
+    else:
+        st.info("לא נבחרו תיקיות למחיקה.")
+
+    st.markdown("---")
+    st.balloons()
+    st.success("כל הפעולות הנבחרות הסתיימו!")
+    if st.button("התחל סריקה חדשה"):
+        st.session_state.current_step = "config"
+        st.session_state.all_scanned_folders = None
+        st.session_state.comparison_results = None
+        st.session_state.folders_to_delete_choices = {}
+        st.session_state.active_expander_pair_key = None
+        st.rerun()
+
+
+
+def main_ui():
+    st.set_page_config(layout="wide", page_title="Music Duplicate Detector")
+    st.title("Music Duplicate Detector UI 🎵")
+    st.caption("ממשק משתמש לזיהוי אלבומי מוזיקה כפולים")
+
+    init_session_state()
+
+    if st.session_state.current_step == "config":
+        render_config_step()
+    elif st.session_state.current_step == "results":
+        render_results_step()
+    elif st.session_state.current_step == "actions":
+        render_actions_step()
 
 if __name__ == "__main__":
-    logger.info("Launching Gradio Web UI...")
-    try:
-        demo.queue()
-        demo.launch(share=False, inbrowser=True, server_name="0.0.0.0", server_port=7860)
-    except Exception as launch_err:
-        logger.critical(f"Failed to launch Gradio UI: {launch_err}", exc_info=True)
-        print(f"\n\nCritical Error launching UI: {launch_err}")
-        print(f"Log file: '{log_file.resolve()}'")
-        if "address already in use" in str(launch_err).lower(): print("\nHint: Port 7860 might be in use.")
+    main_ui()
