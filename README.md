@@ -45,7 +45,7 @@
 
 ```bash
 # דוגמה כללית לשכפול הריפו
-git clone <repository_url>
+git clone https://github.com/NHLOCAL/Music-Automatic.git
 cd Music-Automatic
 ```
 
