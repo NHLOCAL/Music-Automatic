@@ -8,7 +8,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
-
+# Dummy Pillow classes for environments where it's not installed
 class _DummyPillowError(Exception):
     pass
 
@@ -18,21 +18,19 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
     Image = None
-    UnidentifiedImageError = _DummyPillowError 
+    UnidentifiedImageError = _DummyPillowError
     logging.warning("Pillow library not found. Gemini album art analysis will be limited/skipped.")
 
 from google import genai
 from google.genai import types
 from google.genai.types import UploadFileConfig
-
-
 from .. import config
 from ..models import FolderInfo, FileInfo, FolderComparisonResult
 from ..utils import AnsiColors
 
 logger = logging.getLogger(__name__)
 
-
+# --- Load System Instruction ---
 SYSTEM_INST = None
 try:
     current_dir = Path(__file__).parent
@@ -47,6 +45,7 @@ except Exception as e:
     logger.error(f"Error reading Gemini system instruction file at {instruction_file_path}: {e}", exc_info=True)
     SYSTEM_INST = "Error: Could not load system instructions due to an unexpected error."
 
+# --- API Key and Model Name ---
 API_KEY = os.environ.get(config.GEMINI_API_KEY_ENV_VAR)
 if not API_KEY:
     logger.warning(f"{config.GEMINI_API_KEY_ENV_VAR} environment variable not set. Gemini analysis will be disabled.")
@@ -55,8 +54,6 @@ if not API_KEY:
 MODEL_NAME = config.GEMINI_MODEL_NAME
 
 class GeminiAnalyzer:
-
-
     def __init__(self):
         if not API_KEY:
             raise ValueError(f"Gemini API Key not found in environment variables: {config.GEMINI_API_KEY_ENV_VAR}")
@@ -74,11 +71,11 @@ class GeminiAnalyzer:
             return None
         try:
             with Image.open(image_path) as img:
-                img.convert('RGB') 
+                img.convert('RGB')
             with open(image_path, "rb") as image_file:
                 encoded_bytes = base64.b64encode(image_file.read())
                 return encoded_bytes.decode("utf-8")
-        except UnidentifiedImageError: 
+        except UnidentifiedImageError:
             logger.warning(f"Cannot identify image file (possibly not an image or corrupted): {image_path}")
             return None
         except Exception as e:
@@ -91,7 +88,7 @@ class GeminiAnalyzer:
             if art_path.is_file():
                 if PIL_AVAILABLE and Image is not None:
                     try:
-                        with Image.open(art_path) as img: 
+                        with Image.open(art_path) as img:
                             img.verify()
                         logger.debug(f"Found valid album art file: {art_path}")
                         return art_path
@@ -103,7 +100,7 @@ class GeminiAnalyzer:
                         continue
                 else:
                     logger.debug(f"Found potential album art file (PIL unavailable or Image module is None for verification): {art_path}")
-                    return art_path 
+                    return art_path
         return None
 
     def _prepare_album_data(self, folder_info: FolderInfo) -> Dict[str, Any]:
@@ -123,27 +120,28 @@ class GeminiAnalyzer:
             album_data["album_art_base64"] = self._encode_image_to_base64(art_path)
             if not album_data["album_art_base64"]:
                 logger.warning(f"Failed to encode album art for {folder_info.path.name}")
+        
+        # *** CHANGE: Send all files, not just a subset ***
+        for file_info in folder_info.files:
+            # *** CHANGE: Start with all tags, then add/override specific fields ***
+            cleaned = file_info.all_tags.copy()
+            
+            # Add or override fields for clarity and consistency
+            cleaned["filename"] = file_info.filename
+            cleaned["duration_seconds"] = int(file_info.duration) if file_info.duration else None
+            cleaned["size_mb"] = round(file_info.size_mb, 2) if file_info.size_mb else None
+            cleaned["bitrate_kbps"] = file_info.bitrate # More descriptive key
 
-        MAX_FILES_TO_SEND = 15
-        for i, file_info in enumerate(folder_info.files):
-            if i >= MAX_FILES_TO_SEND:
-                album_data["files"].append({"filename": f"... ועוד {len(folder_info.files) - MAX_FILES_TO_SEND} קבצים"})
-                break
+            # Ensure main fields are present even if not in tags
+            if 'title' not in cleaned: cleaned['title'] = file_info.title
+            if 'artist' not in cleaned: cleaned['artist'] = file_info.artist
+            if 'album' not in cleaned: cleaned['album'] = file_info.album
 
-            cleaned = {
-                "filename": file_info.filename,
-                "title": file_info.title,
-                "artist": file_info.artist,
-                "album": file_info.album,
-                "bitrate": file_info.bitrate,
-                "duration_seconds": int(file_info.duration) if file_info.duration else None,
-                "size_mb": round(file_info.size_mb, 2) if file_info.size_mb else None,
-                "track_number": file_info.all_tags.get('tracknumber'),
-                "disc_number": file_info.all_tags.get('discnumber'),
-            }
+            # Remove None or empty values to keep the payload clean
             cleaned = {k:v for k,v in cleaned.items() if v not in (None, '')}
+            
             album_data["files"].append(cleaned)
-
+            
         return album_data
 
     def _add_user_text(self, message: str):
@@ -172,7 +170,6 @@ class GeminiAnalyzer:
             },
             system_instruction=SYSTEM_INST
         )
-
         max_retries = 2
         for attempt in range(max_retries):
             try:
@@ -185,12 +182,10 @@ class GeminiAnalyzer:
                 for chunk in stream:
                     if hasattr(chunk, "text") and chunk.text:
                         full_response += chunk.text
-
                 self.conversation.append(types.ModelContent(
                     parts=[types.Part.from_text(text=full_response.strip())]
                 ))
                 return full_response.strip()
-
             except requests.exceptions.Timeout:
                 logger.warning(f"Gemini API request timed out (Attempt {attempt+1}/{max_retries}). Retrying...")
                 if attempt == max_retries - 1:
@@ -203,21 +198,23 @@ class GeminiAnalyzer:
                 logger.error(f"Unexpected error during Gemini communication (Attempt {attempt+1}/{max_retries}): {e}", exc_info=True)
                 if attempt == max_retries - 1:
                     return f"API_ERROR: Unexpected error: {e}"
-
         return "API_ERROR: Max retries exceeded without success."
 
-
-    def analyze_pair(self, folder_info1: FolderInfo, folder_info2: FolderInfo, script_similarity_score: float
+    def analyze_pair(self, folder_info1: FolderInfo, folder_info2: FolderInfo, ml_similarity_score: Optional[float]
                     ) -> Tuple[Optional[str], Optional[float], str]:
         self.conversation.clear()
 
         album1 = self._prepare_album_data(folder_info1)
         album2 = self._prepare_album_data(folder_info2)
+
         data = {
             "album1": album1,
             "album2": album2,
-            "similarity_score_script": round(script_similarity_score, 2)
         }
+        
+        # *** CHANGE: Conditionally add the ML score if it exists ***
+        if ml_similarity_score is not None:
+            data["provided_ml_score"] = round(ml_similarity_score, 2)
 
         user_msg = (
             "Analyze the following two music albums to determine if they are likely duplicates. "
@@ -228,12 +225,13 @@ class GeminiAnalyzer:
         logger.debug("--- Sending to Gemini ---")
         logger.debug(f"Album 1 Folder: {folder_info1.path.name}")
         logger.debug(f"Album 2 Folder: {folder_info2.path.name}")
-        logger.debug(f"Script Similarity: {script_similarity_score:.2f}%")
+        if ml_similarity_score is not None:
+             logger.debug(f"Provided ML Similarity: {ml_similarity_score:.2f}%")
+        else:
+             logger.debug("No ML score provided to Gemini.")
         logger.debug("--- End Gemini Send ---")
 
         self._add_user_text(user_msg)
-
-
         if album1.get("album_art_base64"):
             art_bytes = base64.b64decode(album1["album_art_base64"])
             file1 = self.client.files.upload(
@@ -247,8 +245,7 @@ class GeminiAnalyzer:
                 ]))
             else:
                 logger.warning(f"Failed to upload or get URI for album 1 art ({folder_info1.path.name}). Skipping art in Gemini prompt.")
-
-
+        
         if album2.get("album_art_base64"):
             art_bytes = base64.b64decode(album2["album_art_base64"])
             file2 = self.client.files.upload(
@@ -262,7 +259,7 @@ class GeminiAnalyzer:
                 ]))
             else:
                 logger.warning(f"Failed to upload or get URI for album 2 art ({folder_info2.path.name}). Skipping art in Gemini prompt.")
-
+        
         response_text = self._send_and_receive()
 
         try:
@@ -270,8 +267,6 @@ class GeminiAnalyzer:
             if match:
                 resp_json = json.loads(match.group(0))
                 verdict = resp_json.get("verdict")
-
-
                 similarity_score_from_model_val = resp_json.get("similarity_score_from_model")
                 reason = resp_json.get("reason", "No reason provided by Gemini.")
 
@@ -280,7 +275,7 @@ class GeminiAnalyzer:
                     logger.warning(f"Invalid verdict from Gemini: {verdict}")
                     reason += f" (Invalid verdict '{verdict}' received from API)"
                     verdict = None
-
+                
                 parsed_similarity_score_from_model: Optional[float] = None
                 if similarity_score_from_model_val is not None:
                     try:
@@ -299,7 +294,6 @@ class GeminiAnalyzer:
                      return None, None, reason
 
                 logger.info(f"Gemini result: verdict={verdict}, similarity_score_from_model={parsed_similarity_score_from_model}, reason={reason}")
-
                 return verdict, parsed_similarity_score_from_model, reason
             else:
                 return None, None, f"JSON_PARSE_ERROR: Could not extract JSON. Raw: {response_text}"

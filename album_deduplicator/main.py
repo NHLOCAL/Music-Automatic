@@ -1,4 +1,3 @@
-# main.py
 import argparse
 from collections import defaultdict
 import logging
@@ -18,6 +17,7 @@ from music_dup_lib.core.quality_analyzer import QualityAnalyzer
 from music_dup_lib.core.action_handler import ActionHandler
 from music_dup_lib.external.ml_similarity_model import MLSimilarityModel
 
+# --- Gemini Imports ---
 try:
     from music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
     GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
@@ -32,6 +32,7 @@ except ImportError as e:
 
 logger: Optional[logging.Logger] = None
 
+
 def display_comparison_results(results: List[FolderComparisonResult], all_folders: Dict[Path, FolderInfo]):
     if not results:
         print(utils.AnsiColors.GREEN + "\nNo significantly similar folders found." + utils.AnsiColors.RESET)
@@ -43,19 +44,19 @@ def display_comparison_results(results: List[FolderComparisonResult], all_folder
     for result in results:
         f1_path = result.folder1_path
         f2_path = result.folder2_path
-
+        
         primary_score = result.final_combined_score if result.final_combined_score is not None else \
                         (result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score)
 
-
         f1_info = all_folders.get(f1_path)
         f2_info = all_folders.get(f2_path)
+        
         q1_str = f"(Q: {f1_info.quality_score:.2f}%)" if f1_info and f1_info.quality_score is not None else "(Q: N/A)"
         q2_str = f"(Q: {f2_info.quality_score:.2f}%)" if f2_info and f2_info.quality_score is not None else "(Q: N/A)"
 
         color = utils.AnsiColors.GREEN if primary_score >= 90 else utils.AnsiColors.YELLOW if primary_score >= 70 else utils.AnsiColors.RESET
         print(f"Pair: '{utils.AnsiColors.BLUE}{f1_path.name}{utils.AnsiColors.RESET}' {q1_str} <-> '{utils.AnsiColors.BLUE}{f2_path.name}{utils.AnsiColors.RESET}' {q2_str}")
-
+        
         if result.final_combined_score is not None:
             print(f"  Combined Similarity Score: {color}{result.final_combined_score:.2f}%{utils.AnsiColors.RESET}")
             if result.ml_similarity_score is not None:
@@ -66,8 +67,7 @@ def display_comparison_results(results: List[FolderComparisonResult], all_folder
             print(f"    Algorithmic Score (raw): {result.weighted_score:.2f}%")
         else:
             print(f"  Algorithmic Score: {color}{result.weighted_score:.2f}%{utils.AnsiColors.RESET}")
-
-
+        
         if result.is_identical_by_hash:
             print(f"    {utils.AnsiColors.MAGENTA}(Identical by file hashes){utils.AnsiColors.RESET}")
 
@@ -91,6 +91,7 @@ def display_comparison_results(results: List[FolderComparisonResult], all_folder
             elif verdict == 'uncertain':
                 verdict_text = "Uncertain"
                 verdict_color = utils.AnsiColors.MAGENTA
+
             similarity_str = f"{result.gemini_similarity_score:.1f}%" if result.gemini_similarity_score is not None else "N/A"
             print(f"  {utils.AnsiColors.CYAN}Gemini Verdict:{utils.AnsiColors.RESET} {verdict_color}{verdict_text}{utils.AnsiColors.RESET} (Gemini Similarity: {similarity_str})")
             if result.gemini_reason:
@@ -108,12 +109,16 @@ def display_comparison_results(results: List[FolderComparisonResult], all_folder
                     details.append(f"{k}={v:.2f}")
             if details:
                  print(f"  Scores: [ {', '.join(details)} ]")
+
         print("-" * 20)
+
 
 def display_quality_results_grouped(all_folders: Dict[Path, FolderInfo], comparison_results: List[FolderComparisonResult]):
     print(utils.AnsiColors.CYAN + "\n--- Folder Quality Assessment (Grouped by Similarity) ---" + utils.AnsiColors.RESET)
+    
     graph: Dict[Path, Set[Path]] = defaultdict(set)
     nodes_in_graph: Set[Path] = set()
+
     for result in comparison_results:
         current_score = result.final_combined_score if result.final_combined_score is not None else \
                         (result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score)
@@ -123,13 +128,16 @@ def display_quality_results_grouped(all_folders: Dict[Path, FolderInfo], compari
              graph[f2_path].add(f1_path)
              nodes_in_graph.add(f1_path)
              nodes_in_graph.add(f2_path)
+
     if not nodes_in_graph:
         print("No similar folder groups to display quality for.")
         print(utils.AnsiColors.CYAN + "--- End of Quality Assessment ---" + utils.AnsiColors.RESET)
         return
+
     processed_nodes: Set[Path] = set()
     group_count = 0
     sorted_nodes = sorted(list(nodes_in_graph), key=str)
+
     for start_node in sorted_nodes:
         if start_node not in processed_nodes:
             group_count += 1
@@ -154,6 +162,7 @@ def display_quality_results_grouped(all_folders: Dict[Path, FolderInfo], compari
                 if not component_folders:
                     if logger: logger.info(f"Group {group_count} has no folders with calculated quality scores. Component paths: {[str(p) for p in component_paths]}")
                     continue
+                
                 for i, folder in enumerate(component_folders):
                     quality = folder.quality_score if folder.quality_score is not None else -1.0
                     q_str = f"{quality:.2f}%" if quality >= 0 else "N/A "
@@ -165,7 +174,9 @@ def display_quality_results_grouped(all_folders: Dict[Path, FolderInfo], compari
                     if logging.getLogger().isEnabledFor(logging.DEBUG) and folder.quality_breakdown:
                         breakdown_str = ", ".join([f"{k}: {v:.1f}" for k, v in sorted(folder.quality_breakdown.items())])
                         print(f"      Breakdown: [{breakdown_str}]")
+
     print(utils.AnsiColors.CYAN + "\n--- End of Quality Assessment ---" + utils.AnsiColors.RESET)
+
 
 def _select_representatives(
     all_folders: Dict[Path, FolderInfo],
@@ -173,6 +184,7 @@ def _select_representatives(
     similarity_threshold: float
 ) -> Dict[Path, Path]:
     if logger: logger.info(f"Selecting representatives for clusters with similarity >= {similarity_threshold}%...")
+    
     representative_map: Dict[Path, Path] = {path: path for path in all_folders}
     graph: Dict[Path, Set[Path]] = defaultdict(set)
     nodes_in_graph: Set[Path] = set()
@@ -182,6 +194,7 @@ def _select_representatives(
         if (r.final_combined_score if r.final_combined_score is not None else \
             (r.ml_similarity_score if r.ml_similarity_score is not None else r.weighted_score)) >= similarity_threshold
     ]
+    
     if not relevant_results:
         if logger: logger.info("No pairs met the high similarity threshold for representative selection.")
         return representative_map
@@ -214,6 +227,7 @@ def _select_representatives(
             if len(component_paths) > 1:
                 component_folders_all_info = [all_folders[p] for p in component_paths if p in all_folders]
                 component_folders = [f for f in component_folders_all_info if f and f.quality_score is not None]
+                
                 if len(component_folders) > 1:
                     clusters_found += 1
                     best_folder = max(component_folders, key=lambda f: f.quality_score if f.quality_score is not None else -1.0)
@@ -229,6 +243,7 @@ def _select_representatives(
 
     if logger: logger.info(f"Representative selection complete. Found {clusters_found} clusters.")
     return representative_map
+
 
 def run_gemini_analysis(
     comparison_results: List[FolderComparisonResult],
@@ -257,6 +272,7 @@ def run_gemini_analysis(
         comparison_results,
         config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE
     )
+
     if logger: logger.info(f"Filtering pairs for Gemini analysis (Range: {min_sim}%-{max_sim}%, Rep Threshold: {config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE}%)...")
 
     pairs_to_analyze: List[FolderComparisonResult] = []
@@ -266,6 +282,7 @@ def run_gemini_analysis(
         result for result in comparison_results
         if min_sim <= (result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score) <= max_sim and not result.is_identical_by_hash
     ]
+
     skipped_count_rep = 0
     skipped_count_dup_rep = 0
     for result in candidate_results:
@@ -275,8 +292,10 @@ def run_gemini_analysis(
         if f1_path not in representative_map or f2_path not in representative_map:
              if logger: logger.warning(f"Skipping pair ({f1_path.name}, {f2_path.name}) for Gemini: Folder path not found in representative map.")
              continue
+
         rep1 = representative_map[f1_path]
         rep2 = representative_map[f2_path]
+        
         if rep1 == rep2:
             skipped_count_rep += 1
             if logger: logger.debug(f"Skipping Gemini (Same Rep): {f1_path.name} ({rep1.name}) <-> {f2_path.name} ({rep2.name})")
@@ -291,7 +310,7 @@ def run_gemini_analysis(
             skipped_count_dup_rep += 1
             if logger: logger.debug(f"Skipping Gemini (Duplicate Rep Pair): {f1_path.name} ({rep1.name}) <-> {f2_path.name} ({rep2.name})")
             continue
-
+        
         pairs_to_analyze.append(result)
         processed_representative_pairs.add(canonical_rep_pair)
         if logger: logger.debug(f"Adding pair for Gemini: {f1_path.name} <-> {f2_path.name} (Reps: {rep1.name} <-> {rep2.name})")
@@ -302,9 +321,11 @@ def run_gemini_analysis(
         return
 
     pairs_to_analyze.sort(key=lambda x: (x.ml_similarity_score if x.ml_similarity_score is not None else x.weighted_score), reverse=True)
+    
     total_candidates = len(candidate_results)
     final_count = len(pairs_to_analyze)
     if logger: logger.info(f"Gemini analysis will run on {final_count} pairs (filtered from {total_candidates}). Skipped {skipped_count_rep} same-rep pairs, {skipped_count_dup_rep} duplicate-rep pairs.")
+    
     print(f"\n{utils.AnsiColors.CYAN}--- Running Optimized Gemini Analysis ({final_count} pairs between {min_sim}-{max_sim}%, reduced from {total_candidates}) ---{utils.AnsiColors.RESET}")
 
     try:
@@ -321,14 +342,15 @@ def run_gemini_analysis(
     analysis_count = 0
     cached_hits_count = 0
     start_time = time.time()
+
     for i, result in enumerate(pairs_to_analyze):
         f1 = all_folders.get(result.folder1_path)
         f2 = all_folders.get(result.folder2_path)
         if not f1 or not f2:
             if logger: logger.warning(f"Skipping Gemini analysis for pair ({result.folder1_path.name}, {result.folder2_path.name}): FolderInfo missing.")
             continue
-        progress = f"({i+1}/{len(pairs_to_analyze)})"
 
+        progress = f"({i+1}/{len(pairs_to_analyze)})"
         cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
         if cached_results_map and cache_key in cached_results_map:
             cached_result = cached_results_map[cache_key]
@@ -344,12 +366,17 @@ def run_gemini_analysis(
                 continue
             else:
                 if logger: logger.debug(f"Cached Gemini result for pair ({f1.path.name}, {f2.path.name}) was invalid (verdict: {cached_result.gemini_verdict}, error: {cached_result.gemini_error}) or incomplete. Will re-analyze.")
-
-        current_algorithmic_score_for_gemini = result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score
-        print(f"{progress} Analyzing pair: '{f1.path.name}' <-> '{f2.path.name}' (Basis Score: {current_algorithmic_score_for_gemini:.2f}%) with Gemini API", end='\r')
+        
+        # Send the ML score if available, otherwise send None.
+        score_for_gemini = result.ml_similarity_score if result.ml_similarity_score is not None else None
+        
+        basis_score_str = f"ML Score: {score_for_gemini:.2f}%" if score_for_gemini is not None else "No Score Provided"
+        print(f"{progress} Analyzing pair: '{f1.path.name}' <-> '{f2.path.name}' ({basis_score_str}) with Gemini API", end='\r')
+        
         if logger: logger.info(f"{progress} Sending pair to Gemini API: {f1.path.name} <-> {f2.path.name}")
+        
+        verdict, gemini_sim_score, reason_or_error = gemini_analyzer.analyze_pair(f1, f2, score_for_gemini)
 
-        verdict, gemini_sim_score, reason_or_error = gemini_analyzer.analyze_pair(f1, f2, current_algorithmic_score_for_gemini)
         print(" " * 120, end='\r')
 
         is_error = reason_or_error and ("API_ERROR" in reason_or_error or "PARSE_ERROR" in reason_or_error or "TIMEOUT" in reason_or_error or "UNEXPECTED" in reason_or_error)
@@ -371,6 +398,7 @@ def run_gemini_analysis(
             verdict_display = verdict if verdict else "Inconclusive"
             gemini_sim_score_str = f"{gemini_sim_score:.1f}%" if gemini_sim_score is not None else "N/A"
             print(f"{progress} Analyzed pair: '{f1.path.name}' <-> '{f2.path.name}'. Verdict: {verdict_display} (Gemini Similarity: {gemini_sim_score_str})")
+        
         analysis_count += 1
         time.sleep(config.GEMINI_API_DELAY_SECONDS)
 
@@ -384,7 +412,6 @@ def run_gemini_analysis(
 
 def run_analysis(args):
     global logger
-
     if not getattr(run_analysis, 'logger_initialized', False):
         utils.setup_logging(args.log_level, config.LOGS_DIR)
         logger = logging.getLogger(__name__)
@@ -397,12 +424,13 @@ def run_analysis(args):
         music_cache_file=config.MUSIC_DATA_CACHE_FILE,
         comparison_cache_file=config.COMPARISON_RESULTS_CACHE_FILE
     )
+
     enable_hashing = not args.disable_hash
     file_processor = FileProcessor(enable_hashing=enable_hashing)
     folder_scanner = FolderScanner(file_processor, data_store, force_rescan=args.force_rescan)
     comparison_engine = ComparisonEngine(enable_hashing=enable_hashing)
     quality_analyzer = QualityAnalyzer(preferred_bitrate=args.bitrate)
-    
+
     ml_similarity_model = None
     if args.ml_scoring:
         ml_similarity_model = MLSimilarityModel()
@@ -411,13 +439,11 @@ def run_analysis(args):
     else:
         if logger: logger.info("ML scoring not requested (--ml-scoring flag not set).")
 
-
     start_scan_time = time.time()
     root_paths = [Path(p) for p in args.folders]
     all_scanned_folders: Dict[Path, FolderInfo] = folder_scanner.scan_folders(root_paths)
     scan_duration = time.time() - start_scan_time
     if logger: logger.info(f"Folder scanning finished in {scan_duration:.2f} seconds.")
-
 
     cached_comparison_results_map: Dict[FrozenSet[str], FolderComparisonResult] = {}
     if args.force_rescan or args.clear_comparison_cache:
@@ -436,7 +462,6 @@ def run_analysis(args):
         return
 
     start_compare_time = time.time()
-
     comparison_results: List[FolderComparisonResult] = comparison_engine.find_similar_folders(all_scanned_folders)
     compare_duration = time.time() - start_compare_time
     if logger: logger.info(f"Folder comparison finished in {compare_duration:.2f} seconds. Found {len(comparison_results)} pairs above initial algorithmic display threshold.")
@@ -453,11 +478,6 @@ def run_analysis(args):
                 )
                 if ml_score is not None:
                     result.ml_similarity_score = ml_score
-                    # Ensure ml_score is scaled 0-100 if it's not already.
-                    # For now, assuming the ML model output is directly the score or
-                    # handled appropriately by the MLSimilarityModel class.
-                    # If it were a raw output like 0-5, it would need scaling:
-                    # result.ml_similarity_score = min(max(ml_score * 20, 0.0), 100.0) # Example scaling
                     ml_predictions_made += 1
             else:
                 if logger: logger.warning(f"FolderInfo not found for pair {result.folder1_path.name} - {result.folder2_path.name} "
@@ -468,13 +488,12 @@ def run_analysis(args):
     else:
         if logger: logger.info("ML scoring was not requested. Skipping ML enhancement step.")
 
-
     folders_for_quality_analysis: Set[Path] = set()
     if comparison_results:
         for result in comparison_results:
             folders_for_quality_analysis.add(result.folder1_path)
             folders_for_quality_analysis.add(result.folder2_path)
-
+    
     if folders_for_quality_analysis:
         start_quality_time = time.time()
         if logger: logger.info(f"Calculating quality scores for {len(folders_for_quality_analysis)} folders involved in similar pairs...")
@@ -490,7 +509,7 @@ def run_analysis(args):
         if logger: logger.info(f"Quality score calculation complete for {processed_quality_count} folders in {quality_duration:.2f} seconds.")
     else:
         if logger: logger.info("No similar folder pairs found meeting display criteria. Skipping quality score calculation.")
-
+    
     if args.gemini_analysis:
         run_gemini_analysis(
             comparison_results,
@@ -501,17 +520,12 @@ def run_analysis(args):
     else:
         if logger: logger.info("Gemini analysis was not requested (--gemini-analysis flag not set).")
 
-
     for result in comparison_results:
         algorithmic_component = result.weighted_score
         if args.ml_scoring and result.ml_similarity_score is not None:
-            # Crucial: ensure ml_similarity_score is scaled appropriately (0-100)
-            # For example, if your model output is 0-5, scale it: result.ml_similarity_score * 20
-            # Here, we assume it's already in a comparable 0-100 scale or the user handles this.
-            algorithmic_component = result.ml_similarity_score 
+            algorithmic_component = result.ml_similarity_score
             if logger: logger.debug(f"Using ML score ({algorithmic_component:.4f}) as base for final combined score for pair {result.folder1_path.name} - {result.folder2_path.name}")
-
-
+        
         if result.gemini_verdict is not None and \
            result.gemini_similarity_score is not None and \
            result.gemini_error is None:
@@ -526,9 +540,8 @@ def run_analysis(args):
                 result.final_combined_score = algorithmic_component
         else:
             result.final_combined_score = algorithmic_component
+    
     if logger: logger.info("Final combined scores calculated for comparison results from this run.")
-
-
 
     if comparison_results:
         if logger: logger.info(f"Saving/Updating {len(comparison_results)} comparison results from this run to cache: {data_store.comparison_cache_file}")
@@ -536,7 +549,6 @@ def run_analysis(args):
         if logger: logger.info("Comparison results saved/updated successfully in cache.")
     else:
         if logger: logger.info("No new/updated comparison results from this run to save to cache.")
-
 
     display_results_list = sorted(
         comparison_results,
@@ -566,6 +578,7 @@ def run_analysis(args):
         except EOFError:
             user_input_merge = 'n'
             print("Non-interactive mode detected, skipping merge confirmation.")
+
         if user_input_merge == 'y':
             action_handler.merge_similar_folders(merge_candidates)
             print("Metadata merge process finished.")
@@ -614,7 +627,7 @@ def run_analysis(args):
     else:
         print("Skipping deletion process.")
         if logger: logger.info("Deletion process skipped.")
-
+    
     total_duration = time.time() - start_scan_time
     if logger: logger.info(f"Analysis finished. Total execution time: {total_duration:.2f} seconds.")
     print(f"\nAnalysis complete. Total time: {total_duration:.2f}s")
@@ -652,19 +665,18 @@ if __name__ == "__main__":
     ml_group.add_argument("-m", "--ml-scoring", action="store_true",
                           help=f"Enable similarity scoring using the local ML model. Requires '{config.ML_MODEL_FILE.name}' in data directory.")
 
-
     gemini_group = parser.add_argument_group('Gemini Analysis Options (Optional)')
     gemini_group.add_argument("-g", "--gemini-analysis", action="store_true",
                               help=f"Enable Gemini API analysis. Requires '{config.GEMINI_API_KEY_ENV_VAR}' env var and 'google-generativeai', 'requests', 'Pillow'.")
     gemini_group.add_argument("-gr", "--gemini-range", type=str, default=config.DEFAULT_GEMINI_SIMILARITY_RANGE,
                               metavar="MIN-MAX",
                               help="Similarity range ('min-max' percentage, based on algorithmic or ML score) for sending pairs to Gemini API.")
+
     args = parser.parse_args()
 
     log_level_initial = getattr(logging, args.log_level.upper(), logging.INFO)
     logging.basicConfig(level=log_level_initial, format=config.LOG_FORMAT, handlers=[logging.StreamHandler()])
     logger = logging.getLogger(__name__)
-
 
     if args.clear_comparison_cache:
         print(f"Attempting to clear comparison results cache: {config.COMPARISON_RESULTS_CACHE_FILE}")
@@ -685,6 +697,7 @@ if __name__ == "__main__":
     invalid_paths = []
     if not args.folders:
          parser.error("No input folders specified.")
+         
     for folder_str in args.folders:
         p = Path(folder_str)
         try:
@@ -698,6 +711,7 @@ if __name__ == "__main__":
         except Exception as e:
             if logger: logger.error(f"Invalid path specified '{folder_str}': {e}")
             invalid_paths.append(f"{folder_str} (Invalid Path)")
+
     if invalid_paths:
         print(f"{utils.AnsiColors.RED}Error: The following input paths are invalid or inaccessible:{utils.AnsiColors.RESET}")
         for invalid in invalid_paths:
@@ -707,6 +721,7 @@ if __name__ == "__main__":
             sys.exit(1)
         else:
             print("Proceeding with the valid paths...")
+    
     args.folders = [str(p) for p in valid_folders]
 
     if args.preferred_root:
@@ -732,7 +747,6 @@ if __name__ == "__main__":
             print(f"{utils.AnsiColors.YELLOW}Warning: ML scoring requested (--ml-scoring) but the model file '{config.ML_MODEL_FILE}' was not found. ML scoring will be disabled.{utils.AnsiColors.RESET}")
             if logger: logger.warning(f"ML scoring requested but model file '{config.ML_MODEL_FILE}' not found. Disabling ML scoring for this run.")
             args.ml_scoring = False
-
 
     try:
         run_analysis(args)
