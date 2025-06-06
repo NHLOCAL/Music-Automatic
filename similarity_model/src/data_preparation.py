@@ -12,41 +12,31 @@ import re
 import sys
 
 # --- הגדרת נתיבים ---
-# נניח שקובץ זה נמצא ב: album_similarity_model/src/data_preparation.py
-# נתיב לשורש פרויקט album_similarity_model
 SIMILARITY_MODEL_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-# נתיב לשורש הריפו (התיקייה שמכילה את similarity_model ו- album_deduplicator)
 REPO_ROOT = SIMILARITY_MODEL_PROJECT_ROOT.parent
-
-# הוספת נתיב הריפו הראשי ל-sys.path כדי לאפשר ייבוא מ-album_deduplicator
-# זה מאפשר למצוא את 'album_deduplicator' כחבילה ברמה העליונה
 sys.path.insert(0, str(REPO_ROOT))
 
 # --- ייבואים מ-album_deduplicator ---
-# app_config יהיה album_deduplicator.music_dup_lib.config
 from album_deduplicator.music_dup_lib import config as app_config
 from album_deduplicator.music_dup_lib import utils
 from album_deduplicator.music_dup_lib.models import FolderInfo, FolderComparisonResult, FileInfo
 from album_deduplicator.music_dup_lib.core.data_store import DataStore
 from album_deduplicator.music_dup_lib.core.comparison_engine import ComparisonEngine
-from album_deduplicator.music_dup_lib.external.ml_similarity_model import MLSimilarityModel # <--- ADDED: Import the ML model class
+from album_deduplicator.music_dup_lib.external.ml_similarity_model import MLSimilarityModel
 
 try:
-    # GeminiAnalyzer ו- GEMINI_API_KEY מגיעים מהספרייה album_deduplicator
     from album_deduplicator.music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
     GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
     if not GEMINI_AVAILABLE:
-        # GEMINI_API_KEY_ENV_VAR עדיין מגיע מ-app_config של album_deduplicator
         logging.warning(f"Gemini API Key ({app_config.GEMINI_API_KEY_ENV_VAR}) not found. Gemini labeling will be limited.")
 except ImportError:
     logging.warning("Could not import GeminiAnalyzer from album_deduplicator.music_dup_lib.external. Gemini labeling disabled.")
-    GeminiAnalyzer = None # type: ignore
+    GeminiAnalyzer = None
     GEMINI_AVAILABLE = False
 
 # --- קבועים של פרויקט similarity_model ---
-# DATA_DIR זה הוא של פרויקט similarity_model, ישמש לשמירת קבצי ה-CSV של ה-dataset
 DATA_DIR = SIMILARITY_MODEL_PROJECT_ROOT / "data"
-LOGS_DIR_SIM_MODEL = SIMILARITY_MODEL_PROJECT_ROOT / "logs" # לוגים ספציפיים ל-similarity_model
+LOGS_DIR_SIM_MODEL = SIMILARITY_MODEL_PROJECT_ROOT / "logs"
 
 TRAIN_DATASET_FILE = DATA_DIR / "album_pair_features_train.csv"
 TEST_DATASET_FILE = DATA_DIR / "album_pair_features_test.csv"
@@ -59,11 +49,14 @@ LOW_CERTAINTY_THRESHOLD = 30.0
 DEFINITE_DUPLICATE_LABEL = 98.0
 DEFINITE_DIFFERENT_LABEL = 2.0
 
-MAX_LOW_SIM_PAIRS_FROM_SAMPLING = 10000
-MAX_GEMINI_CANDIDATES_FROM_SAMPLING = 1000
+### --- CHANGED: Implemented dynamic ratio for negative samples ---
+NEGATIVE_TO_POSITIVE_RATIO = 10  # We want 10 negative samples for every 1 positive sample.
+MAX_GEMINI_CANDIDATES_FROM_SAMPLING = 1000 # Keep a fixed cap on new Gemini queries to control costs.
+# MAX_LOW_SIM_PAIRS_FROM_SAMPLING is now removed.
 
-logger = logging.getLogger("SimilarityModel.DatasetBuilder") # שם לוגר ספציפי יותר
+logger = logging.getLogger("SimilarityModel.DatasetBuilder")
 
+# ... (פונקציות העזר נשארות זהות: calculate_jaccard_index, _calculate_folder_stats, etc.)
 def calculate_jaccard_index(set1: Set[str], set2: Set[str]) -> float:
     if not set1 and not set2: return 1.0
     intersection_size = len(set1.intersection(set2))
@@ -317,351 +310,208 @@ def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> Folder
     )
 
 def build_dataset(args):
-    # הגדרת לוגינג עבור סקריפט זה, יישמר בתיקיית הלוגים של similarity_model
     LOGS_DIR_SIM_MODEL.mkdir(parents=True, exist_ok=True)
-    utils.setup_logging(args.log_level, LOGS_DIR_SIM_MODEL / "dataset_builder.log") # Changed to .log
-    logger.info("Starting dataset construction for ML model (within similarity_model project).")
+    utils.setup_logging(args.log_level, LOGS_DIR_SIM_MODEL / "dataset_builder.log")
+    logger.info("Starting dataset construction with dynamic ratio and hard negative mining.")
 
-    # DataStore (from album_deduplicator) will use album_deduplicator's config (app_config)
-    # to locate its data files (e.g., album_deduplicator/data/music_data.json).
     data_store = DataStore()
-
-    if not hasattr(app_config, 'ENABLE_HASHING'):
-        logger.warning("app_config from album_deduplicator.music_dup_lib.config is missing ENABLE_HASHING. Defaulting to True for ComparisonEngine.")
-        enable_hashing_for_engine = True
-    else:
-        enable_hashing_for_engine = app_config.ENABLE_HASHING
-
-    comparison_engine = ComparisonEngine(enable_hashing=enable_hashing_for_engine)
-    
-    # <--- ADDED: Initialize the ML model ---
+    comparison_engine = ComparisonEngine(enable_hashing=app_config.ENABLE_HASHING)
     ml_similarity_model = MLSimilarityModel()
     if not ml_similarity_model.model_loaded:
-        logger.warning("MLSimilarityModel failed to load. The deciding score will fall back to the algorithmic score.")
-    # --- END ADDED ---
-        
+        logger.warning("MLSimilarityModel failed to load. Deciding score will fall back to algorithmic.")
+    
     gemini_analyzer = None
     gemini_actually_available = GEMINI_AVAILABLE and not args.disable_gemini
     if gemini_actually_available:
         try:
-            gemini_analyzer = GeminiAnalyzer() # Uses album_deduplicator's config internally
+            gemini_analyzer = GeminiAnalyzer()
             logger.info("Gemini Analyzer initialized.")
-        except ValueError as e: # GeminiAnalyzer raises ValueError if API key is missing
-            logger.error(f"Failed to initialize Gemini Analyzer: {e}. Gemini labeling will be skipped.")
+        except Exception as e:
+            logger.error(f"Failed to initialize Gemini Analyzer: {e}. Gemini labeling will be skipped.", exc_info=True)
             gemini_actually_available = False
-        except Exception as e: # Catch any other init errors
-            logger.error(f"Unexpected error initializing Gemini Analyzer: {e}. Gemini labeling will be skipped.", exc_info=True)
-            gemini_actually_available = False
-    else:
-        logger.warning("Gemini analysis is disabled by flag or due to API key/module issues.")
 
-    all_music_folders: Dict[Path, FolderInfo] = {}
-    # data_store.load_data() will load from album_deduplicator/data/music_data.json
-    # This path is determined by app_config.DATA_DIR within DataStore's logic.
-    music_data_cache_path = app_config.DATA_DIR / app_config.MUSIC_DATA_CACHE_FILE
     cached_music_data = data_store.load_data()
     if not cached_music_data:
-        logger.error(f"Music data cache (expected at {music_data_cache_path}) is empty. "
-                     "Run main scanner from album_deduplicator project first.")
+        logger.error("Music data cache is empty. Run main scanner first.")
         return
-    for path_str, folder_data_dict in cached_music_data.items():
-        try:
-            all_music_folders[Path(path_str)] = _folder_info_from_dict(path_str, folder_data_dict)
-        except Exception as e:
-            logger.error(f"Error parsing folder data for {path_str} from cache: {e}", exc_info=True)
+        
+    all_music_folders = {Path(p): _folder_info_from_dict(p, d) for p, d in cached_music_data.items()}
     logger.info(f"Loaded {len(all_music_folders)} FolderInfo objects.")
-    if not all_music_folders: return
 
-    # data_store.load_comparison_results() will load from album_deduplicator/data/comparison_results_cache.json
-    existing_comparison_results_str_keys: Dict[FrozenSet[str], FolderComparisonResult] = data_store.load_comparison_results()
-    logger.info(f"Loaded {len(existing_comparison_results_str_keys)} existing comparison results from cache.")
+    existing_comparison_results = data_store.load_comparison_results()
+    logger.info(f"Loaded {len(existing_comparison_results)} existing comparison results from cache.")
+    
+    processed_pairs = set()
+    
+    # --- NEW LOGIC: Categorize pairs first ---
+    # Store tuples of (folder1, folder2, comp_res, label, label_source)
+    positive_pairs = []
+    hard_negative_pairs_from_cache = []
+    easy_negative_pairs_from_cache = []
+    gemini_candidates_new = [] # Holds (folder1, folder2, comp_res, deciding_score)
 
-    dataset_rows: List[Dict[str, any]] = []
-    processed_pairs: Set[FrozenSet[str]] = set()
-    # <--- MODIFIED: Gemini candidates list will now hold the score to be sent ---
-    gemini_candidates_new: List[Tuple[FolderInfo, FolderInfo, FolderComparisonResult, float]] = []
-
-    filter_pairs_by_file_count_ml = getattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML', True)
-    filter_pairs_by_file_count_ml_gemini = getattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI', True)
-    gemini_api_delay = getattr(app_config, 'GEMINI_API_DELAY_SECONDS', 1.0)
-
-    logger.info("Processing pairs from existing comparison cache...")
-    for pair_key_str, comp_res in existing_comparison_results_str_keys.items():
+    logger.info("Phase 1: Categorizing pairs from existing comparison cache...")
+    for pair_key, comp_res in existing_comparison_results.items():
+        processed_pairs.add(pair_key)
         f1p, f2p = comp_res.folder1_path, comp_res.folder2_path
-
         if f1p not in all_music_folders or f2p not in all_music_folders:
-            logger.warning(f"FolderInfo missing for pair from cache: {f1p.name}, {f2p.name}. Skipping.")
-            processed_pairs.add(pair_key_str)
             continue
-
-        folder1 = all_music_folders[f1p]
-        folder2 = all_music_folders[f2p]
-
-        if len(folder1.files) != len(folder2.files) and filter_pairs_by_file_count_ml:
-            logger.debug(f"Skipping cached pair {f1p.name}-{f2p.name} due to different file counts "
-                         f"({len(folder1.files)} vs {len(folder2.files)}) and "
-                         f"FILTER_PAIRS_BY_FILE_COUNT_FOR_ML is True. Not adding to dataset.")
-            processed_pairs.add(pair_key_str)
-            continue
-
-        processed_pairs.add(pair_key_str)
         
-        # <--- MODIFIED: Calculate ML score and use it as the deciding score ---
-        ml_score = None
-        if ml_similarity_model.model_loaded:
-            ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
+        folder1, folder2 = all_music_folders[f1p], all_music_folders[f2p]
         
-        # Fallback to algorithmic score if ML score is not available
-        deciding_score = ml_score if ml_score is not None else (comp_res.final_combined_score if comp_res.final_combined_score is not None else comp_res.weighted_score)
-        
-        if ml_score is None:
-            logger.debug(f"Using algorithmic score ({deciding_score:.2f}) for cached pair {f1p.name}-{f2p.name} as ML score is unavailable.")
-        # --- END MODIFIED ---
+        ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res) if ml_similarity_model.model_loaded else None
+        deciding_score = ml_score if ml_score is not None else comp_res.weighted_score
 
-        label = None
-        label_source = "unknown"
-
-        # <--- MODIFIED: Use `deciding_score` for threshold checks ---
-        if deciding_score >= HIGH_CERTAINTY_THRESHOLD:
-            label = DEFINITE_DUPLICATE_LABEL
-            label_source = "ml_high_certainty_cached" if ml_score is not None else "algo_high_certainty_cached"
+        # Categorize POSITIVES
+        if deciding_score >= HIGH_CERTAINTY_THRESHOLD or comp_res.gemini_verdict == 'duplicate':
+            label = DEFINITE_DUPLICATE_LABEL if comp_res.gemini_verdict != 'duplicate' else comp_res.gemini_similarity_score
+            label_source = 'gemini_cached' if comp_res.gemini_verdict == 'duplicate' else ('ml_high_certainty' if ml_score is not None else 'algo_high_certainty')
+            positive_pairs.append((folder1, folder2, comp_res, label, label_source))
+        # Categorize NEGATIVES
         elif deciding_score < LOW_CERTAINTY_THRESHOLD:
-            label = DEFINITE_DIFFERENT_LABEL
-            label_source = "ml_low_certainty_cached" if ml_score is not None else "algo_low_certainty_cached"
+            easy_negative_pairs_from_cache.append((folder1, folder2, comp_res, DEFINITE_DIFFERENT_LABEL, 'easy_negative_cached'))
+        # Categorize MID-RANGE (Hard Negatives or Gemini Candidates)
         else:
-            if comp_res.gemini_similarity_score is not None and comp_res.gemini_error is None:
-                label = comp_res.gemini_similarity_score
-                label_source = "gemini_cached"
-            elif gemini_actually_available:
-                # Append the deciding_score to be sent to Gemini later
+            if comp_res.gemini_verdict in ['different', 'uncertain']:
+                hard_negative_pairs_from_cache.append((folder1, folder2, comp_res, comp_res.gemini_similarity_score, 'hard_negative_gemini_cached'))
+            elif gemini_actually_available and comp_res.gemini_verdict is None:
                 gemini_candidates_new.append((folder1, folder2, comp_res, deciding_score))
-            else:
-                label_source = "gemini_range_no_gemini_available"
-                logger.debug(f"Pair {f1p.name}-{f2p.name} in Gemini range but Gemini unavailable and no cached score. Skipping labeling.")
-        # --- END MODIFIED ---
+    
+    logger.info(f"Initial categorization complete. Positives: {len(positive_pairs)}, Hard Negatives: {len(hard_negative_pairs_from_cache)}, Easy Negatives: {len(easy_negative_pairs_from_cache)}, New Gemini Candidates: {len(gemini_candidates_new)}")
 
-        if label is not None:
-            features = extract_features_for_pair(folder1, folder2, comp_res)
-            if features:
-                features['target_label'] = label
-                features['label_source'] = label_source
-                features['folder1_path_id'] = str(f1p)
-                features['folder2_path_id'] = str(f2p)
-                dataset_rows.append(features)
+    # --- NEW LOGIC: Calculate quota and assemble negative set ---
+    logger.info("Phase 2: Assembling balanced negative dataset...")
+    n_positive = len(positive_pairs)
+    negative_quota = n_positive * NEGATIVE_TO_POSITIVE_RATIO
+    logger.info(f"Found {n_positive} positive samples. Setting negative sample quota to: {negative_quota}")
 
-    logger.info("Sampling and processing additional pairs...")
+    final_negative_pairs = []
+    # Prioritize hard negatives
+    final_negative_pairs.extend(hard_negative_pairs_from_cache)
+    logger.info(f"Added {len(hard_negative_pairs_from_cache)} hard negatives from cache.")
+    
+    # Fill with easy negatives from cache
+    needed_more_negatives = negative_quota - len(final_negative_pairs)
+    if needed_more_negatives > 0:
+        random.shuffle(easy_negative_pairs_from_cache)
+        added_easy = easy_negative_pairs_from_cache[:needed_more_negatives]
+        final_negative_pairs.extend(added_easy)
+        logger.info(f"Added {len(added_easy)} easy negatives from cache to meet quota.")
+
+    # --- NEW LOGIC: Sample only if quotas are not met ---
+    logger.info("Phase 3: Sampling to fill remaining quotas...")
     all_folder_paths_list = list(all_music_folders.keys())
-    num_total_folders = len(all_folder_paths_list)
-
-    max_sampling_attempts = max( (MAX_LOW_SIM_PAIRS_FROM_SAMPLING + MAX_GEMINI_CANDIDATES_FROM_SAMPLING) * 20, num_total_folders * 5 )
-    if num_total_folders < 2: max_sampling_attempts = 0
-
-    low_sim_pairs_count = sum(1 for r in dataset_rows if r['label_source'].startswith("algo_low") or r['label_source'].startswith("ml_low"))
-    new_gemini_candidates_count = len(gemini_candidates_new)
-
+    max_sampling_attempts = len(all_folder_paths_list) * 10 # More reasonable limit
+    
     for attempt in range(max_sampling_attempts):
-        if low_sim_pairs_count >= MAX_LOW_SIM_PAIRS_FROM_SAMPLING and \
-           new_gemini_candidates_count >= MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
-            logger.info("Reached sampling limits for low similarity and new Gemini candidates.")
+        # Check if we still need to sample for anything
+        if len(final_negative_pairs) >= negative_quota and len(gemini_candidates_new) >= MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
+            logger.info("All quotas filled. Stopping sampling.")
             break
 
-        idx1, idx2 = random.sample(range(num_total_folders), 2)
-        f1p_path_obj, f2p_path_obj = all_folder_paths_list[idx1], all_folder_paths_list[idx2]
-        current_pair_key_str = frozenset({str(f1p_path_obj), str(f2p_path_obj)})
+        if len(all_folder_paths_list) < 2: break
+        
+        idx1, idx2 = random.sample(range(len(all_folder_paths_list)), 2)
+        f1p, f2p = all_folder_paths_list[idx1], all_folder_paths_list[idx2]
+        current_pair_key = frozenset({str(f1p), str(f2p)})
 
-        if current_pair_key_str in processed_pairs:
+        if current_pair_key in processed_pairs:
             continue
-        processed_pairs.add(current_pair_key_str)
+        processed_pairs.add(current_pair_key)
 
-        folder1 = all_music_folders[f1p_path_obj]
-        folder2 = all_music_folders[f2p_path_obj]
+        folder1, folder2 = all_music_folders[f1p], all_music_folders[f2p]
+        comp_res = comparison_engine.compare_two_folders(folder1, folder2)
 
-        if len(folder1.files) != len(folder2.files) and filter_pairs_by_file_count_ml:
-            logger.debug(f"Skipping sampled pair {f1p_path_obj.name}-{f2p_path_obj.name} due to different file counts "
-                         f"({len(folder1.files)} vs {len(folder2.files)}) and "
-                         f"FILTER_PAIRS_BY_FILE_COUNT_FOR_ML is True. Not adding to dataset.")
-            continue
-
-        fresh_comp_res = comparison_engine.compare_two_folders(folder1, folder2)
-        label = None
-        label_source = "unknown_sampled"
-
-        if not fresh_comp_res:
-            if low_sim_pairs_count < MAX_LOW_SIM_PAIRS_FROM_SAMPLING:
-                label = DEFINITE_DIFFERENT_LABEL
-                label_source = "algo_no_comparison_result_sampled"
-                low_sim_pairs_count += 1
-        else:
-            # <--- MODIFIED: Calculate ML score and use it as the deciding score for sampled pairs ---
-            ml_score = None
-            if ml_similarity_model.model_loaded:
-                ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, fresh_comp_res)
+        if comp_res:
+            ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res) if ml_similarity_model.model_loaded else None
+            deciding_score = ml_score if ml_score is not None else comp_res.weighted_score
             
-            # Fallback to algorithmic score if ML score is not available
-            deciding_score = ml_score if ml_score is not None else (fresh_comp_res.final_combined_score if fresh_comp_res.final_combined_score is not None else fresh_comp_res.weighted_score)
+            if deciding_score < LOW_CERTAINTY_THRESHOLD and len(final_negative_pairs) < negative_quota:
+                final_negative_pairs.append((folder1, folder2, comp_res, DEFINITE_DIFFERENT_LABEL, 'easy_negative_sampled'))
+            elif LOW_CERTAINTY_THRESHOLD <= deciding_score < HIGH_CERTAINTY_THRESHOLD and len(gemini_candidates_new) < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
+                gemini_candidates_new.append((folder1, folder2, comp_res, deciding_score))
+                # Add to main cache so we can update it later
+                existing_comparison_results[current_pair_key] = comp_res
 
-            if ml_score is None:
-                logger.debug(f"Using algorithmic score ({deciding_score:.2f}) for sampled pair {f1p_path_obj.name}-{f2p_path_obj.name} as ML score is unavailable.")
+    logger.info(f"Sampling complete. Final negatives: {len(final_negative_pairs)}. New Gemini candidates: {len(gemini_candidates_new)}.")
 
-            if deciding_score >= HIGH_CERTAINTY_THRESHOLD:
-                label = DEFINITE_DUPLICATE_LABEL
-                label_source = "ml_high_certainty_sampled" if ml_score is not None else "algo_high_certainty_sampled"
-            elif deciding_score < LOW_CERTAINTY_THRESHOLD:
-                if low_sim_pairs_count < MAX_LOW_SIM_PAIRS_FROM_SAMPLING:
-                    label = DEFINITE_DIFFERENT_LABEL
-                    label_source = "ml_low_certainty_sampled" if ml_score is not None else "algo_low_certainty_sampled"
-                    low_sim_pairs_count += 1
-            else:
-                if gemini_actually_available and new_gemini_candidates_count < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
-                    # Append the deciding_score to be sent to Gemini
-                    gemini_candidates_new.append((folder1, folder2, fresh_comp_res, deciding_score))
-                    existing_comparison_results_str_keys[current_pair_key_str] = fresh_comp_res
-                    new_gemini_candidates_count += 1
-                else:
-                    label_source = "gemini_range_no_gemini_available_sampled"
-                    logger.debug(f"Sampled pair {f1p_path_obj.name}-{f2p_path_obj.name} in Gemini range but Gemini unavailable/limit reached. Skipping.")
-            # --- END MODIFIED ---
-
-        if label is not None:
-            features = extract_features_for_pair(folder1, folder2, fresh_comp_res)
-            if features:
-                features['target_label'] = label
-                features['label_source'] = label_source
-                features['folder1_path_id'] = str(f1p_path_obj)
-                features['folder2_path_id'] = str(f2p_path_obj)
-                dataset_rows.append(features)
-
-        if attempt % 1000 == 0 and attempt > 0:
-            logger.info(f"Sampling: Attempt {attempt}/{max_sampling_attempts}. "
-                        f"Dataset rows: {len(dataset_rows)}. Low_sim_added: {low_sim_pairs_count}. "
-                        f"New Gemini candidates: {new_gemini_candidates_count}.")
-
+    # --- NEW LOGIC: Process Gemini and add results to final lists ---
+    gemini_processed_pairs = []
     if gemini_actually_available and gemini_analyzer and gemini_candidates_new:
-        logger.info(f"Running Gemini analysis on {len(gemini_candidates_new)} new candidate pairs...")
-        gemini_api_calls = 0
-        # <--- MODIFIED: Unpack the 4-item tuple including the score for Gemini ---
-        for f1_info, f2_info, comp_res_for_gemini, score_for_gemini in gemini_candidates_new:
-            if len(f1_info.files) != len(f2_info.files) and filter_pairs_by_file_count_ml_gemini:
-                logger.warning(f"Skipping Gemini for {f1_info.path.name} vs {f2_info.path.name} "
-                               f"due to different file counts ({len(f1_info.files)} vs {len(f2_info.files)}) "
-                               f"and FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI is True.")
-                continue
-
-            f1p_path_obj, f2p_path_obj = f1_info.path, f2_info.path
+        logger.info(f"Phase 4: Running Gemini analysis on {len(gemini_candidates_new)} candidate pairs...")
+        for f1_info, f2_info, comp_res_gemini, score_for_gemini in gemini_candidates_new:
+            time.sleep(app_config.GEMINI_API_DELAY_SECONDS)
+            logger.info(f"Sending to Gemini: {f1_info.path.name} vs {f2_info.path.name} (Score: {score_for_gemini:.2f})")
+            verdict, gemini_sim_score, reason = gemini_analyzer.analyze_pair(f1_info, f2_info, score_for_gemini)
             
-            # <--- MODIFIED: Use the pre-calculated deciding score ---
-            logger.info(f"Gemini ({gemini_api_calls+1}/{len(gemini_candidates_new)}): {f1p_path_obj.name} vs {f2p_path_obj.name} (Deciding Score for Gemini: {score_for_gemini:.2f})")
+            # Update the main comparison result object
+            pair_key = frozenset({str(f1_info.path), str(f2_info.path)})
+            comp_res_gemini.gemini_verdict = verdict
+            comp_res_gemini.gemini_similarity_score = gemini_sim_score
+            comp_res_gemini.gemini_reason = reason
+            comp_res_gemini.gemini_error = None if "ERROR" not in reason.upper() else reason
+            existing_comparison_results[pair_key] = comp_res_gemini
 
-            time.sleep(gemini_api_delay)
-            # Send the deciding score (which is ML-based if available) to Gemini
-            verdict, gemini_sim_score, reason_or_error = gemini_analyzer.analyze_pair(f1_info, f2_info, score_for_gemini)
-            gemini_api_calls += 1
+            if gemini_sim_score is not None and comp_res_gemini.gemini_error is None:
+                if verdict == 'duplicate':
+                     gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_positive_new'))
+                else: # 'different' or 'uncertain' are treated as negatives
+                     gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_negative_new'))
 
-            label = None
-            label_source = "gemini_new_run_failed"
-            current_pair_key_str_for_gemini = frozenset({str(f1p_path_obj), str(f2p_path_obj)})
-            # Retrieve the canonical FolderComparisonResult object to update
-            target_comp_res_obj = existing_comparison_results_str_keys.get(current_pair_key_str_for_gemini)
-            if not target_comp_res_obj:
-                logger.error(f"Consistency issue: comp_res object not found in cache for Gemini pair {f1p_path_obj} - {f2p_path_obj}. Using the one passed to Gemini call.")
-                target_comp_res_obj = comp_res_for_gemini
+    # --- NEW LOGIC: Final assembly ---
+    logger.info("Phase 5: Assembling final dataset...")
+    
+    all_labeled_pairs = positive_pairs + final_negative_pairs + gemini_processed_pairs
+    logger.info(f"Total labeled pairs for dataset: {len(all_labeled_pairs)} (Positives: {len(positive_pairs)}, Negatives: {len(final_negative_pairs)}, Gemini-processed: {len(gemini_processed_pairs)})")
 
-            if gemini_sim_score is not None and ("ERROR" not in reason_or_error.upper() if reason_or_error else True and verdict is not None):
-                label = gemini_sim_score
-                label_source = "gemini_new_run_success"
-                target_comp_res_obj.gemini_verdict = verdict
-                target_comp_res_obj.gemini_similarity_score = gemini_sim_score
-                target_comp_res_obj.gemini_reason = reason_or_error
-                target_comp_res_obj.gemini_error = None
-            else:
-                logger.warning(f"Gemini analysis failed or returned invalid data for {f1p_path_obj.name} vs {f2p_path_obj.name}. "
-                               f"Error/Reason: {reason_or_error}. This pair will not be added with Gemini label.")
-                target_comp_res_obj.gemini_error = reason_or_error
-                target_comp_res_obj.gemini_verdict = None
-                target_comp_res_obj.gemini_similarity_score = None
-                target_comp_res_obj.gemini_reason = None
-
-            existing_comparison_results_str_keys[current_pair_key_str_for_gemini] = target_comp_res_obj
-
-            if label is not None:
-                features = extract_features_for_pair(f1_info, f2_info, target_comp_res_obj)
-                if features:
-                    features['target_label'] = label
-                    features['label_source'] = label_source
-                    features['folder1_path_id'] = str(f1p_path_obj)
-                    features['folder2_path_id'] = str(f2p_path_obj)
-                    dataset_rows.append(features)
-    else:
-        logger.info("Skipping new Gemini runs (Gemini unavailable, analyzer init failed, or no new candidates).")
+    dataset_rows = []
+    for f1, f2, res, label, source in all_labeled_pairs:
+        features = extract_features_for_pair(f1, f2, res)
+        if features:
+            features['target_label'] = label
+            features['label_source'] = source
+            features['folder1_path_id'] = str(f1.path)
+            features['folder2_path_id'] = str(f2.path)
+            dataset_rows.append(features)
 
     if not dataset_rows:
         logger.warning("No data rows were generated for the dataset. Exiting.")
-        if args.update_comparison_cache and existing_comparison_results_str_keys:
-            comparison_cache_path = app_config.DATA_DIR / app_config.COMPARISON_RESULTS_CACHE_FILE
-            logger.info(f"Updating comparison_results_cache.json (at {comparison_cache_path}) with {len(existing_comparison_results_str_keys)} entries...")
-            data_store.save_comparison_results(existing_comparison_results_str_keys)
-            logger.info(f"Comparison cache (at {comparison_cache_path}) updated.")
         return
 
+    # --- Final processing and saving (mostly unchanged) ---
     final_df = pd.DataFrame(dataset_rows)
-    final_df.dropna(subset=['target_label'], inplace=True) 
+    final_df.dropna(subset=['target_label'], inplace=True)
     final_df.fillna(0.0, inplace=True)
 
-    logger.info(f"Total dataset rows before split: {final_df.shape[0]}, columns: {final_df.shape[1]}.")
+    logger.info(f"Total dataset rows before split: {final_df.shape[0]}")
     if final_df.shape[0] > 0:
-        logger.info(f"Columns: {final_df.columns.tolist()}")
-        logger.info(f"Target label statistics (full dataset):\n{final_df['target_label'].describe(percentiles=[.02, .1, .25, .5, .75, .9, .98])}")
-        logger.info(f"Label source distribution (full dataset):\n{final_df['label_source'].value_counts(dropna=False)}")
+        logger.info(f"Label source distribution:\n{final_df['label_source'].value_counts(dropna=False)}")
+        logger.info(f"Target label statistics:\n{final_df['target_label'].describe(percentiles=[.1, .25, .5, .75, .9])}")
 
-    # Ensure DATA_DIR (for similarity_model) exists before saving
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-
     if final_df.shape[0] < 2:
-        logger.warning("Dataset has less than 2 rows. Cannot split. Saving all to train file if any.")
-        if final_df.shape[0] == 1:
-            try:
-                final_df.to_csv(TRAIN_DATASET_FILE, index=False, encoding='utf-8')
-                logger.info(f"Single row dataset saved to: {TRAIN_DATASET_FILE}")
-            except Exception as e:
-                logger.error(f"Error saving single row dataset to {TRAIN_DATASET_FILE}: {e}", exc_info=True)
-        else:
-             logger.info("Dataset is empty, no files will be saved.")
+        final_df.to_csv(TRAIN_DATASET_FILE, index=False, encoding='utf-8')
+        logger.warning(f"Dataset has < 2 rows. Saved all to: {TRAIN_DATASET_FILE}")
     else:
-        logger.info(f"Splitting dataset into training ({1-TEST_SPLIT_RATIO:.0%}) and testing ({TEST_SPLIT_RATIO:.0%}).")
-        try:
-            train_df, test_df = train_test_split(
-                final_df, test_size=TEST_SPLIT_RATIO, random_state=DATASET_RANDOM_STATE, shuffle=True
-            )
-        except ValueError as e: 
-            logger.warning(f"Could not stratify during train-test split (Reason: {e}). Performing non-stratified split.")
-            train_df, test_df = train_test_split(
-                final_df, test_size=TEST_SPLIT_RATIO, random_state=DATASET_RANDOM_STATE, shuffle=True
-            )
-        logger.info(f"Training set shape: {train_df.shape}")
-        logger.info(f"Testing set shape: {test_df.shape}")
-        try:
-            train_df.to_csv(TRAIN_DATASET_FILE, index=False, encoding='utf-8')
-            logger.info(f"Training dataset successfully saved to: {TRAIN_DATASET_FILE}")
+        train_df, test_df = train_test_split(final_df, test_size=TEST_SPLIT_RATIO, random_state=DATASET_RANDOM_STATE, shuffle=True)
+        train_df.to_csv(TRAIN_DATASET_FILE, index=False, encoding='utf-8')
+        test_df.to_csv(TEST_DATASET_FILE, index=False, encoding='utf-8')
+        logger.info(f"Training ({train_df.shape[0]} rows) and testing ({test_df.shape[0]} rows) datasets saved.")
 
-            test_df.to_csv(TEST_DATASET_FILE, index=False, encoding='utf-8')
-            logger.info(f"Testing dataset successfully saved to: {TEST_DATASET_FILE}")
-        except Exception as e:
-            logger.error(f"Error saving train/test datasets: {e}", exc_info=True)
+    if args.update_comparison_cache:
+        logger.info(f"Updating comparison_results_cache.json with {len(existing_comparison_results)} total entries...")
+        data_store.save_comparison_results(existing_comparison_results)
+        logger.info("Comparison cache updated successfully.")
 
-    if args.update_comparison_cache and existing_comparison_results_str_keys:
-        comparison_cache_path = app_config.DATA_DIR / app_config.COMPARISON_RESULTS_CACHE_FILE
-        logger.info(f"Updating comparison_results_cache.json (at {comparison_cache_path}) with {len(existing_comparison_results_str_keys)} entries...")
-        data_store.save_comparison_results(existing_comparison_results_str_keys)
-        logger.info(f"Comparison cache (at {comparison_cache_path}) updated.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Build a training dataset for music duplicate detection ML model, using Gemini for labeling.")
+    parser = argparse.ArgumentParser(description="Build a balanced training dataset for the music duplicate detection ML model.")
     parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         default="INFO", help="Set the logging level.")
     parser.add_argument("-d", "--disable-gemini", action="store_true",
                         help="Completely disable new Gemini API calls, even if API key is present.")
     parser.add_argument("-u", "--update-comparison-cache", action="store_true",
-                        help="Update the comparison_results_cache.json file (in album_deduplicator/data) with new Gemini results or comparisons.")
+                        help="Update the main comparison_results_cache.json with new Gemini results.")
     cli_args = parser.parse_args()
 
     build_dataset(cli_args)
