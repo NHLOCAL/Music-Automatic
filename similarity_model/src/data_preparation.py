@@ -341,6 +341,40 @@ def build_dataset(args):
     existing_comparison_results = data_store.load_comparison_results()
     logger.info(f"Loaded {len(existing_comparison_results)} existing comparison results from cache.")
     
+    ### --- ADDED: Full scan logic ---
+    if args.full_scan:
+        logger.info("---[ Full Scan Mode Activated ]---")
+        logger.info("Comparing all possible folder pairs not already present in the cache.")
+        if not args.update_comparison_cache:
+            logger.warning("Full scan is enabled, but --update-comparison-cache is not. New comparison results will be processed in memory but NOT saved to disk.")
+
+        all_folder_paths_list = list(all_music_folders.keys())
+        cached_pairs = set(existing_comparison_results.keys())
+        
+        total_possible_pairs = len(all_folder_paths_list) * (len(all_folder_paths_list) - 1) // 2
+        logger.info(f"Total possible pairs: {total_possible_pairs}. Already cached: {len(cached_pairs)}.")
+        
+        new_comparisons = 0
+        for f1p, f2p in combinations(all_folder_paths_list, 2):
+            pair_key = frozenset({str(f1p), str(f2p)})
+            if pair_key in cached_pairs:
+                continue
+
+            # This is a new pair, let's compare it
+            folder1 = all_music_folders[f1p]
+            folder2 = all_music_folders[f2p]
+            
+            comp_res = comparison_engine.compare_two_folders(folder1, folder2)
+            if comp_res:
+                existing_comparison_results[pair_key] = comp_res
+                new_comparisons += 1
+                if new_comparisons > 0 and new_comparisons % 100 == 0:
+                    logger.info(f"Completed {new_comparisons} new comparisons...")
+        
+        logger.info(f"Full scan complete. Performed {new_comparisons} new comparisons.")
+        logger.info("---[ Exiting Full Scan Mode, proceeding with dataset construction ]---")
+    ### --- END of added logic ---
+
     processed_pairs = set()
     
     # --- NEW LOGIC: Categorize pairs first ---
@@ -508,10 +542,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build a balanced training dataset for the music duplicate detection ML model.")
     parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         default="INFO", help="Set the logging level.")
+    ### --- ADDED: New argument for full scan ---
+    parser.add_argument("-f", "--full-scan", action="store_true",
+                        help="Perform a full comparison of all folder pairs in music-data, skipping pairs already in the comparison cache.")
     parser.add_argument("-d", "--disable-gemini", action="store_true",
                         help="Completely disable new Gemini API calls, even if API key is present.")
     parser.add_argument("-u", "--update-comparison-cache", action="store_true",
-                        help="Update the main comparison_results_cache.json with new Gemini results.")
+                        help="Update the main comparison_results_cache.json with new Gemini results or full scan results.")
     cli_args = parser.parse_args()
 
     build_dataset(cli_args)
