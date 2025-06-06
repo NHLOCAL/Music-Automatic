@@ -29,6 +29,7 @@ from album_deduplicator.music_dup_lib import utils
 from album_deduplicator.music_dup_lib.models import FolderInfo, FolderComparisonResult, FileInfo
 from album_deduplicator.music_dup_lib.core.data_store import DataStore
 from album_deduplicator.music_dup_lib.core.comparison_engine import ComparisonEngine
+from album_deduplicator.music_dup_lib.external.ml_similarity_model import MLSimilarityModel # <--- ADDED: Import the ML model class
 
 try:
     # GeminiAnalyzer ו- GEMINI_API_KEY מגיעים מהספרייה album_deduplicator
@@ -332,6 +333,13 @@ def build_dataset(args):
         enable_hashing_for_engine = app_config.ENABLE_HASHING
 
     comparison_engine = ComparisonEngine(enable_hashing=enable_hashing_for_engine)
+    
+    # <--- ADDED: Initialize the ML model ---
+    ml_similarity_model = MLSimilarityModel()
+    if not ml_similarity_model.model_loaded:
+        logger.warning("MLSimilarityModel failed to load. The deciding score will fall back to the algorithmic score.")
+    # --- END ADDED ---
+        
     gemini_analyzer = None
     gemini_actually_available = GEMINI_AVAILABLE and not args.disable_gemini
     if gemini_actually_available:
@@ -370,7 +378,8 @@ def build_dataset(args):
 
     dataset_rows: List[Dict[str, any]] = []
     processed_pairs: Set[FrozenSet[str]] = set()
-    gemini_candidates_new: List[Tuple[FolderInfo, FolderInfo, FolderComparisonResult]] = []
+    # <--- MODIFIED: Gemini candidates list will now hold the score to be sent ---
+    gemini_candidates_new: List[Tuple[FolderInfo, FolderInfo, FolderComparisonResult, float]] = []
 
     filter_pairs_by_file_count_ml = getattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML', True)
     filter_pairs_by_file_count_ml_gemini = getattr(app_config, 'FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI', True)
@@ -396,28 +405,40 @@ def build_dataset(args):
             continue
 
         processed_pairs.add(pair_key_str)
-        current_algorithmic_score = comp_res.final_combined_score if comp_res.final_combined_score is not None else comp_res.weighted_score
-        if comp_res.final_combined_score is None:
-             logger.warning(f"final_combined_score is None for cached pair {f1p.name}-{f2p.name}. Falling back to weighted_score ({comp_res.weighted_score}).")
+        
+        # <--- MODIFIED: Calculate ML score and use it as the deciding score ---
+        ml_score = None
+        if ml_similarity_model.model_loaded:
+            ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
+        
+        # Fallback to algorithmic score if ML score is not available
+        deciding_score = ml_score if ml_score is not None else (comp_res.final_combined_score if comp_res.final_combined_score is not None else comp_res.weighted_score)
+        
+        if ml_score is None:
+            logger.debug(f"Using algorithmic score ({deciding_score:.2f}) for cached pair {f1p.name}-{f2p.name} as ML score is unavailable.")
+        # --- END MODIFIED ---
 
         label = None
         label_source = "unknown"
 
-        if current_algorithmic_score >= HIGH_CERTAINTY_THRESHOLD:
+        # <--- MODIFIED: Use `deciding_score` for threshold checks ---
+        if deciding_score >= HIGH_CERTAINTY_THRESHOLD:
             label = DEFINITE_DUPLICATE_LABEL
-            label_source = "algo_high_certainty_cached"
-        elif current_algorithmic_score < LOW_CERTAINTY_THRESHOLD:
+            label_source = "ml_high_certainty_cached" if ml_score is not None else "algo_high_certainty_cached"
+        elif deciding_score < LOW_CERTAINTY_THRESHOLD:
             label = DEFINITE_DIFFERENT_LABEL
-            label_source = "algo_low_certainty_cached"
+            label_source = "ml_low_certainty_cached" if ml_score is not None else "algo_low_certainty_cached"
         else:
             if comp_res.gemini_similarity_score is not None and comp_res.gemini_error is None:
                 label = comp_res.gemini_similarity_score
                 label_source = "gemini_cached"
             elif gemini_actually_available:
-                gemini_candidates_new.append((folder1, folder2, comp_res))
+                # Append the deciding_score to be sent to Gemini later
+                gemini_candidates_new.append((folder1, folder2, comp_res, deciding_score))
             else:
                 label_source = "gemini_range_no_gemini_available"
                 logger.debug(f"Pair {f1p.name}-{f2p.name} in Gemini range but Gemini unavailable and no cached score. Skipping labeling.")
+        # --- END MODIFIED ---
 
         if label is not None:
             features = extract_features_for_pair(folder1, folder2, comp_res)
@@ -435,7 +456,7 @@ def build_dataset(args):
     max_sampling_attempts = max( (MAX_LOW_SIM_PAIRS_FROM_SAMPLING + MAX_GEMINI_CANDIDATES_FROM_SAMPLING) * 20, num_total_folders * 5 )
     if num_total_folders < 2: max_sampling_attempts = 0
 
-    low_sim_pairs_count = sum(1 for r in dataset_rows if r['label_source'].startswith("algo_low"))
+    low_sim_pairs_count = sum(1 for r in dataset_rows if r['label_source'].startswith("algo_low") or r['label_source'].startswith("ml_low"))
     new_gemini_candidates_count = len(gemini_candidates_new)
 
     for attempt in range(max_sampling_attempts):
@@ -471,27 +492,35 @@ def build_dataset(args):
                 label_source = "algo_no_comparison_result_sampled"
                 low_sim_pairs_count += 1
         else:
-            current_algorithmic_score = fresh_comp_res.final_combined_score if fresh_comp_res.final_combined_score is not None else fresh_comp_res.weighted_score
-            if fresh_comp_res.final_combined_score is None:
-                logger.warning(f"final_combined_score is None for sampled pair {f1p_path_obj.name}-{f2p_path_obj.name}. Falling back to weighted_score ({fresh_comp_res.weighted_score}).")
+            # <--- MODIFIED: Calculate ML score and use it as the deciding score for sampled pairs ---
+            ml_score = None
+            if ml_similarity_model.model_loaded:
+                ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, fresh_comp_res)
+            
+            # Fallback to algorithmic score if ML score is not available
+            deciding_score = ml_score if ml_score is not None else (fresh_comp_res.final_combined_score if fresh_comp_res.final_combined_score is not None else fresh_comp_res.weighted_score)
 
-            if current_algorithmic_score >= HIGH_CERTAINTY_THRESHOLD:
+            if ml_score is None:
+                logger.debug(f"Using algorithmic score ({deciding_score:.2f}) for sampled pair {f1p_path_obj.name}-{f2p_path_obj.name} as ML score is unavailable.")
+
+            if deciding_score >= HIGH_CERTAINTY_THRESHOLD:
                 label = DEFINITE_DUPLICATE_LABEL
-                label_source = "algo_high_certainty_sampled"
-            elif current_algorithmic_score < LOW_CERTAINTY_THRESHOLD:
+                label_source = "ml_high_certainty_sampled" if ml_score is not None else "algo_high_certainty_sampled"
+            elif deciding_score < LOW_CERTAINTY_THRESHOLD:
                 if low_sim_pairs_count < MAX_LOW_SIM_PAIRS_FROM_SAMPLING:
                     label = DEFINITE_DIFFERENT_LABEL
-                    label_source = "algo_low_certainty_sampled"
+                    label_source = "ml_low_certainty_sampled" if ml_score is not None else "algo_low_certainty_sampled"
                     low_sim_pairs_count += 1
             else:
                 if gemini_actually_available and new_gemini_candidates_count < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
-                    gemini_candidates_new.append((folder1, folder2, fresh_comp_res))
-                    # Add to existing_comparison_results_str_keys so it can be updated by Gemini if needed
+                    # Append the deciding_score to be sent to Gemini
+                    gemini_candidates_new.append((folder1, folder2, fresh_comp_res, deciding_score))
                     existing_comparison_results_str_keys[current_pair_key_str] = fresh_comp_res
                     new_gemini_candidates_count += 1
                 else:
                     label_source = "gemini_range_no_gemini_available_sampled"
                     logger.debug(f"Sampled pair {f1p_path_obj.name}-{f2p_path_obj.name} in Gemini range but Gemini unavailable/limit reached. Skipping.")
+            # --- END MODIFIED ---
 
         if label is not None:
             features = extract_features_for_pair(folder1, folder2, fresh_comp_res)
@@ -510,7 +539,8 @@ def build_dataset(args):
     if gemini_actually_available and gemini_analyzer and gemini_candidates_new:
         logger.info(f"Running Gemini analysis on {len(gemini_candidates_new)} new candidate pairs...")
         gemini_api_calls = 0
-        for f1_info, f2_info, comp_res_for_gemini in gemini_candidates_new:
+        # <--- MODIFIED: Unpack the 4-item tuple including the score for Gemini ---
+        for f1_info, f2_info, comp_res_for_gemini, score_for_gemini in gemini_candidates_new:
             if len(f1_info.files) != len(f2_info.files) and filter_pairs_by_file_count_ml_gemini:
                 logger.warning(f"Skipping Gemini for {f1_info.path.name} vs {f2_info.path.name} "
                                f"due to different file counts ({len(f1_info.files)} vs {len(f2_info.files)}) "
@@ -518,14 +548,13 @@ def build_dataset(args):
                 continue
 
             f1p_path_obj, f2p_path_obj = f1_info.path, f2_info.path
-            algo_score = comp_res_for_gemini.final_combined_score if comp_res_for_gemini.final_combined_score is not None else comp_res_for_gemini.weighted_score
-            if comp_res_for_gemini.final_combined_score is None:
-                 logger.warning(f"final_combined_score is None for Gemini candidate pair {f1p_path_obj.name}-{f2p_path_obj.name} when sending to Gemini. Falling back to weighted_score ({comp_res_for_gemini.weighted_score}).")
-
-            logger.info(f"Gemini ({gemini_api_calls+1}/{len(gemini_candidates_new)}): {f1p_path_obj.name} vs {f2p_path_obj.name} (Algo Score (final_combined): {algo_score:.2f})")
+            
+            # <--- MODIFIED: Use the pre-calculated deciding score ---
+            logger.info(f"Gemini ({gemini_api_calls+1}/{len(gemini_candidates_new)}): {f1p_path_obj.name} vs {f2p_path_obj.name} (Deciding Score for Gemini: {score_for_gemini:.2f})")
 
             time.sleep(gemini_api_delay)
-            verdict, gemini_sim_score, reason_or_error = gemini_analyzer.analyze_pair(f1_info, f2_info, algo_score)
+            # Send the deciding score (which is ML-based if available) to Gemini
+            verdict, gemini_sim_score, reason_or_error = gemini_analyzer.analyze_pair(f1_info, f2_info, score_for_gemini)
             gemini_api_calls += 1
 
             label = None
@@ -534,9 +563,8 @@ def build_dataset(args):
             # Retrieve the canonical FolderComparisonResult object to update
             target_comp_res_obj = existing_comparison_results_str_keys.get(current_pair_key_str_for_gemini)
             if not target_comp_res_obj:
-                # This case should ideally not happen if logic is correct (sampled pairs added to existing_comparison_results_str_keys)
                 logger.error(f"Consistency issue: comp_res object not found in cache for Gemini pair {f1p_path_obj} - {f2p_path_obj}. Using the one passed to Gemini call.")
-                target_comp_res_obj = comp_res_for_gemini # Fallback, but it might not be the one in the main cache
+                target_comp_res_obj = comp_res_for_gemini
 
             if gemini_sim_score is not None and ("ERROR" not in reason_or_error.upper() if reason_or_error else True and verdict is not None):
                 label = gemini_sim_score
@@ -552,9 +580,8 @@ def build_dataset(args):
                 target_comp_res_obj.gemini_verdict = None
                 target_comp_res_obj.gemini_similarity_score = None
                 target_comp_res_obj.gemini_reason = None
-            # Ensure the potentially updated object is back in the main cache if it was retrieved and modified
-            existing_comparison_results_str_keys[current_pair_key_str_for_gemini] = target_comp_res_obj
 
+            existing_comparison_results_str_keys[current_pair_key_str_for_gemini] = target_comp_res_obj
 
             if label is not None:
                 features = extract_features_for_pair(f1_info, f2_info, target_comp_res_obj)
@@ -577,11 +604,8 @@ def build_dataset(args):
         return
 
     final_df = pd.DataFrame(dataset_rows)
-    final_df.dropna(subset=['target_label'], inplace=True) # Ensure target_label is not NaN
-    # Fill all other NaNs with 0.0 AFTER dropping rows with NaN target_label
-    # This is important because features can legitimately be 0.0
+    final_df.dropna(subset=['target_label'], inplace=True) 
     final_df.fillna(0.0, inplace=True)
-
 
     logger.info(f"Total dataset rows before split: {final_df.shape[0]}, columns: {final_df.shape[1]}.")
     if final_df.shape[0] > 0:
@@ -605,18 +629,10 @@ def build_dataset(args):
     else:
         logger.info(f"Splitting dataset into training ({1-TEST_SPLIT_RATIO:.0%}) and testing ({TEST_SPLIT_RATIO:.0%}).")
         try:
-            # Try to stratify if target_label has enough unique values for both splits
-            # This requires at least 2 samples per class if stratifying
-            # If target_label is continuous, stratification might not be directly applicable or sklearn might handle it
-            # For regression-like targets, simple shuffle split is common.
-            # If target_label is categorical-like (e.g., binned scores), stratification could be useful.
-            # Given the nature of similarity scores (0-100), direct stratification by raw score is not typical.
-            # If it were classes, stratify=final_df['target_label'] would be used.
-            # For now, using shuffle split. If stratification is needed, target would need to be binned.
             train_df, test_df = train_test_split(
                 final_df, test_size=TEST_SPLIT_RATIO, random_state=DATASET_RANDOM_STATE, shuffle=True
             )
-        except ValueError as e: # This might occur if stratification fails due to too few samples in a class
+        except ValueError as e: 
             logger.warning(f"Could not stratify during train-test split (Reason: {e}). Performing non-stratified split.")
             train_df, test_df = train_test_split(
                 final_df, test_size=TEST_SPLIT_RATIO, random_state=DATASET_RANDOM_STATE, shuffle=True
