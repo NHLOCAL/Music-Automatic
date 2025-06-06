@@ -54,13 +54,23 @@ DEFINITE_DIFFERENT_LABEL = 2.0
 NEGATIVE_TO_POSITIVE_RATIO = 10
 MAX_GEMINI_CANDIDATES_FROM_SAMPLING = 1000
 
-### --- MODIFIED: Constants for incremental and filtered caching ---
-MIN_SCORE_TO_CACHE = 15.0  # Only cache pairs with a weighted score > 5.0
-CACHE_SAVE_BATCH_SIZE = 50000 # Save to disk every 5000 new valuable entries
+MIN_SCORE_TO_CACHE = 15.0
+CACHE_SAVE_BATCH_SIZE = 50000
 
 logger = logging.getLogger("SimilarityModel.DatasetBuilder")
 
-# ... (פונקציות העזר נשארות זהות) ...
+### --- MODIFIED: Helper function to truncate floats in nested structures ---
+def _truncate_floats_recursive(data: Any, decimals: int = 2) -> Any:
+    """Recursively traverses a data structure and rounds any float it finds."""
+    if isinstance(data, float):
+        return round(data, decimals)
+    if isinstance(data, dict):
+        return {k: _truncate_floats_recursive(v, decimals) for k, v in data.items()}
+    if isinstance(data, list):
+        return [_truncate_floats_recursive(item, decimals) for item in data]
+    return data
+
+# ... (פונקציות העזר האחרות נשארות זהות) ...
 def calculate_jaccard_index(set1: Set[str], set2: Set[str]) -> float:
     if not set1 and not set2: return 1.0
     intersection_size = len(set1.intersection(set2))
@@ -343,9 +353,8 @@ def build_dataset(args):
     existing_comparison_results = data_store.load_comparison_results()
     logger.info(f"Loaded {len(existing_comparison_results)} existing comparison results from cache.")
     
-    ### --- MODIFIED: Full scan logic with filtering and incremental saving ---
     if args.full_scan:
-        logger.info(f"---[ Full Scan Mode: Filtering pairs with score < {MIN_SCORE_TO_CACHE} and saving incrementally ]---")
+        logger.info(f"---[ Full Scan Mode: Filtering, Truncating, and Saving Incrementally ]---")
         
         groups_by_file_count = defaultdict(list)
         for path, folder_info in all_music_folders.items():
@@ -393,20 +402,26 @@ def build_dataset(args):
                     folder2 = all_music_folders[f2p]
                     comp_res = comparison_engine.compare_two_folders(folder1, folder2)
 
-                    if comp_res and comp_res.weighted_score >= MIN_SCORE_TO_CACHE:
-                        existing_comparison_results[pair_key] = comp_res # Keep in memory for this run
-                        new_valuable_entries += 1
-                        
-                        if args.update_comparison_cache:
-                            new_results_batch[pair_key] = comp_res
-                            if len(new_results_batch) >= CACHE_SAVE_BATCH_SIZE:
-                                sys.stdout.write("\n") # Newline before saving message
-                                logger.info(f"Saving a batch of {len(new_results_batch)} new results to cache...")
-                                current_cache = data_store.load_comparison_results()
-                                current_cache.update(new_results_batch)
-                                data_store.save_comparison_results(current_cache)
-                                new_results_batch.clear()
-                                logger.info("Batch saved. Resuming scan...")
+                    if comp_res:
+                        ### --- MODIFIED: Truncate all floats before caching ---
+                        comp_res.weighted_score = round(comp_res.weighted_score, 2)
+                        comp_res.similarity_scores = _truncate_floats_recursive(comp_res.similarity_scores)
+                        ### --- END MODIFICATION ---
+
+                        if comp_res.weighted_score >= MIN_SCORE_TO_CACHE:
+                            existing_comparison_results[pair_key] = comp_res
+                            new_valuable_entries += 1
+                            
+                            if args.update_comparison_cache:
+                                new_results_batch[pair_key] = comp_res
+                                if len(new_results_batch) >= CACHE_SAVE_BATCH_SIZE:
+                                    sys.stdout.write("\n")
+                                    logger.info(f"Saving a batch of {len(new_results_batch)} new results to cache...")
+                                    current_cache = data_store.load_comparison_results()
+                                    current_cache.update(new_results_batch)
+                                    data_store.save_comparison_results(current_cache)
+                                    new_results_batch.clear()
+                                    logger.info("Batch saved. Resuming scan...")
 
                     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     status_line = (
@@ -419,7 +434,6 @@ def build_dataset(args):
             sys.stdout.write('\n')
             sys.stdout.flush()
 
-            # Save any remaining items in the final batch
             if args.update_comparison_cache and new_results_batch:
                 logger.info(f"Saving final batch of {len(new_results_batch)} new results to cache...")
                 current_cache = data_store.load_comparison_results()
@@ -433,7 +447,6 @@ def build_dataset(args):
 
         logger.info(f"Full scan complete. Added {new_valuable_entries} new valuable entries to the cache.")
         logger.info("---[ Exiting Full Scan Mode, proceeding with dataset construction ]---")
-    ### --- END of modified logic ---
     
     processed_pairs = set()
     
@@ -577,10 +590,8 @@ def build_dataset(args):
         test_df.to_csv(TEST_DATASET_FILE, index=False, encoding='utf-8')
         logger.info(f"Training ({train_df.shape[0]} rows) and testing ({test_df.shape[0]} rows) datasets saved.")
 
-    # The final save is now less critical for --full-scan, but still necessary for results from Gemini or sampling.
-    # Since the in-memory dictionary is now much smaller, this is no longer a bottleneck.
-    if args.update_comparison_cache:
-        logger.info(f"Updating comparison_results_cache.json with final results...")
+    if args.update_comparison_cache and not args.full_scan:
+        logger.info(f"Updating comparison_results_cache.json with final results from sampling/Gemini...")
         data_store.save_comparison_results(existing_comparison_results)
         logger.info("Comparison cache updated successfully.")
 
@@ -590,7 +601,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         default="INFO", help="Set the logging level.")
     parser.add_argument("-f", "--full-scan", action="store_true",
-                        help="Perform a full comparison of all folder pairs, filtered by audio file count.")
+                        help="Perform a full, optimized comparison of all folder pairs.")
     parser.add_argument("-d", "--disable-gemini", action="store_true",
                         help="Completely disable new Gemini API calls, even if API key is present.")
     parser.add_argument("-u", "--update-comparison-cache", action="store_true",
