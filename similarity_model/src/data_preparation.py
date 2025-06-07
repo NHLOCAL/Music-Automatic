@@ -1,3 +1,5 @@
+# --- START OF FILE data_preparation.py ---
+
 import argparse
 import logging
 from pathlib import Path
@@ -453,7 +455,19 @@ def build_dataset(args):
 
         folder1, folder2 = all_music_folders[f1p], all_music_folders[f2p]
 
-        ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res) if ml_similarity_model.model_loaded else None
+        # ### START OF CHANGE 1 ###
+        # Check for a cached ML score. If not present, calculate and save it back to the object.
+        # `hasattr` is used for backward compatibility with old cache files.
+        if hasattr(comp_res, 'ml_similarity_score') and comp_res.ml_similarity_score is not None:
+            ml_score = comp_res.ml_similarity_score
+        elif ml_similarity_model.model_loaded:
+            ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
+            # Save the newly calculated score back to the in-memory object
+            comp_res.ml_similarity_score = ml_score
+        else:
+            ml_score = None
+        # ### END OF CHANGE 1 ###
+
         deciding_score = ml_score if ml_score is not None else comp_res.weighted_score
 
         if deciding_score >= HIGH_CERTAINTY_THRESHOLD or comp_res.gemini_verdict == 'duplicate':
@@ -511,7 +525,15 @@ def build_dataset(args):
         comp_res = comparison_engine.compare_two_folders(folder1, folder2)
 
         if comp_res:
-            ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res) if ml_similarity_model.model_loaded else None
+            # ### START OF CHANGE 2 ###
+            # When creating a new comparison result, calculate the ML score immediately
+            # and store it in the new comp_res object.
+            ml_score = None
+            if ml_similarity_model.model_loaded:
+                ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
+                comp_res.ml_similarity_score = ml_score # Save to object
+            # ### END OF CHANGE 2 ###
+
             deciding_score = ml_score if ml_score is not None else comp_res.weighted_score
 
             if deciding_score < LOW_CERTAINTY_THRESHOLD and len(final_negative_pairs) < negative_quota:
