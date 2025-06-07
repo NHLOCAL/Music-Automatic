@@ -14,29 +14,31 @@ import re
 import sys
 
 # --- הגדרת נתיבים ---
-SIMILARITY_MODEL_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-REPO_ROOT = SIMILARITY_MODEL_PROJECT_ROOT.parent
-sys.path.insert(0, str(REPO_ROOT))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+ALBUM_DEDUP_PATH = PROJECT_ROOT / "album_deduplicator"
+sys.path.insert(0, str(ALBUM_DEDUP_PATH))
+
 
 # --- ייבואים מ-album_deduplicator ---
-from album_deduplicator.music_dup_lib import config as app_config
-from album_deduplicator.music_dup_lib import utils
-from album_deduplicator.music_dup_lib.models import FolderInfo, FolderComparisonResult, FileInfo
-from album_deduplicator.music_dup_lib.core.data_store import DataStore
-from album_deduplicator.music_dup_lib.core.comparison_engine import ComparisonEngine
-from album_deduplicator.music_dup_lib.external.ml_similarity_model import MLSimilarityModel
+from music_dup_lib import config as app_config
+from music_dup_lib import utils
+from music_dup_lib.models import FolderInfo, FolderComparisonResult, FileInfo
+from music_dup_lib.core.data_store import DataStore
+from music_dup_lib.core.comparison_engine import ComparisonEngine
+from music_dup_lib.external.ml_similarity_model import MLSimilarityModel
 
 try:
-    from album_deduplicator.music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
+    from music_dup_lib.external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
     GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
     if not GEMINI_AVAILABLE:
         logging.warning(f"Gemini API Key ({app_config.GEMINI_API_KEY_ENV_VAR}) not found. Gemini labeling will be limited.")
 except ImportError:
-    logging.warning("Could not import GeminiAnalyzer from album_deduplicator.music_dup_lib.external. Gemini labeling disabled.")
+    logging.warning("Could not import GeminiAnalyzer from music_dup_lib.external. Gemini labeling disabled.")
     GeminiAnalyzer = None
     GEMINI_AVAILABLE = False
 
 # --- קבועים של פרויקט similarity_model ---
+SIMILARITY_MODEL_PROJECT_ROOT = PROJECT_ROOT / "similarity_model"
 DATA_DIR = SIMILARITY_MODEL_PROJECT_ROOT / "data"
 LOGS_DIR_SIM_MODEL = SIMILARITY_MODEL_PROJECT_ROOT / "logs"
 
@@ -54,23 +56,12 @@ DEFINITE_DIFFERENT_LABEL = 2.0
 NEGATIVE_TO_POSITIVE_RATIO = 10
 MAX_GEMINI_CANDIDATES_FROM_SAMPLING = 500
 
-MIN_SCORE_TO_CACHE = 15.0
+MIN_SCORE_TO_CACHE = 30.0
 CACHE_SAVE_BATCH_SIZE = 50000
 
 logger = logging.getLogger("SimilarityModel.DatasetBuilder")
 
-### --- MODIFIED: Helper function to truncate floats in nested structures ---
-def _truncate_floats_recursive(data: Any, decimals: int = 2) -> Any:
-    """Recursively traverses a data structure and rounds any float it finds."""
-    if isinstance(data, float):
-        return round(data, decimals)
-    if isinstance(data, dict):
-        return {k: _truncate_floats_recursive(v, decimals) for k, v in data.items()}
-    if isinstance(data, list):
-        return [_truncate_floats_recursive(item, decimals) for item in data]
-    return data
 
-# ... (פונקציות העזר האחרות נשארות זהות) ...
 def calculate_jaccard_index(set1: Set[str], set2: Set[str]) -> float:
     if not set1 and not set2: return 1.0
     intersection_size = len(set1.intersection(set2))
@@ -326,12 +317,15 @@ def build_dataset(args):
     utils.setup_logging(args.log_level, LOGS_DIR_SIM_MODEL / "dataset_builder.log")
     logger.info("Starting dataset construction...")
 
-    data_store = DataStore()
+    data_store = DataStore(
+        music_cache_file=app_config.MUSIC_DATA_CACHE_FILE,
+        comparison_cache_file=app_config.COMPARISON_RESULTS_CACHE_FILE
+    )
     comparison_engine = ComparisonEngine(enable_hashing=app_config.ENABLE_HASHING)
-    ml_similarity_model = MLSimilarityModel()
+    ml_similarity_model = MLSimilarityModel(model_path=app_config.ML_MODEL_FILE)
     if not ml_similarity_model.model_loaded:
         logger.warning("MLSimilarityModel failed to load. Deciding score will fall back to algorithmic.")
-    
+
     gemini_analyzer = None
     gemini_actually_available = GEMINI_AVAILABLE and not args.disable_gemini
     if gemini_actually_available:
@@ -346,22 +340,22 @@ def build_dataset(args):
     if not cached_music_data:
         logger.error("Music data cache is empty. Run main scanner first.")
         return
-        
+
     all_music_folders = {Path(p): _folder_info_from_dict(p, d) for p, d in cached_music_data.items()}
     logger.info(f"Loaded {len(all_music_folders)} FolderInfo objects.")
 
     existing_comparison_results = data_store.load_comparison_results()
     logger.info(f"Loaded {len(existing_comparison_results)} existing comparison results from cache.")
-    
+
     if args.full_scan:
-        logger.info(f"---[ Full Scan Mode: Filtering, Truncating, and Saving Incrementally ]---")
-        
+        logger.info(f"---[ Full Scan Mode: Filtering, and Saving Incrementally ]---")
+
         groups_by_file_count = defaultdict(list)
         for path, folder_info in all_music_folders.items():
             audio_file_count = len(folder_info.files)
             if audio_file_count > 0:
                 groups_by_file_count[audio_file_count].append(path)
-        
+
         total_pairs_to_check_after_filtering = 0
         for group in groups_by_file_count.values():
             n = len(group)
@@ -373,7 +367,7 @@ def build_dataset(args):
 
         if not args.update_comparison_cache:
             logger.warning("Full scan is enabled, but --update-comparison-cache is not. New comparison results will NOT be saved to disk.")
-        
+
         cached_pairs = set(existing_comparison_results.keys())
         new_valuable_entries = 0
         pairs_processed = 0
@@ -386,12 +380,12 @@ def build_dataset(args):
                 console_handler = handler
                 root_logger.removeHandler(handler)
                 break
-        
+
         try:
             for file_count, folder_paths in groups_by_file_count.items():
                 if len(folder_paths) < 2:
                     continue
-                
+
                 for f1p, f2p in combinations(folder_paths, 2):
                     pairs_processed += 1
                     pair_key = frozenset({str(f1p), str(f2p)})
@@ -403,15 +397,10 @@ def build_dataset(args):
                     comp_res = comparison_engine.compare_two_folders(folder1, folder2)
 
                     if comp_res:
-                        ### --- MODIFIED: Truncate all floats before caching ---
-                        comp_res.weighted_score = round(comp_res.weighted_score, 2)
-                        comp_res.similarity_scores = _truncate_floats_recursive(comp_res.similarity_scores)
-                        ### --- END MODIFICATION ---
-
                         if comp_res.weighted_score >= MIN_SCORE_TO_CACHE:
                             existing_comparison_results[pair_key] = comp_res
                             new_valuable_entries += 1
-                            
+
                             if args.update_comparison_cache:
                                 new_results_batch[pair_key] = comp_res
                                 if len(new_results_batch) >= CACHE_SAVE_BATCH_SIZE:
@@ -447,9 +436,9 @@ def build_dataset(args):
 
         logger.info(f"Full scan complete. Added {new_valuable_entries} new valuable entries to the cache.")
         logger.info("---[ Exiting Full Scan Mode, proceeding with dataset construction ]---")
-    
+
     processed_pairs = set()
-    
+
     positive_pairs = []
     hard_negative_pairs_from_cache = []
     easy_negative_pairs_from_cache = []
@@ -461,24 +450,26 @@ def build_dataset(args):
         f1p, f2p = comp_res.folder1_path, comp_res.folder2_path
         if f1p not in all_music_folders or f2p not in all_music_folders:
             continue
-        
+
         folder1, folder2 = all_music_folders[f1p], all_music_folders[f2p]
-        
+
         ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res) if ml_similarity_model.model_loaded else None
         deciding_score = ml_score if ml_score is not None else comp_res.weighted_score
 
         if deciding_score >= HIGH_CERTAINTY_THRESHOLD or comp_res.gemini_verdict == 'duplicate':
             label = DEFINITE_DUPLICATE_LABEL if comp_res.gemini_verdict != 'duplicate' else comp_res.gemini_similarity_score
             label_source = 'gemini_cached' if comp_res.gemini_verdict == 'duplicate' else ('ml_high_certainty' if ml_score is not None else 'algo_high_certainty')
-            positive_pairs.append((folder1, folder2, comp_res, label, label_source))
+            if label is not None:
+                positive_pairs.append((folder1, folder2, comp_res, label, label_source))
         elif deciding_score < LOW_CERTAINTY_THRESHOLD:
             easy_negative_pairs_from_cache.append((folder1, folder2, comp_res, DEFINITE_DIFFERENT_LABEL, 'easy_negative_cached'))
         else:
             if comp_res.gemini_verdict in ['different', 'uncertain']:
-                hard_negative_pairs_from_cache.append((folder1, folder2, comp_res, comp_res.gemini_similarity_score, 'hard_negative_gemini_cached'))
+                if comp_res.gemini_similarity_score is not None:
+                    hard_negative_pairs_from_cache.append((folder1, folder2, comp_res, comp_res.gemini_similarity_score, 'hard_negative_gemini_cached'))
             elif gemini_actually_available and comp_res.gemini_verdict is None:
                 gemini_candidates_new.append((folder1, folder2, comp_res, deciding_score))
-    
+
     logger.info(f"Initial categorization complete. Positives: {len(positive_pairs)}, Hard Negatives: {len(hard_negative_pairs_from_cache)}, Easy Negatives: {len(easy_negative_pairs_from_cache)}, New Gemini Candidates: {len(gemini_candidates_new)}")
 
     logger.info("Phase 2: Assembling balanced negative dataset...")
@@ -489,7 +480,7 @@ def build_dataset(args):
     final_negative_pairs = []
     final_negative_pairs.extend(hard_negative_pairs_from_cache)
     logger.info(f"Added {len(hard_negative_pairs_from_cache)} hard negatives from cache.")
-    
+
     needed_more_negatives = negative_quota - len(final_negative_pairs)
     if needed_more_negatives > 0:
         random.shuffle(easy_negative_pairs_from_cache)
@@ -500,14 +491,14 @@ def build_dataset(args):
     logger.info("Phase 3: Sampling to fill remaining quotas...")
     all_folder_paths_list = list(all_music_folders.keys())
     max_sampling_attempts = len(all_folder_paths_list) * 10
-    
+
     for attempt in range(max_sampling_attempts):
         if len(final_negative_pairs) >= negative_quota and len(gemini_candidates_new) >= MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
             logger.info("All quotas filled. Stopping sampling.")
             break
 
         if len(all_folder_paths_list) < 2: break
-        
+
         idx1, idx2 = random.sample(range(len(all_folder_paths_list)), 2)
         f1p, f2p = all_folder_paths_list[idx1], all_folder_paths_list[idx2]
         current_pair_key = frozenset({str(f1p), str(f2p)})
@@ -522,7 +513,7 @@ def build_dataset(args):
         if comp_res:
             ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res) if ml_similarity_model.model_loaded else None
             deciding_score = ml_score if ml_score is not None else comp_res.weighted_score
-            
+
             if deciding_score < LOW_CERTAINTY_THRESHOLD and len(final_negative_pairs) < negative_quota:
                 final_negative_pairs.append((folder1, folder2, comp_res, DEFINITE_DIFFERENT_LABEL, 'easy_negative_sampled'))
             elif LOW_CERTAINTY_THRESHOLD <= deciding_score < HIGH_CERTAINTY_THRESHOLD and len(gemini_candidates_new) < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
@@ -533,32 +524,37 @@ def build_dataset(args):
 
     gemini_processed_pairs = []
     if gemini_actually_available and gemini_analyzer and gemini_candidates_new:
+        assert gemini_analyzer is not None, "Gemini analyzer should be initialized here"
         logger.info(f"Phase 4: Running Gemini analysis on {len(gemini_candidates_new)} candidate pairs...")
         for f1_info, f2_info, comp_res_gemini, score_for_gemini in gemini_candidates_new:
             time.sleep(app_config.GEMINI_API_DELAY_SECONDS)
             logger.info(f"Sending to Gemini: {f1_info.path.name} vs {f2_info.path.name} (Score: {score_for_gemini:.2f})")
             verdict, gemini_sim_score, reason = gemini_analyzer.analyze_pair(f1_info, f2_info, score_for_gemini)
-            
+
             pair_key = frozenset({str(f1_info.path), str(f2_info.path)})
             comp_res_gemini.gemini_verdict = verdict
             comp_res_gemini.gemini_similarity_score = gemini_sim_score
             comp_res_gemini.gemini_reason = reason
-            comp_res_gemini.gemini_error = None if "ERROR" not in reason.upper() else reason
+            # Correctly check if 'reason' contains an error string
+            comp_res_gemini.gemini_error = reason if reason and "ERROR" in reason.upper() else None
             existing_comparison_results[pair_key] = comp_res_gemini
 
-            if gemini_sim_score is not None and comp_res_gemini.gemini_error is None:
+            if gemini_sim_score is not None and not comp_res_gemini.gemini_error:
                 if verdict == 'duplicate':
                      gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_positive_new'))
                 else:
                      gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_negative_new'))
 
     logger.info("Phase 5: Assembling final dataset...")
-    
+
     all_labeled_pairs = positive_pairs + final_negative_pairs + gemini_processed_pairs
     logger.info(f"Total labeled pairs for dataset: {len(all_labeled_pairs)} (Positives: {len(positive_pairs)}, Negatives: {len(final_negative_pairs)}, Gemini-processed: {len(gemini_processed_pairs)})")
 
     dataset_rows = []
     for f1, f2, res, label, source in all_labeled_pairs:
+        if label is None:
+            logger.warning(f"Skipping pair {f1.path.name} vs {f2.path.name} due to None label (source: {source}).")
+            continue
         features = extract_features_for_pair(f1, f2, res)
         if features:
             features['target_label'] = label
@@ -574,6 +570,11 @@ def build_dataset(args):
     final_df = pd.DataFrame(dataset_rows)
     final_df.dropna(subset=['target_label'], inplace=True)
     final_df.fillna(0.0, inplace=True)
+
+    # Ensuring all expected columns from ML model exist
+    for col in MLSimilarityModel.EXPECTED_FEATURE_NAMES_ORDERED:
+        if col not in final_df.columns:
+            final_df[col] = 0.0
 
     logger.info(f"Total dataset rows before split: {final_df.shape[0]}")
     if final_df.shape[0] > 0:
@@ -591,7 +592,7 @@ def build_dataset(args):
         logger.info(f"Training ({train_df.shape[0]} rows) and testing ({test_df.shape[0]} rows) datasets saved.")
 
     if args.update_comparison_cache and not args.full_scan:
-        logger.info(f"Updating comparison_results_cache.json with final results from sampling/Gemini...")
+        logger.info(f"Updating comparison_results_cache.pkl with final results from sampling/Gemini...")
         data_store.save_comparison_results(existing_comparison_results)
         logger.info("Comparison cache updated successfully.")
 
@@ -605,7 +606,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--disable-gemini", action="store_true",
                         help="Completely disable new Gemini API calls, even if API key is present.")
     parser.add_argument("-u", "--update-comparison-cache", action="store_true",
-                        help="Update the main comparison_results_cache.json with new results.")
+                        help="Update the main comparison_results_cache.pkl with new results from this run.")
     cli_args = parser.parse_args()
 
     build_dataset(cli_args)
