@@ -399,7 +399,16 @@ def build_dataset(args):
                     comp_res = comparison_engine.compare_two_folders(folder1, folder2)
 
                     if comp_res:
-                        if comp_res.weighted_score >= MIN_SCORE_TO_CACHE:
+                        # ### START OF CHANGE 3 ###
+                        # Calculate and attach ML score for NEWLY generated results during full scan
+                        if ml_similarity_model.model_loaded:
+                            ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
+                            comp_res.ml_similarity_score = ml_score # Save to object
+                        # ### END OF CHANGE 3 ###
+
+                        deciding_score = comp_res.ml_similarity_score if hasattr(comp_res, 'ml_similarity_score') and comp_res.ml_similarity_score is not None else comp_res.weighted_score
+
+                        if deciding_score >= MIN_SCORE_TO_CACHE:
                             existing_comparison_results[pair_key] = comp_res
                             new_valuable_entries += 1
 
