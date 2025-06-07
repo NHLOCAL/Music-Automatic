@@ -97,13 +97,11 @@ def display_quality_results_grouped(all_folders: Dict[Path, FolderInfo], compari
     graph: Dict[Path, Set[Path]] = defaultdict(set)
     nodes_in_graph: Set[Path] = set()
     for result in comparison_results:
-        # NOTE: This function receives the already filtered list for display, so no need to filter again.
         f1_path, f2_path = result.folder1_path, result.folder2_path
         graph[f1_path].add(f2_path)
         graph[f2_path].add(f1_path)
         nodes_in_graph.add(f1_path)
         nodes_in_graph.add(f2_path)
-
     if not nodes_in_graph:
         print("No similar folder groups to display quality for.")
         print(utils.AnsiColors.CYAN + "--- End of Quality Assessment ---" + utils.AnsiColors.RESET)
@@ -380,17 +378,13 @@ def run_analysis(args):
         print("No music folders meeting the criteria were found in the specified paths.")
         return
     start_compare_time = time.time()
-    
-    ### CHANGED ###
-    # This variable now holds ALL comparison results, not just those above the display threshold.
     all_comparison_results: List[FolderComparisonResult] = comparison_engine.find_similar_folders(all_scanned_folders)
     compare_duration = time.time() - start_compare_time
-    logger.info(f"Folder comparison finished in {compare_duration:.2f} seconds. Processed {len(all_comparison_results)} total pairs.")
-
+    if logger:
+        logger.info(f"Folder comparison finished in {compare_duration:.2f} seconds. Processed {len(all_comparison_results)} total pairs.")
     if args.ml_scoring and ml_similarity_model and ml_similarity_model.model_loaded:
         if logger: logger.info("Enhancing comparison results with ML model predictions...")
         ml_predictions_made = 0
-        # Iterate over all results to calculate ML score
         for result in all_comparison_results:
             folder1_info = all_scanned_folders.get(result.folder1_path)
             folder2_info = all_scanned_folders.get(result.folder2_path)
@@ -409,17 +403,14 @@ def run_analysis(args):
         if logger: logger.warning("ML scoring requested but model is not available/loaded. Proceeding without ML scores.")
     else:
         if logger: logger.info("ML scoring was not requested. Skipping ML enhancement step.")
-        
     folders_for_quality_analysis: Set[Path] = set()
     if all_comparison_results:
         for result in all_comparison_results:
-            # Only calculate quality for folders that might be displayed to save time
             current_score = result.final_combined_score if result.final_combined_score is not None else \
                             (result.ml_similarity_score if result.ml_similarity_score is not None else result.weighted_score)
             if current_score >= config.MINIMAL_DISPLAY_SIMILARITY:
                 folders_for_quality_analysis.add(result.folder1_path)
                 folders_for_quality_analysis.add(result.folder2_path)
-
     if folders_for_quality_analysis:
         start_quality_time = time.time()
         if logger: logger.info(f"Calculating quality scores for {len(folders_for_quality_analysis)} folders involved in potentially similar pairs...")
@@ -437,15 +428,13 @@ def run_analysis(args):
         if logger: logger.info("No similar folder pairs found meeting display criteria. Skipping quality score calculation.")
     if args.gemini_analysis:
         run_gemini_analysis(
-            all_comparison_results, # Send all results to Gemini analysis function
+            all_comparison_results,
             all_scanned_folders,
             args.gemini_range,
             cached_results_map=cached_comparison_results_map
         )
     else:
         if logger: logger.info("Gemini analysis was not requested (--gemini-analysis flag not set).")
-    
-    # Calculate final combined score for all pairs
     for result in all_comparison_results:
         algorithmic_component = result.weighted_score
         if args.ml_scoring and result.ml_similarity_score is not None:
@@ -465,45 +454,35 @@ def run_analysis(args):
                 result.final_combined_score = algorithmic_component
         else:
             result.final_combined_score = algorithmic_component
-            
     if logger: logger.info("Final combined scores calculated for all comparison results from this run.")
-    
-    ### CHANGED ###
-    # Save ALL comparison results to the cache, not just the ones being displayed.
-    # This is the core change that prevents re-computation.
-    if all_comparison_results:
-        if logger: logger.info(f"Saving/Updating {len(all_comparison_results)} total comparison results from this run to cache: {data_store.comparison_cache_file}")
-        data_store.save_comparison_results(all_comparison_results)
+    results_to_cache = [
+        r for r in all_comparison_results
+        if (r.final_combined_score if r.final_combined_score is not None else \
+            (r.ml_similarity_score if r.ml_similarity_score is not None else r.weighted_score)) >= config.MIN_SCORE_FOR_CACHING
+    ]
+    if results_to_cache:
+        if logger: logger.info(f"Saving/Updating {len(results_to_cache)} comparison results (score >= {config.MIN_SCORE_FOR_CACHING}%) to cache: {data_store.comparison_cache_file}")
+        data_store.save_comparison_results(results_to_cache)
         if logger: logger.info("Comparison results saved/updated successfully in cache.")
     else:
-        if logger: logger.info("No new/updated comparison results from this run to save to cache.")
-
-    ### CHANGED ###
-    # Create a new list containing only the results that should be displayed to the user.
+        if logger: logger.info(f"No new/updated comparison results from this run met the threshold ({config.MIN_SCORE_FOR_CACHING}%) to save to cache.")
     display_results_list = [
         r for r in all_comparison_results
         if (r.final_combined_score if r.final_combined_score is not None else \
             (r.ml_similarity_score if r.ml_similarity_score is not None else r.weighted_score)) >= config.MINIMAL_DISPLAY_SIMILARITY
     ]
-    
-    # Sort only the list intended for display.
     display_results_list.sort(
         key=lambda x: x.final_combined_score if x.final_combined_score is not None else \
                       (x.ml_similarity_score if x.ml_similarity_score is not None else x.weighted_score),
         reverse=True
     )
-
-    # Pass the FILTERED list to all subsequent display and action functions.
     display_comparison_results(display_results_list, all_scanned_folders)
     if display_results_list:
         display_quality_results_grouped(all_scanned_folders, display_results_list)
     else:
         if logger: logger.info("No comparison results meeting the display threshold to show.")
-
     preferred_root_path_obj = Path(args.preferred_root) if args.preferred_root else None
     action_handler = ActionHandler(all_scanned_folders, file_processor, preferred_root_path=preferred_root_path_obj)
-    
-    # Use the filtered display_results_list for merge candidates
     merge_candidates = [
         r for r in display_results_list
         if (r.final_combined_score if r.final_combined_score is not None else \
@@ -525,10 +504,8 @@ def run_analysis(args):
     else:
         if logger: logger.info(f"No pairs met the threshold ({config.MIN_SIMILARITY_FOR_MERGE}%) for merging.")
         print(f"\nNo folder pairs found with similarity >= {config.MIN_SIMILARITY_FOR_MERGE}% for merging.")
-        
     min_similarity_for_delete = None
     try:
-        # Check if there's anything to even ask about for deletion
         if display_results_list:
              del_thresh_input = input(f"\nEnter minimum combined similarity % to mark for deletion (e.g., {config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}), or leave blank to skip: ").strip()
              if del_thresh_input:
@@ -547,7 +524,6 @@ def run_analysis(args):
     except EOFError:
         min_similarity_for_delete = None
         print("Non-interactive mode detected, skipping deletion prompt.")
-        
     if min_similarity_for_delete is not None:
         # Use the filtered display_results_list for identifying folders to delete
         folders_to_delete_pairs = action_handler.identify_folders_to_delete(display_results_list, min_similarity_for_delete)
@@ -561,11 +537,9 @@ def run_analysis(args):
     else:
         print("Skipping deletion process.")
         if logger: logger.info("Deletion process skipped.")
-        
     total_duration = time.time() - start_scan_time
     if logger: logger.info(f"Analysis finished. Total execution time: {total_duration:.2f} seconds.")
     print(f"\nAnalysis complete. Total time: {total_duration:.2f}s")
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Analyzes music folders to find duplicates, assess quality, and optionally leverage Gemini API for deeper comparison.",
@@ -602,7 +576,9 @@ if __name__ == "__main__":
                               metavar="MIN-MAX",
                               help="Similarity range ('min-max' percentage, based on algorithmic or ML score) for sending pairs to Gemini API.")
     args = parser.parse_args()
+    # --- START OF FIX ---
     log_level_initial = getattr(logging, args.log_level.upper(), logging.INFO)
+    # --- END OF FIX ---
     logging.basicConfig(level=log_level_initial, format=config.LOG_FORMAT, handlers=[logging.StreamHandler()])
     logger = logging.getLogger(__name__)
     if args.clear_comparison_cache:
