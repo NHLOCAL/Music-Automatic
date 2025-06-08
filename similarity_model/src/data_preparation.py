@@ -50,7 +50,7 @@ TEST_SPLIT_RATIO = 0.2
 DATASET_RANDOM_STATE = 42
 
 HIGH_CERTAINTY_THRESHOLD = 85.0
-LOW_CERTAINTY_THRESHOLD = 20.0
+LOW_CERTAINTY_THRESHOLD = 30.0
 
 DEFINITE_DUPLICATE_LABEL = 98.0
 DEFINITE_DIFFERENT_LABEL = 2.0
@@ -300,8 +300,8 @@ def get_combined_deciding_score(comp_res: FolderComparisonResult) -> float:
     ml_score = getattr(comp_res, 'ml_similarity_score', None)
 
     if ml_score is not None and algo_score is not None:
-        # 50/50 blend of both scores
-        return (algo_score + ml_score) / 2.0
+        # 30/70 blend of both scores
+        return (ml_score * 0.3) + (algo_score * 0.7)
     
     # Fallback to algorithmic score if ML score is not available
     return algo_score if algo_score is not None else 0.0
