@@ -7,7 +7,7 @@ import random
 import time
 from datetime import datetime
 import pandas as pd
-from typing import Dict, List, Tuple, Optional, Set, FrozenSet, Any
+from typing import Dict, List, Tuple, Optional, Set, Any
 from itertools import combinations
 from collections import defaultdict
 from sklearn.model_selection import train_test_split
@@ -79,13 +79,15 @@ def calculate_word_jaccard_index(str1: Optional[str], str2: Optional[str]) -> fl
     return calculate_jaccard_index(words1, words2)
 
 def _calculate_folder_stats(folder_info: FolderInfo) -> Dict[str, float]:
-    stats: Dict[str, Optional[float]] = {
-        "avg_duration": None, "std_duration": None, "min_duration": None, "max_duration": None, "total_duration": None,
-        "std_bitrate": None, "min_bitrate": None, "max_bitrate": None,
-        "avg_other_file_size_bytes": None, "total_other_file_size_bytes": None,
-    }
+    stat_keys = [
+        "avg_duration", "std_duration", "min_duration", "max_duration", "total_duration",
+        "std_bitrate", "min_bitrate", "max_bitrate",
+        "avg_other_file_size_bytes", "total_other_file_size_bytes"
+    ]
+    stats: Dict[str, Optional[float]] = {key: None for key in stat_keys}
+    
     if not folder_info.files and not folder_info.other_files:
-        return {k: 0.0 for k in stats.keys()}
+        return {k: np.nan for k in stat_keys} # NEW: Return NaN if folder is effectively empty
 
     if folder_info.files:
         durations = [f.duration for f in folder_info.files if f.duration is not None and f.duration > 0]
@@ -108,12 +110,11 @@ def _calculate_folder_stats(folder_info: FolderInfo) -> Dict[str, float]:
         if other_file_sizes:
             stats["avg_other_file_size_bytes"] = float(np.mean(other_file_sizes))
             stats["total_other_file_size_bytes"] = float(np.sum(other_file_sizes))
-
+    
     final_stats: Dict[str, float] = {}
-    for key in ["avg_duration", "std_duration", "min_duration", "max_duration", "total_duration",
-                "std_bitrate", "min_bitrate", "max_bitrate",
-                "avg_other_file_size_bytes", "total_other_file_size_bytes"]:
-        final_stats[key] = stats.get(key, 0.0) if stats.get(key) is not None else 0.0
+    for key in stat_keys:
+        value = stats.get(key)
+        final_stats[key] = value if value is not None else np.nan # NEW: Use NaN for uncalculated stats
     return final_stats
 
 def extract_features_for_pair(
@@ -124,23 +125,24 @@ def extract_features_for_pair(
     features = {}
     if not folder1_info or not folder2_info: return None
 
-    f1_avg_bitrate = folder1_info.avg_bitrate if folder1_info.avg_bitrate is not None else 0.0
-    f2_avg_bitrate = folder2_info.avg_bitrate if folder2_info.avg_bitrate is not None else 0.0
+    # NEW: Use np.nan as default for potentially missing numeric values
+    f1_avg_bitrate = folder1_info.avg_bitrate if folder1_info.avg_bitrate is not None else np.nan
+    f2_avg_bitrate = folder2_info.avg_bitrate if folder2_info.avg_bitrate is not None else np.nan
     features['f1_avg_bitrate'] = f1_avg_bitrate
     features['f2_avg_bitrate'] = f2_avg_bitrate
-    features['diff_avg_bitrate'] = abs(f1_avg_bitrate - f2_avg_bitrate)
+    features['diff_avg_bitrate'] = abs(f1_avg_bitrate - f2_avg_bitrate) # np.nan propagation works automatically
 
     features['jaccard_unique_artists'] = calculate_jaccard_index(folder1_info.unique_artists, folder2_info.unique_artists)
     features['jaccard_unique_albums'] = calculate_jaccard_index(folder1_info.unique_albums, folder2_info.unique_albums)
 
-    f1_gen_fname_score = folder1_info.generic_filename_score if folder1_info.generic_filename_score is not None else 0.0
-    f2_gen_fname_score = folder2_info.generic_filename_score if folder2_info.generic_filename_score is not None else 0.0
+    f1_gen_fname_score = folder1_info.generic_filename_score if folder1_info.generic_filename_score is not None else np.nan
+    f2_gen_fname_score = folder2_info.generic_filename_score if folder2_info.generic_filename_score is not None else np.nan
     features['f1_generic_filename_score'] = f1_gen_fname_score
     features['f2_generic_filename_score'] = f2_gen_fname_score
     features['diff_generic_filename_score'] = abs(f1_gen_fname_score - f2_gen_fname_score)
 
-    f1_gen_title_score = folder1_info.generic_title_score if folder1_info.generic_title_score is not None else 0.0
-    f2_gen_title_score = folder2_info.generic_title_score if folder2_info.generic_title_score is not None else 0.0
+    f1_gen_title_score = folder1_info.generic_title_score if folder1_info.generic_title_score is not None else np.nan
+    f2_gen_title_score = folder2_info.generic_title_score if folder2_info.generic_title_score is not None else np.nan
     features['f1_generic_title_score'] = f1_gen_title_score
     features['f2_generic_title_score'] = f2_gen_title_score
     features['diff_generic_title_score'] = abs(f1_gen_title_score - f2_gen_title_score)
@@ -148,24 +150,29 @@ def extract_features_for_pair(
     folder1_stats = _calculate_folder_stats(folder1_info)
     folder2_stats = _calculate_folder_stats(folder2_info)
 
-    for stat_key in ["avg_duration", "std_duration", "min_duration", "max_duration", "total_duration",
-                     "std_bitrate", "min_bitrate", "max_bitrate",
-                     "avg_other_file_size_bytes", "total_other_file_size_bytes"]:
-        s1_val = folder1_stats[stat_key]
-        s2_val = folder2_stats[stat_key]
+    for stat_key in folder1_stats.keys(): # Iterate over all stat keys
+        s1_val = folder1_stats.get(stat_key, np.nan)
+        s2_val = folder2_stats.get(stat_key, np.nan)
         features[f'f1_{stat_key}'] = s1_val
         features[f'f2_{stat_key}'] = s2_val
         features[f'diff_{stat_key}'] = abs(s1_val - s2_val)
+
+        # Handle ratio calculations carefully with potential NaNs
         if stat_key == "total_duration":
             if s1_val == 0 and s2_val == 0:
                 features['ratio_total_duration'] = 1.0
-            else:
+            elif pd.notna(s1_val) and pd.notna(s2_val):
                 features['ratio_total_duration'] = min(s1_val, s2_val) / max(1.0, s1_val, s2_val)
+            else:
+                features['ratio_total_duration'] = np.nan
+        
         if stat_key == "total_other_file_size_bytes":
             if s1_val == 0 and s2_val == 0:
                 features['ratio_total_other_file_size_bytes'] = 1.0
-            else:
+            elif pd.notna(s1_val) and pd.notna(s2_val):
                 features['ratio_total_other_file_size_bytes'] = min(s1_val,s2_val) / max(1.0, s1_val, s2_val)
+            else:
+                features['ratio_total_other_file_size_bytes'] = np.nan
 
     f1_parent_name = folder1_info.parent_folder_name
     f2_parent_name = folder2_info.parent_folder_name
@@ -183,15 +190,14 @@ def extract_features_for_pair(
         'lyrics_ratio': (folder1_info.lyrics_ratio, folder2_info.lyrics_ratio),
     }
     for field, (val1, val2) in quality_related_fields.items():
-        v1 = val1 if val1 is not None else 0.0
-        v2 = val2 if val2 is not None else 0.0
+        v1 = val1 if val1 is not None else np.nan
+        v2 = val2 if val2 is not None else np.nan
         features[f'f1_{field}'] = v1
         features[f'f2_{field}'] = v2
         features[f'diff_{field}'] = abs(v1 - v2)
 
     f1_other_files_details: List[Dict[str, Any]] = folder1_info.other_files
     f2_other_files_details: List[Dict[str, Any]] = folder2_info.other_files
-
     f1_other_files_names = {f['name'] for f in f1_other_files_details}
     f2_other_files_names = {f['name'] for f in f2_other_files_details}
 
@@ -207,14 +213,15 @@ def extract_features_for_pair(
     features['jaccard_other_file_names'] = calculate_jaccard_index(f1_other_files_names, f2_other_files_names)
 
     common_other_file_names = f1_other_files_names.intersection(f2_other_files_names)
-    other_files_hash_match_count = 0
-    other_files_size_similarity_sum = 0.0
-    if common_other_file_names:
+    num_common_other_files = len(common_other_file_names)
+    
+    if num_common_other_files > 0:
+        other_files_hash_match_count = 0
+        other_files_size_similarity_sum = 0.0
         f1_other_map = {f['name']: f for f in f1_other_files_details}
         f2_other_map = {f['name']: f for f in f2_other_files_details}
         for name in common_other_file_names:
-            of1 = f1_other_map[name]
-            of2 = f2_other_map[name]
+            of1, of2 = f1_other_map[name], f2_other_map[name]
             if of1.get('hash') and of2.get('hash') and of1['hash'] == of2['hash']:
                 other_files_hash_match_count += 1
             s1, s2 = of1.get('size_bytes', 0), of2.get('size_bytes', 0)
@@ -223,61 +230,59 @@ def extract_features_for_pair(
                 other_files_size_similarity_sum += 1.0 if ratio >= 0.95 else ratio * ratio
             elif s1 == 0 and s2 == 0:
                 other_files_size_similarity_sum += 1.0
-    num_common_other_files = len(common_other_file_names)
-    features['other_files_common_hash_ratio'] = other_files_hash_match_count / num_common_other_files if num_common_other_files > 0 else 0.0
-    features['other_files_common_avg_size_similarity'] = other_files_size_similarity_sum / num_common_other_files if num_common_other_files > 0 else 0.0
+
+        features['other_files_common_hash_ratio'] = other_files_hash_match_count / num_common_other_files
+        features['other_files_common_avg_size_similarity'] = other_files_size_similarity_sum / num_common_other_files
+    else:
+        # NEW: If no common files, these features are not applicable
+        features['other_files_common_hash_ratio'] = np.nan
+        features['other_files_common_avg_size_similarity'] = np.nan
+
+    # Define all expected keys from comparison and metadata
+    comp_feature_keys = [
+        'file_hash', 'file_size', 'filename', 'title', 'album', 'artist', 
+        'albumartist', 'folder_name', 'album_art_hash', 'duration'
+    ]
+    expected_add_meta_sim_tags = [
+        'length', 'date', 'tracknumber', 'genre', 'media', 'composer', 'encodedby',
+        'discnumber', 'organization', 'grouping', 'bpm', 'copyright', 'barcode',
+        'conductor', 'website', 'version', 'compilation', 'titlesort', 'albumsort',
+        'lyricist', 'isrc', 'author', 'originaldate'
+    ]
 
     if comparison_result:
         sim_scores = comparison_result.similarity_scores
-        comp_feature_keys = [
-            'file_hash', 'file_size', 'filename', 'title', 'album',
-            'artist', 'albumartist', 'folder_name', 'album_art_hash', 'duration'
-        ]
         for key in comp_feature_keys:
-            features[f'comp_{key}_similarity'] = sim_scores.get(key, 0.0)
+            # A score of 0.0 is meaningful (no similarity), so default is 0.0 not NaN
+            features[f'comp_{key}_similarity'] = sim_scores.get(key, 0.0) 
+        
         features['comp_other_files_similarity'] = sim_scores.get('other_files_similarity', 0.0)
+        
         add_meta_details = sim_scores.get('additional_metadata_details', {})
-        if add_meta_details and isinstance(add_meta_details, dict): # Ensure it's a dict
+        if add_meta_details and isinstance(add_meta_details, dict):
             features['comp_avg_add_meta_similarity'] = sum(add_meta_details.values()) / len(add_meta_details) if add_meta_details else 0.0
             features['comp_count_high_add_meta_similarity'] = sum(1 for v in add_meta_details.values() if v >= 0.8)
-            for meta_key, meta_sim_score in add_meta_details.items():
+            for meta_key in expected_add_meta_sim_tags:
                 safe_meta_key = re.sub(r'[^a-zA-Z0-9_]', '_', meta_key.lower())
-                features[f'comp_add_meta_sim_{safe_meta_key}'] = meta_sim_score
+                features[f'comp_add_meta_sim_{safe_meta_key}'] = add_meta_details.get(meta_key, 0.0)
         else:
             features['comp_avg_add_meta_similarity'] = 0.0
             features['comp_count_high_add_meta_similarity'] = 0.0
-            expected_add_meta_sim_tags = [
-                'length', 'date', 'tracknumber', 'genre', 'media', 'composer', 'encodedby',
-                'discnumber', 'organization', 'grouping', 'bpm', 'copyright', 'barcode',
-                'conductor', 'website', 'version', 'compilation', 'titlesort', 'albumsort',
-                'lyricist', 'isrc', 'author', 'originaldate'
-            ]
             for meta_tag in expected_add_meta_sim_tags:
                 features[f'comp_add_meta_sim_{meta_tag}'] = 0.0
-
     else:
-        comp_keys_to_zero = [
-            'comp_file_hash_similarity', 'comp_file_size_similarity', 'comp_filename_similarity',
-            'comp_title_similarity', 'comp_album_similarity', 'comp_artist_similarity',
-            'comp_albumartist_similarity', 'comp_folder_name_similarity', 'comp_album_art_hash_similarity',
-            'comp_duration_similarity', 'comp_other_files_similarity',
-            'comp_avg_add_meta_similarity', 'comp_count_high_add_meta_similarity'
-        ]
-        expected_add_meta_sim_tags = [
-            'length', 'date', 'tracknumber', 'genre', 'media', 'composer', 'encodedby',
-            'discnumber', 'organization', 'grouping', 'bpm', 'copyright', 'barcode',
-            'conductor', 'website', 'version', 'compilation', 'titlesort', 'albumsort',
-            'lyricist', 'isrc', 'author', 'originaldate'
-        ]
+        # NEW: If no comparison result, all these features are missing (NaN)
+        for key in comp_feature_keys:
+            features[f'comp_{key}_similarity'] = np.nan
+        features['comp_other_files_similarity'] = np.nan
+        features['comp_avg_add_meta_similarity'] = np.nan
+        features['comp_count_high_add_meta_similarity'] = np.nan
         for meta_tag in expected_add_meta_sim_tags:
-            comp_keys_to_zero.append(f'comp_add_meta_sim_{meta_tag}')
-
-        for k_comp in comp_keys_to_zero:
-            features[k_comp] = 0.0
-        features['other_files_common_hash_ratio'] = 0.0
-        features['other_files_common_avg_size_similarity'] = 0.0
+            features[f'comp_add_meta_sim_{meta_tag}'] = np.nan
+            
     return features
 
+# ... (The functions _file_info_from_dict and _folder_info_from_dict remain unchanged) ...
 def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
     return FileInfo(
         filename=data.get("filename", "unknown.mp3"), filepath=Path(data.get("filepath", "unknown.mp3")),
@@ -301,11 +306,11 @@ def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> Folder
         other_files=folder_dict.get('other_files', []),
         album_art_hash=folder_dict.get('album_art_hash'),
         file_hashes_present=folder_dict.get('file_hashes_present', False),
-        avg_bitrate=folder_dict.get('avg_bitrate', 0.0),
+        avg_bitrate=folder_dict.get('avg_bitrate'),
         unique_artists=set(folder_dict.get('unique_artists', [])),
         unique_albums=set(folder_dict.get('unique_albums', [])),
-        generic_filename_score=folder_dict.get('generic_filename_score', 0.0),
-        generic_title_score=folder_dict.get('generic_title_score', 0.0),
+        generic_filename_score=folder_dict.get('generic_filename_score'),
+        generic_title_score=folder_dict.get('generic_title_score'),
         quality_score=folder_dict.get('quality_score'),
         quality_breakdown=folder_dict.get('quality_breakdown', {}),
         hebrew_metadata_ratio=folder_dict.get('hebrew_metadata_ratio', 0.0),
@@ -315,10 +320,10 @@ def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> Folder
     )
 
 def build_dataset(args):
+    # ... (All setup code remains the same) ...
     LOGS_DIR_SIM_MODEL.mkdir(parents=True, exist_ok=True)
     utils.setup_logging(args.log_level, LOGS_DIR_SIM_MODEL / "dataset_builder.log")
     logger.info("Starting dataset construction...")
-
     data_store = DataStore(
         music_cache_file=app_config.MUSIC_DATA_CACHE_FILE,
         comparison_cache_file=app_config.COMPARISON_RESULTS_CACHE_FILE
@@ -327,7 +332,6 @@ def build_dataset(args):
     ml_similarity_model = MLSimilarityModel(model_path=app_config.ML_MODEL_FILE)
     if not ml_similarity_model.model_loaded:
         logger.warning("MLSimilarityModel failed to load. Deciding score will fall back to algorithmic.")
-
     gemini_analyzer = None
     gemini_actually_available = GEMINI_AVAILABLE and not args.disable_gemini
     if gemini_actually_available:
@@ -337,44 +341,36 @@ def build_dataset(args):
         except Exception as e:
             logger.error(f"Failed to initialize Gemini Analyzer: {e}. Gemini labeling will be skipped.", exc_info=True)
             gemini_actually_available = False
-
     cached_music_data = data_store.load_data()
     if not cached_music_data:
         logger.error("Music data cache is empty. Run main scanner first.")
         return
-
     all_music_folders = {Path(p): _folder_info_from_dict(p, d) for p, d in cached_music_data.items()}
     logger.info(f"Loaded {len(all_music_folders)} FolderInfo objects.")
-
     existing_comparison_results = data_store.load_comparison_results()
     logger.info(f"Loaded {len(existing_comparison_results)} existing comparison results from cache.")
-
+    
+    # ... (The full_scan logic remains the same) ...
     if args.full_scan:
         logger.info(f"---[ Full Scan Mode: Filtering, and Saving Incrementally ]---")
-
         groups_by_file_count = defaultdict(list)
         for path, folder_info in all_music_folders.items():
             audio_file_count = len(folder_info.files)
             if audio_file_count > 0:
                 groups_by_file_count[audio_file_count].append(path)
-
         total_pairs_to_check_after_filtering = 0
         for group in groups_by_file_count.values():
             n = len(group)
             if n >= 2:
                 total_pairs_to_check_after_filtering += n * (n - 1) // 2
-
         original_total = len(all_music_folders) * (len(all_music_folders) - 1) // 2
         logger.info(f"Filtering by audio file count reduced potential pairs from {original_total} to {total_pairs_to_check_after_filtering}.")
-
         if not args.update_comparison_cache:
             logger.warning("Full scan is enabled, but --update-comparison-cache is not. New comparison results will NOT be saved to disk.")
-
         cached_pairs = set(existing_comparison_results.keys())
         new_valuable_entries = 0
         pairs_processed = 0
         new_results_batch = {}
-
         root_logger = logging.getLogger()
         console_handler = None
         for handler in root_logger.handlers:
@@ -382,36 +378,26 @@ def build_dataset(args):
                 console_handler = handler
                 root_logger.removeHandler(handler)
                 break
-
         try:
             for file_count, folder_paths in groups_by_file_count.items():
                 if len(folder_paths) < 2:
                     continue
-
                 for f1p, f2p in combinations(folder_paths, 2):
                     pairs_processed += 1
                     pair_key = frozenset({str(f1p), str(f2p)})
                     if pair_key in cached_pairs:
                         continue
-
                     folder1 = all_music_folders[f1p]
                     folder2 = all_music_folders[f2p]
                     comp_res = comparison_engine.compare_two_folders(folder1, folder2)
-
                     if comp_res:
-                        # ### START OF CHANGE 3 ###
-                        # Calculate and attach ML score for NEWLY generated results during full scan
                         if ml_similarity_model.model_loaded:
                             ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
-                            comp_res.ml_similarity_score = ml_score # Save to object
-                        # ### END OF CHANGE 3 ###
-
+                            comp_res.ml_similarity_score = ml_score
                         deciding_score = comp_res.ml_similarity_score if hasattr(comp_res, 'ml_similarity_score') and comp_res.ml_similarity_score is not None else comp_res.weighted_score
-
                         if deciding_score >= MIN_SCORE_TO_CACHE:
                             existing_comparison_results[pair_key] = comp_res
                             new_valuable_entries += 1
-
                             if args.update_comparison_cache:
                                 new_results_batch[pair_key] = comp_res
                                 if len(new_results_batch) >= CACHE_SAVE_BATCH_SIZE:
@@ -422,160 +408,103 @@ def build_dataset(args):
                                     data_store.save_comparison_results(current_cache)
                                     new_results_batch.clear()
                                     logger.info("Batch saved. Resuming scan...")
-
                     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    status_line = (
-                        f"{now_str} - [Full Scan] Checked pair {pairs_processed}/{total_pairs_to_check_after_filtering} | "
-                        f"Found valuable new entries: {new_valuable_entries}"
-                    )
+                    status_line = (f"{now_str} - [Full Scan] Checked pair {pairs_processed}/{total_pairs_to_check_after_filtering} | " f"Found valuable new entries: {new_valuable_entries}")
                     sys.stdout.write(f"\r{status_line}   ")
                     sys.stdout.flush()
-
-            sys.stdout.write('\n')
-            sys.stdout.flush()
-
+            sys.stdout.write('\n'); sys.stdout.flush()
             if args.update_comparison_cache and new_results_batch:
                 logger.info(f"Saving final batch of {len(new_results_batch)} new results to cache...")
                 current_cache = data_store.load_comparison_results()
                 current_cache.update(new_results_batch)
                 data_store.save_comparison_results(current_cache)
                 logger.info("Final batch saved.")
-
         finally:
             if console_handler:
                 root_logger.addHandler(console_handler)
-
         logger.info(f"Full scan complete. Added {new_valuable_entries} new valuable entries to the cache.")
         logger.info("---[ Exiting Full Scan Mode, proceeding with dataset construction ]---")
 
+    # ... (The main data gathering and sampling logic remains the same) ...
     processed_pairs = set()
-
-    positive_pairs = []
-    hard_negative_pairs_from_cache = []
-    easy_negative_pairs_from_cache = []
-    gemini_candidates_new = []
-
+    positive_pairs, hard_negative_pairs_from_cache, easy_negative_pairs_from_cache, gemini_candidates_new = [], [], [], []
     logger.info("Phase 1: Categorizing pairs from existing comparison cache...")
     for pair_key, comp_res in existing_comparison_results.items():
         processed_pairs.add(pair_key)
         f1p, f2p = comp_res.folder1_path, comp_res.folder2_path
-        if f1p not in all_music_folders or f2p not in all_music_folders:
-            continue
-
+        if f1p not in all_music_folders or f2p not in all_music_folders: continue
         folder1, folder2 = all_music_folders[f1p], all_music_folders[f2p]
-
-        # ### START OF CHANGE 1 ###
-        # Check for a cached ML score. If not present, calculate and save it back to the object.
-        # `hasattr` is used for backward compatibility with old cache files.
-        if hasattr(comp_res, 'ml_similarity_score') and comp_res.ml_similarity_score is not None:
-            ml_score = comp_res.ml_similarity_score
+        if hasattr(comp_res, 'ml_similarity_score') and comp_res.ml_similarity_score is not None: ml_score = comp_res.ml_similarity_score
         elif ml_similarity_model.model_loaded:
             ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
-            # Save the newly calculated score back to the in-memory object
             comp_res.ml_similarity_score = ml_score
-        else:
-            ml_score = None
-        # ### END OF CHANGE 1 ###
-
+        else: ml_score = None
         deciding_score = ml_score if ml_score is not None else comp_res.weighted_score
-
         if deciding_score >= HIGH_CERTAINTY_THRESHOLD or comp_res.gemini_verdict == 'duplicate':
             label = DEFINITE_DUPLICATE_LABEL if comp_res.gemini_verdict != 'duplicate' else comp_res.gemini_similarity_score
             label_source = 'gemini_cached' if comp_res.gemini_verdict == 'duplicate' else ('ml_high_certainty' if ml_score is not None else 'algo_high_certainty')
-            if label is not None:
-                positive_pairs.append((folder1, folder2, comp_res, label, label_source))
-        elif deciding_score < LOW_CERTAINTY_THRESHOLD:
-            easy_negative_pairs_from_cache.append((folder1, folder2, comp_res, DEFINITE_DIFFERENT_LABEL, 'easy_negative_cached'))
+            if label is not None: positive_pairs.append((folder1, folder2, comp_res, label, label_source))
+        elif deciding_score < LOW_CERTAINTY_THRESHOLD: easy_negative_pairs_from_cache.append((folder1, folder2, comp_res, DEFINITE_DIFFERENT_LABEL, 'easy_negative_cached'))
         else:
             if comp_res.gemini_verdict in ['different', 'uncertain']:
-                if comp_res.gemini_similarity_score is not None:
-                    hard_negative_pairs_from_cache.append((folder1, folder2, comp_res, comp_res.gemini_similarity_score, 'hard_negative_gemini_cached'))
-            elif gemini_actually_available and comp_res.gemini_verdict is None:
-                gemini_candidates_new.append((folder1, folder2, comp_res, deciding_score))
-
+                if comp_res.gemini_similarity_score is not None: hard_negative_pairs_from_cache.append((folder1, folder2, comp_res, comp_res.gemini_similarity_score, 'hard_negative_gemini_cached'))
+            elif gemini_actually_available and comp_res.gemini_verdict is None: gemini_candidates_new.append((folder1, folder2, comp_res, deciding_score))
     logger.info(f"Initial categorization complete. Positives: {len(positive_pairs)}, Hard Negatives: {len(hard_negative_pairs_from_cache)}, Easy Negatives: {len(easy_negative_pairs_from_cache)}, New Gemini Candidates: {len(gemini_candidates_new)}")
-
     logger.info("Phase 2: Assembling balanced negative dataset...")
     n_positive = len(positive_pairs)
     negative_quota = n_positive * NEGATIVE_TO_POSITIVE_RATIO
     logger.info(f"Found {n_positive} positive samples. Setting negative sample quota to: {negative_quota}")
-
     final_negative_pairs = []
     final_negative_pairs.extend(hard_negative_pairs_from_cache)
     logger.info(f"Added {len(hard_negative_pairs_from_cache)} hard negatives from cache.")
-
     needed_more_negatives = negative_quota - len(final_negative_pairs)
     if needed_more_negatives > 0:
         random.shuffle(easy_negative_pairs_from_cache)
         added_easy = easy_negative_pairs_from_cache[:needed_more_negatives]
         final_negative_pairs.extend(added_easy)
         logger.info(f"Added {len(added_easy)} easy negatives from cache to meet quota.")
-
     logger.info("Phase 3: Sampling to fill remaining quotas...")
     all_folder_paths_list = list(all_music_folders.keys())
     max_sampling_attempts = len(all_folder_paths_list) * 10
-
     for attempt in range(max_sampling_attempts):
         if len(final_negative_pairs) >= negative_quota and len(gemini_candidates_new) >= MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
-            logger.info("All quotas filled. Stopping sampling.")
-            break
-
+            logger.info("All quotas filled. Stopping sampling."); break
         if len(all_folder_paths_list) < 2: break
-
         idx1, idx2 = random.sample(range(len(all_folder_paths_list)), 2)
         f1p, f2p = all_folder_paths_list[idx1], all_folder_paths_list[idx2]
         current_pair_key = frozenset({str(f1p), str(f2p)})
-
-        if current_pair_key in processed_pairs:
-            continue
+        if current_pair_key in processed_pairs: continue
         processed_pairs.add(current_pair_key)
-
         folder1, folder2 = all_music_folders[f1p], all_music_folders[f2p]
         comp_res = comparison_engine.compare_two_folders(folder1, folder2)
-
         if comp_res:
-            # ### START OF CHANGE 2 ###
-            # When creating a new comparison result, calculate the ML score immediately
-            # and store it in the new comp_res object.
             ml_score = None
             if ml_similarity_model.model_loaded:
                 ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
-                comp_res.ml_similarity_score = ml_score # Save to object
-            # ### END OF CHANGE 2 ###
-
+                comp_res.ml_similarity_score = ml_score
             deciding_score = ml_score if ml_score is not None else comp_res.weighted_score
-
             if deciding_score < LOW_CERTAINTY_THRESHOLD and len(final_negative_pairs) < negative_quota:
                 final_negative_pairs.append((folder1, folder2, comp_res, DEFINITE_DIFFERENT_LABEL, 'easy_negative_sampled'))
             elif LOW_CERTAINTY_THRESHOLD <= deciding_score < HIGH_CERTAINTY_THRESHOLD and len(gemini_candidates_new) < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
                 gemini_candidates_new.append((folder1, folder2, comp_res, deciding_score))
                 existing_comparison_results[current_pair_key] = comp_res
-
     logger.info(f"Sampling complete. Final negatives: {len(final_negative_pairs)}. New Gemini candidates: {len(gemini_candidates_new)}.")
-
     gemini_processed_pairs = []
     if gemini_actually_available and gemini_analyzer and gemini_candidates_new:
         assert gemini_analyzer is not None, "Gemini analyzer should be initialized here"
         logger.info(f"Phase 4: Running Gemini analysis on {len(gemini_candidates_new)} candidate pairs...")
         for f1_info, f2_info, comp_res_gemini, score_for_gemini in gemini_candidates_new:
-            time.sleep(app_config.GEMINI_API_DELAY_SECONDS)
+            time.sleep(3)
             logger.info(f"Sending to Gemini: {f1_info.path.name} vs {f2_info.path.name} (Score: {score_for_gemini:.2f})")
             verdict, gemini_sim_score, reason = gemini_analyzer.analyze_pair(f1_info, f2_info, score_for_gemini)
-
             pair_key = frozenset({str(f1_info.path), str(f2_info.path)})
-            comp_res_gemini.gemini_verdict = verdict
-            comp_res_gemini.gemini_similarity_score = gemini_sim_score
-            comp_res_gemini.gemini_reason = reason
-            # Correctly check if 'reason' contains an error string
+            comp_res_gemini.gemini_verdict, comp_res_gemini.gemini_similarity_score, comp_res_gemini.gemini_reason = verdict, gemini_sim_score, reason
             comp_res_gemini.gemini_error = reason if reason and "ERROR" in reason.upper() else None
             existing_comparison_results[pair_key] = comp_res_gemini
-
             if gemini_sim_score is not None and not comp_res_gemini.gemini_error:
-                if verdict == 'duplicate':
-                     gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_positive_new'))
-                else:
-                     gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_negative_new'))
-
+                if verdict == 'duplicate': gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_positive_new'))
+                else: gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_negative_new'))
+    
     logger.info("Phase 5: Assembling final dataset...")
 
     all_labeled_pairs = positive_pairs + final_negative_pairs + gemini_processed_pairs
@@ -600,12 +529,15 @@ def build_dataset(args):
 
     final_df = pd.DataFrame(dataset_rows)
     final_df.dropna(subset=['target_label'], inplace=True)
-    final_df.fillna(0.0, inplace=True)
+    
+    # --- MAJOR CHANGE HERE ---
+    # DO NOT fill all NaNs with 0.0. Let the model handle them.
+    # final_df.fillna(0.0, inplace=True) # <- THIS LINE IS REMOVED
 
-    # Ensuring all expected columns from ML model exist
+    # NEW: If any expected feature columns are missing, add them and fill with NaN
     for col in MLSimilarityModel.EXPECTED_FEATURE_NAMES_ORDERED:
         if col not in final_df.columns:
-            final_df[col] = 0.0
+            final_df[col] = np.nan
 
     logger.info(f"Total dataset rows before split: {final_df.shape[0]}")
     if final_df.shape[0] > 0:
