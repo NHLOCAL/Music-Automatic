@@ -383,18 +383,32 @@ def run_analysis(args):
     if logger:
         logger.info(f"Folder comparison finished in {compare_duration:.2f} seconds. Processed {len(all_comparison_results)} total pairs.")
     if args.ml_scoring and ml_similarity_model and ml_similarity_model.model_loaded:
+        print(f"{utils.AnsiColors.CYAN}--- Enhancing comparison results with ML model predictions... ---{utils.AnsiColors.RESET}")
         if logger: logger.info("Enhancing comparison results with ML model predictions...")
         ml_predictions_made_api = 0
         ml_predictions_from_cache = 0
-        for result in all_comparison_results:
+        total_pairs = len(all_comparison_results)
+        
+        for i, result in enumerate(all_comparison_results):
             cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
             cached_result = cached_comparison_results_map.get(cache_key)
+            
+            # Display progress
+            progress_percent = (i + 1) / total_pairs * 100
+            status_line = (
+                f"Processing ML scores: {i+1}/{total_pairs} ({progress_percent:.1f}%) | "
+                f"New: {ml_predictions_made_api}, Cache: {ml_predictions_from_cache}"
+            )
+            sys.stdout.write(f"\r{status_line}")
+            sys.stdout.flush()
+
             if cached_result and hasattr(cached_result, 'ml_similarity_score') and cached_result.ml_similarity_score is not None:
                 result.ml_similarity_score = cached_result.ml_similarity_score
                 ml_predictions_from_cache += 1
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(f"Used cached ML score for pair {result.folder1_path.name} - {result.folder2_path.name}: {result.ml_similarity_score:.4f}")
                 continue
+
             folder1_info = all_scanned_folders.get(result.folder1_path)
             folder2_info = all_scanned_folders.get(result.folder2_path)
             if folder1_info and folder2_info:
@@ -407,6 +421,9 @@ def run_analysis(args):
             else:
                 if logger: logger.warning(f"FolderInfo not found for pair {result.folder1_path.name} - {result.folder2_path.name} "
                                            f"during ML enhancement. Skipping ML for this pair.")
+        
+        sys.stdout.write("\n") # Newline after progress bar finishes
+        print(f"{utils.AnsiColors.CYAN}--- ML Enhancement Complete ---{utils.AnsiColors.RESET}")
         if logger: logger.info(f"ML enhancement complete. New predictions: {ml_predictions_made_api}, From cache: {ml_predictions_from_cache}.")
     elif args.ml_scoring and (not ml_similarity_model or not ml_similarity_model.model_loaded):
         if logger: logger.warning("ML scoring requested but model is not available/loaded. Proceeding without ML scores.")
@@ -529,7 +546,7 @@ def run_analysis(args):
         print(f"{utils.AnsiColors.RED}Error: Invalid input. Please enter a number.{utils.AnsiColors.RESET}")
         print(f"Using default threshold for potential deletion: {config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}%")
         min_similarity_for_delete = config.DEFAULT_MIN_SIMILARITY_FOR_DELETE
-        if logger: logger.warning(f"Invalid delete threshold input (not a number), using default {config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}")
+        if logger: logger.warning(f"Invalid delete threshold input (not a number), using default {config.DEFAULT_MIN_SIMILARITY_for_DELETE}")
     except EOFError:
         min_similarity_for_delete = None
         print("Non-interactive mode detected, skipping deletion prompt.")
