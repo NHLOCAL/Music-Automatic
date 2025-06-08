@@ -257,7 +257,7 @@ def run_gemini_analysis(
             continue
         pairs_to_analyze.append(result)
         processed_representative_pairs.add(canonical_rep_pair)
-        if logger: logger.debug(f"Adding pair for Gemini: {f1_path.name} <-> {f2_path.name} (Reps: {rep1.name} <-> {rep2.name})")
+        if logger: logger.debug(f"Adding pair for Gemini: {f1_path.name} <-> {f2.path.name} (Reps: {rep1.name} <-> {rep2.name})")
     if not pairs_to_analyze:
         if logger: logger.info(f"No folder pairs remaining for Gemini analysis after filtering (Range: {min_sim}-{max_sim}%, Rep Threshold: {config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE}%). Skipped {skipped_count_rep} same-rep pairs, {skipped_count_dup_rep} duplicate-rep pairs.")
         print(f"\nNo folder pairs found within the specified range ({min_sim}-{max_sim}%) for Gemini analysis after optimization.")
@@ -384,8 +384,17 @@ def run_analysis(args):
         logger.info(f"Folder comparison finished in {compare_duration:.2f} seconds. Processed {len(all_comparison_results)} total pairs.")
     if args.ml_scoring and ml_similarity_model and ml_similarity_model.model_loaded:
         if logger: logger.info("Enhancing comparison results with ML model predictions...")
-        ml_predictions_made = 0
+        ml_predictions_made_api = 0
+        ml_predictions_from_cache = 0
         for result in all_comparison_results:
+            cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
+            cached_result = cached_comparison_results_map.get(cache_key)
+            if cached_result and hasattr(cached_result, 'ml_similarity_score') and cached_result.ml_similarity_score is not None:
+                result.ml_similarity_score = cached_result.ml_similarity_score
+                ml_predictions_from_cache += 1
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"Used cached ML score for pair {result.folder1_path.name} - {result.folder2_path.name}: {result.ml_similarity_score:.4f}")
+                continue
             folder1_info = all_scanned_folders.get(result.folder1_path)
             folder2_info = all_scanned_folders.get(result.folder2_path)
             if folder1_info and folder2_info:
@@ -394,11 +403,11 @@ def run_analysis(args):
                 )
                 if ml_score is not None:
                     result.ml_similarity_score = ml_score
-                    ml_predictions_made += 1
+                    ml_predictions_made_api += 1
             else:
                 if logger: logger.warning(f"FolderInfo not found for pair {result.folder1_path.name} - {result.folder2_path.name} "
                                            f"during ML enhancement. Skipping ML for this pair.")
-        if logger: logger.info(f"ML enhancement complete. {ml_predictions_made} predictions made.")
+        if logger: logger.info(f"ML enhancement complete. New predictions: {ml_predictions_made_api}, From cache: {ml_predictions_from_cache}.")
     elif args.ml_scoring and (not ml_similarity_model or not ml_similarity_model.model_loaded):
         if logger: logger.warning("ML scoring requested but model is not available/loaded. Proceeding without ML scores.")
     else:
@@ -525,7 +534,6 @@ def run_analysis(args):
         min_similarity_for_delete = None
         print("Non-interactive mode detected, skipping deletion prompt.")
     if min_similarity_for_delete is not None:
-        # Use the filtered display_results_list for identifying folders to delete
         folders_to_delete_pairs = action_handler.identify_folders_to_delete(display_results_list, min_similarity_for_delete)
         if folders_to_delete_pairs:
             if args.preferred_root:
@@ -576,9 +584,7 @@ if __name__ == "__main__":
                               metavar="MIN-MAX",
                               help="Similarity range ('min-max' percentage, based on algorithmic or ML score) for sending pairs to Gemini API.")
     args = parser.parse_args()
-    # --- START OF FIX ---
     log_level_initial = getattr(logging, args.log_level.upper(), logging.INFO)
-    # --- END OF FIX ---
     logging.basicConfig(level=log_level_initial, format=config.LOG_FORMAT, handlers=[logging.StreamHandler()])
     logger = logging.getLogger(__name__)
     if args.clear_comparison_cache:
