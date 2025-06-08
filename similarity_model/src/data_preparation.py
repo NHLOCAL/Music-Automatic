@@ -121,7 +121,7 @@ def extract_features_for_pair(
     folder1_info: FolderInfo,
     folder2_info: FolderInfo,
     comparison_result: Optional[FolderComparisonResult]
-) -> Optional[Dict[str, any]]:
+) -> Optional[Dict[str, Any]]:
     features = {}
     if not folder1_info or not folder2_info: return None
 
@@ -283,7 +283,7 @@ def extract_features_for_pair(
     return features
 
 # ... (The functions _file_info_from_dict and _folder_info_from_dict remain unchanged) ...
-def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
+def _file_info_from_dict(data: Dict[str, Any]) -> FileInfo:
     return FileInfo(
         filename=data.get("filename", "unknown.mp3"), filepath=Path(data.get("filepath", "unknown.mp3")),
         extension=data.get("extension", ".mp3"), size_mb=float(data.get("size_mb", 0.0)),
@@ -297,7 +297,12 @@ def _file_info_from_dict(data: Dict[str, any]) -> FileInfo:
         is_lossless=bool(data.get("is_lossless", False))
     )
 
-def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> FolderInfo:
+def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, Any]) -> FolderInfo:
+    # FIXED: Coalesce None values to 0.0 for float fields to prevent type errors.
+    avg_bitrate_val = folder_dict.get('avg_bitrate')
+    generic_fn_score_val = folder_dict.get('generic_filename_score')
+    generic_title_score_val = folder_dict.get('generic_title_score')
+
     return FolderInfo(
         path=Path(path_str),
         folder_name=folder_dict.get('folder_name', Path(path_str).name),
@@ -306,11 +311,11 @@ def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, any]) -> Folder
         other_files=folder_dict.get('other_files', []),
         album_art_hash=folder_dict.get('album_art_hash'),
         file_hashes_present=folder_dict.get('file_hashes_present', False),
-        avg_bitrate=folder_dict.get('avg_bitrate'),
+        avg_bitrate=avg_bitrate_val if avg_bitrate_val is not None else 0.0,
         unique_artists=set(folder_dict.get('unique_artists', [])),
         unique_albums=set(folder_dict.get('unique_albums', [])),
-        generic_filename_score=folder_dict.get('generic_filename_score'),
-        generic_title_score=folder_dict.get('generic_title_score'),
+        generic_filename_score=generic_fn_score_val if generic_fn_score_val is not None else 0.0,
+        generic_title_score=generic_title_score_val if generic_title_score_val is not None else 0.0,
         quality_score=folder_dict.get('quality_score'),
         quality_breakdown=folder_dict.get('quality_breakdown', {}),
         hebrew_metadata_ratio=folder_dict.get('hebrew_metadata_ratio', 0.0),
@@ -334,13 +339,16 @@ def build_dataset(args):
         logger.warning("MLSimilarityModel failed to load. Deciding score will fall back to algorithmic.")
     gemini_analyzer = None
     gemini_actually_available = GEMINI_AVAILABLE and not args.disable_gemini
-    if gemini_actually_available:
+    if gemini_actually_available and GeminiAnalyzer is not None:
         try:
             gemini_analyzer = GeminiAnalyzer()
             logger.info("Gemini Analyzer initialized.")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini Analyzer: {e}. Gemini labeling will be skipped.", exc_info=True)
             gemini_actually_available = False
+    elif gemini_actually_available and GeminiAnalyzer is None:
+        logger.warning("GeminiAnalyzer class is None. Gemini labeling will be skipped.")
+        gemini_actually_available = False
     cached_music_data = data_store.load_data()
     if not cached_music_data:
         logger.error("Music data cache is empty. Run main scanner first.")
@@ -491,6 +499,7 @@ def build_dataset(args):
     logger.info(f"Sampling complete. Final negatives: {len(final_negative_pairs)}. New Gemini candidates: {len(gemini_candidates_new)}.")
     gemini_processed_pairs = []
     if gemini_actually_available and gemini_analyzer and gemini_candidates_new:
+        # FIXED: Add assert to help the type checker understand gemini_analyzer is not None here.
         assert gemini_analyzer is not None, "Gemini analyzer should be initialized here"
         logger.info(f"Phase 4: Running Gemini analysis on {len(gemini_candidates_new)} candidate pairs...")
         for f1_info, f2_info, comp_res_gemini, score_for_gemini in gemini_candidates_new:
