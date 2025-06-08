@@ -50,7 +50,7 @@ TEST_SPLIT_RATIO = 0.2
 DATASET_RANDOM_STATE = 42
 
 HIGH_CERTAINTY_THRESHOLD = 85.0
-LOW_CERTAINTY_THRESHOLD = 30.0
+LOW_CERTAINTY_THRESHOLD = 20.0
 
 DEFINITE_DUPLICATE_LABEL = 98.0
 DEFINITE_DIFFERENT_LABEL = 2.0
@@ -58,7 +58,7 @@ DEFINITE_DIFFERENT_LABEL = 2.0
 NEGATIVE_TO_POSITIVE_RATIO = 10
 MAX_GEMINI_CANDIDATES_FROM_SAMPLING = 500
 
-MIN_SCORE_TO_CACHE = 30.0
+MIN_SCORE_TO_CACHE = 20.0
 CACHE_SAVE_BATCH_SIZE = 50000
 
 logger = logging.getLogger("SimilarityModel.DatasetBuilder")
@@ -282,7 +282,31 @@ def extract_features_for_pair(
             
     return features
 
-# ... (The functions _file_info_from_dict and _folder_info_from_dict remain unchanged) ...
+
+def get_combined_deciding_score(comp_res: FolderComparisonResult) -> float:
+    """
+    Calculates a combined deciding score for a folder pair.
+
+    The score is a 50/50 blend of the algorithmic weighted score and the ML similarity score.
+    If the ML score is not available, it falls back to using only the algorithmic score.
+    
+    Args:
+        comp_res: The FolderComparisonResult object for the pair.
+
+    Returns:
+        The combined score, or the algorithmic score if ML score is missing.
+    """
+    algo_score = comp_res.weighted_score
+    ml_score = getattr(comp_res, 'ml_similarity_score', None)
+
+    if ml_score is not None and algo_score is not None:
+        # 50/50 blend of both scores
+        return (algo_score + ml_score) / 2.0
+    
+    # Fallback to algorithmic score if ML score is not available
+    return algo_score if algo_score is not None else 0.0
+
+
 def _file_info_from_dict(data: Dict[str, Any]) -> FileInfo:
     return FileInfo(
         filename=data.get("filename", "unknown.mp3"), filepath=Path(data.get("filepath", "unknown.mp3")),
@@ -325,7 +349,6 @@ def _folder_info_from_dict(path_str: str, folder_dict: Dict[str, Any]) -> Folder
     )
 
 def build_dataset(args):
-    # ... (All setup code remains the same) ...
     LOGS_DIR_SIM_MODEL.mkdir(parents=True, exist_ok=True)
     utils.setup_logging(args.log_level, LOGS_DIR_SIM_MODEL / "dataset_builder.log")
     logger.info("Starting dataset construction...")
@@ -358,7 +381,6 @@ def build_dataset(args):
     existing_comparison_results = data_store.load_comparison_results()
     logger.info(f"Loaded {len(existing_comparison_results)} existing comparison results from cache.")
     
-    # ... (The full_scan logic remains the same) ...
     if args.full_scan:
         logger.info(f"---[ Full Scan Mode: Filtering, and Saving Incrementally ]---")
         groups_by_file_count = defaultdict(list)
@@ -399,10 +421,16 @@ def build_dataset(args):
                     folder2 = all_music_folders[f2p]
                     comp_res = comparison_engine.compare_two_folders(folder1, folder2)
                     if comp_res:
+                        # --- MODIFICATION START ---
+                        # Calculate ML score and attach it to the result object
                         if ml_similarity_model.model_loaded:
                             ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
                             comp_res.ml_similarity_score = ml_score
-                        deciding_score = comp_res.ml_similarity_score if hasattr(comp_res, 'ml_similarity_score') and comp_res.ml_similarity_score is not None else comp_res.weighted_score
+                        
+                        # Use the new helper function to get the combined score
+                        deciding_score = get_combined_deciding_score(comp_res)
+                        # --- MODIFICATION END ---
+
                         if deciding_score >= MIN_SCORE_TO_CACHE:
                             existing_comparison_results[pair_key] = comp_res
                             new_valuable_entries += 1
@@ -433,7 +461,6 @@ def build_dataset(args):
         logger.info(f"Full scan complete. Added {new_valuable_entries} new valuable entries to the cache.")
         logger.info("---[ Exiting Full Scan Mode, proceeding with dataset construction ]---")
 
-    # ... (The main data gathering and sampling logic remains the same) ...
     processed_pairs = set()
     positive_pairs, hard_negative_pairs_from_cache, easy_negative_pairs_from_cache, gemini_candidates_new = [], [], [], []
     logger.info("Phase 1: Categorizing pairs from existing comparison cache...")
@@ -442,21 +469,30 @@ def build_dataset(args):
         f1p, f2p = comp_res.folder1_path, comp_res.folder2_path
         if f1p not in all_music_folders or f2p not in all_music_folders: continue
         folder1, folder2 = all_music_folders[f1p], all_music_folders[f2p]
-        if hasattr(comp_res, 'ml_similarity_score') and comp_res.ml_similarity_score is not None: ml_score = comp_res.ml_similarity_score
-        elif ml_similarity_model.model_loaded:
+
+        # --- MODIFICATION START ---
+        # Ensure ML score is present on comp_res if possible (might have been added in a previous run)
+        if (not hasattr(comp_res, 'ml_similarity_score') or comp_res.ml_similarity_score is None) and ml_similarity_model.model_loaded:
             ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
             comp_res.ml_similarity_score = ml_score
-        else: ml_score = None
-        deciding_score = ml_score if ml_score is not None else comp_res.weighted_score
+        
+        # Use the new helper function for all decisions
+        deciding_score = get_combined_deciding_score(comp_res)
+        # --- MODIFICATION END ---
+        
         if deciding_score >= HIGH_CERTAINTY_THRESHOLD or comp_res.gemini_verdict == 'duplicate':
             label = DEFINITE_DUPLICATE_LABEL if comp_res.gemini_verdict != 'duplicate' else comp_res.gemini_similarity_score
-            label_source = 'gemini_cached' if comp_res.gemini_verdict == 'duplicate' else ('ml_high_certainty' if ml_score is not None else 'algo_high_certainty')
+            label_source = 'gemini_cached' if comp_res.gemini_verdict == 'duplicate' else 'combined_high_certainty'
             if label is not None: positive_pairs.append((folder1, folder2, comp_res, label, label_source))
-        elif deciding_score < LOW_CERTAINTY_THRESHOLD: easy_negative_pairs_from_cache.append((folder1, folder2, comp_res, DEFINITE_DIFFERENT_LABEL, 'easy_negative_cached'))
+        elif deciding_score < LOW_CERTAINTY_THRESHOLD: 
+            easy_negative_pairs_from_cache.append((folder1, folder2, comp_res, DEFINITE_DIFFERENT_LABEL, 'easy_negative_cached'))
         else:
             if comp_res.gemini_verdict in ['different', 'uncertain']:
-                if comp_res.gemini_similarity_score is not None: hard_negative_pairs_from_cache.append((folder1, folder2, comp_res, comp_res.gemini_similarity_score, 'hard_negative_gemini_cached'))
-            elif gemini_actually_available and comp_res.gemini_verdict is None: gemini_candidates_new.append((folder1, folder2, comp_res, deciding_score))
+                if comp_res.gemini_similarity_score is not None: 
+                    hard_negative_pairs_from_cache.append((folder1, folder2, comp_res, comp_res.gemini_similarity_score, 'hard_negative_gemini_cached'))
+            elif gemini_actually_available and comp_res.gemini_verdict is None: 
+                gemini_candidates_new.append((folder1, folder2, comp_res, deciding_score))
+    
     logger.info(f"Initial categorization complete. Positives: {len(positive_pairs)}, Hard Negatives: {len(hard_negative_pairs_from_cache)}, Easy Negatives: {len(easy_negative_pairs_from_cache)}, New Gemini Candidates: {len(gemini_candidates_new)}")
     logger.info("Phase 2: Assembling balanced negative dataset...")
     n_positive = len(positive_pairs)
@@ -471,6 +507,7 @@ def build_dataset(args):
         added_easy = easy_negative_pairs_from_cache[:needed_more_negatives]
         final_negative_pairs.extend(added_easy)
         logger.info(f"Added {len(added_easy)} easy negatives from cache to meet quota.")
+    
     logger.info("Phase 3: Sampling to fill remaining quotas...")
     all_folder_paths_list = list(all_music_folders.keys())
     max_sampling_attempts = len(all_folder_paths_list) * 10
@@ -486,33 +523,39 @@ def build_dataset(args):
         folder1, folder2 = all_music_folders[f1p], all_music_folders[f2p]
         comp_res = comparison_engine.compare_two_folders(folder1, folder2)
         if comp_res:
-            ml_score = None
+            # --- MODIFICATION START ---
             if ml_similarity_model.model_loaded:
                 ml_score = ml_similarity_model.predict_similarity_for_pair(folder1, folder2, comp_res)
                 comp_res.ml_similarity_score = ml_score
-            deciding_score = ml_score if ml_score is not None else comp_res.weighted_score
+
+            deciding_score = get_combined_deciding_score(comp_res)
+            # --- MODIFICATION END ---
+            
             if deciding_score < LOW_CERTAINTY_THRESHOLD and len(final_negative_pairs) < negative_quota:
                 final_negative_pairs.append((folder1, folder2, comp_res, DEFINITE_DIFFERENT_LABEL, 'easy_negative_sampled'))
             elif LOW_CERTAINTY_THRESHOLD <= deciding_score < HIGH_CERTAINTY_THRESHOLD and len(gemini_candidates_new) < MAX_GEMINI_CANDIDATES_FROM_SAMPLING:
                 gemini_candidates_new.append((folder1, folder2, comp_res, deciding_score))
                 existing_comparison_results[current_pair_key] = comp_res
+
     logger.info(f"Sampling complete. Final negatives: {len(final_negative_pairs)}. New Gemini candidates: {len(gemini_candidates_new)}.")
     gemini_processed_pairs = []
     if gemini_actually_available and gemini_analyzer and gemini_candidates_new:
-        # FIXED: Add assert to help the type checker understand gemini_analyzer is not None here.
         assert gemini_analyzer is not None, "Gemini analyzer should be initialized here"
         logger.info(f"Phase 4: Running Gemini analysis on {len(gemini_candidates_new)} candidate pairs...")
+        # Note: The score passed to Gemini is the combined score, which is correct
         for f1_info, f2_info, comp_res_gemini, score_for_gemini in gemini_candidates_new:
             time.sleep(3)
-            logger.info(f"Sending to Gemini: {f1_info.path.name} vs {f2_info.path.name} (Score: {score_for_gemini:.2f})")
+            logger.info(f"Sending to Gemini: {f1_info.path.name} vs {f2_info.path.name} (Combined Score: {score_for_gemini:.2f})")
             verdict, gemini_sim_score, reason = gemini_analyzer.analyze_pair(f1_info, f2_info, score_for_gemini)
             pair_key = frozenset({str(f1_info.path), str(f2_info.path)})
             comp_res_gemini.gemini_verdict, comp_res_gemini.gemini_similarity_score, comp_res_gemini.gemini_reason = verdict, gemini_sim_score, reason
             comp_res_gemini.gemini_error = reason if reason and "ERROR" in reason.upper() else None
             existing_comparison_results[pair_key] = comp_res_gemini
             if gemini_sim_score is not None and not comp_res_gemini.gemini_error:
-                if verdict == 'duplicate': gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_positive_new'))
-                else: gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_negative_new'))
+                if verdict == 'duplicate': 
+                    gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_positive_new'))
+                else: 
+                    gemini_processed_pairs.append((f1_info, f2_info, comp_res_gemini, gemini_sim_score, 'gemini_negative_new'))
     
     logger.info("Phase 5: Assembling final dataset...")
 
@@ -539,11 +582,6 @@ def build_dataset(args):
     final_df = pd.DataFrame(dataset_rows)
     final_df.dropna(subset=['target_label'], inplace=True)
     
-    # --- MAJOR CHANGE HERE ---
-    # DO NOT fill all NaNs with 0.0. Let the model handle them.
-    # final_df.fillna(0.0, inplace=True) # <- THIS LINE IS REMOVED
-
-    # NEW: If any expected feature columns are missing, add them and fill with NaN
     for col in MLSimilarityModel.EXPECTED_FEATURE_NAMES_ORDERED:
         if col not in final_df.columns:
             final_df[col] = np.nan
