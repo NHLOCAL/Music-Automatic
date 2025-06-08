@@ -80,7 +80,7 @@ def display_comparison_results(results: List[FolderComparisonResult], all_folder
             if result.gemini_reason:
                 reason_preview = result.gemini_reason.replace('\n', ' ').strip()
                 print(f"  {utils.AnsiColors.CYAN}Gemini Reason:{utils.AnsiColors.RESET} {reason_preview[:200]}{'...' if len(reason_preview) > 200 else ''}")
-        if logging.getLogger().isEnabledFor(logging.DEBUG) and result.similarity_scores:
+        if logger and logger.isEnabledFor(logging.DEBUG) and result.similarity_scores:
             details = []
             for k, v in sorted(result.similarity_scores.items()):
                 if k == 'additional_metadata_details':
@@ -140,7 +140,7 @@ def display_quality_results_grouped(all_folders: Dict[Path, FolderInfo], compari
                          color = utils.AnsiColors.GREEN if i == 0 else utils.AnsiColors.YELLOW if quality > 50 else utils.AnsiColors.RED
                     marker = "👑 (Best)" if i == 0 and quality >=0 else " " * 9
                     print(f"  {marker} {color}{q_str:<7}{utils.AnsiColors.RESET} '{folder.path}'")
-                    if logging.getLogger().isEnabledFor(logging.DEBUG) and folder.quality_breakdown:
+                    if logger and logger.isEnabledFor(logging.DEBUG) and folder.quality_breakdown:
                         breakdown_str = ", ".join([f"{k}: {v:.1f}" for k, v in sorted(folder.quality_breakdown.items())])
                         print(f"      Breakdown: [{breakdown_str}]")
     print(utils.AnsiColors.CYAN + "\n--- End of Quality Assessment ---" + utils.AnsiColors.RESET)
@@ -257,7 +257,7 @@ def run_gemini_analysis(
             continue
         pairs_to_analyze.append(result)
         processed_representative_pairs.add(canonical_rep_pair)
-        if logger: logger.debug(f"Adding pair for Gemini: {f1_path.name} <-> {f2.path.name} (Reps: {rep1.name} <-> {rep2.name})")
+        if logger: logger.debug(f"Adding pair for Gemini: {f1_path.name} <-> {f2_path.name} (Reps: {rep1.name} <-> {rep2.name})")
     if not pairs_to_analyze:
         if logger: logger.info(f"No folder pairs remaining for Gemini analysis after filtering (Range: {min_sim}-{max_sim}%, Rep Threshold: {config.GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE}%). Skipped {skipped_count_rep} same-rep pairs, {skipped_count_dup_rep} duplicate-rep pairs.")
         print(f"\nNo folder pairs found within the specified range ({min_sim}-{max_sim}%) for Gemini analysis after optimization.")
@@ -284,6 +284,7 @@ def run_gemini_analysis(
         f1 = all_folders.get(result.folder1_path)
         f2 = all_folders.get(result.folder2_path)
         if not f1 or not f2:
+            # FIXED: Use result.folderX_path.name as f1/f2 might be None
             if logger: logger.warning(f"Skipping Gemini analysis for pair ({result.folder1_path.name}, {result.folder2_path.name}): FolderInfo missing.")
             continue
         progress = f"({i+1}/{len(pairs_to_analyze)})"
@@ -405,7 +406,7 @@ def run_analysis(args):
             if cached_result and hasattr(cached_result, 'ml_similarity_score') and cached_result.ml_similarity_score is not None:
                 result.ml_similarity_score = cached_result.ml_similarity_score
                 ml_predictions_from_cache += 1
-                if logger.isEnabledFor(logging.DEBUG):
+                if logger and logger.isEnabledFor(logging.DEBUG):
                     logger.debug(f"Used cached ML score for pair {result.folder1_path.name} - {result.folder2_path.name}: {result.ml_similarity_score:.4f}")
                 continue
 
@@ -546,7 +547,7 @@ def run_analysis(args):
         print(f"{utils.AnsiColors.RED}Error: Invalid input. Please enter a number.{utils.AnsiColors.RESET}")
         print(f"Using default threshold for potential deletion: {config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}%")
         min_similarity_for_delete = config.DEFAULT_MIN_SIMILARITY_FOR_DELETE
-        if logger: logger.warning(f"Invalid delete threshold input (not a number), using default {config.DEFAULT_MIN_SIMILARITY_for_DELETE}")
+        if logger: logger.warning(f"Invalid delete threshold input (not a number), using default {config.DEFAULT_MIN_SIMILARITY_FOR_DELETE}")
     except EOFError:
         min_similarity_for_delete = None
         print("Non-interactive mode detected, skipping deletion prompt.")
