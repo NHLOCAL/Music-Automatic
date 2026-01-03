@@ -10,3 +10,4 @@ fastapi
 uvicorn
 pydantic
 python-multipart
+lightgbm
