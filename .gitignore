@@ -156,3 +156,5 @@ o1_project/RecycleBin
 music_data.json
 **/logs/**
 **/repomix-output.*
+/album_deduplicator/ui/node_modules
+album_deduplicator/ui/package-lock.json
