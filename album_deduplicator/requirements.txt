@@ -6,3 +6,4 @@ rapidfuzz
 joblib
 pandas
 numpy
+Send2Trash
