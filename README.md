@@ -21,8 +21,22 @@
 [למידע נוסף](./music_organizer/README.md)
 
 ###  **`album_deduplicator`**:
-המודול המרכזי לזיהוי, ניתוח וטיפול באלבומי מוזיקה כפולים או דומים. כולל CLI, Web UI (מבוסס Streamlit), ומנוע השוואה מתוחכם.
+המודול המרכזי לזיהוי, ניתוח וטיפול באלבומי מוזיקה כפולים או דומים. כולל CLI, Web UI (מבוסס Streamlit), מנוע השוואה מתוחכם, API חדש (FastAPI) וממשק קדמי React.
 [למידע נוסף](./album_deduplicator/README.md)
+
+**הפעלה מהירה לממשק החדש:**
+
+```bash
+cd album_deduplicator
+pip install -r requirements.txt
+uvicorn api:app --reload --port 8000
+
+cd ui
+npm install
+npm run dev
+```
+
+שרת ה-API יאזין בברירת מחדל על `http://localhost:8000/api` וה-UI על `http://localhost:5173`.
 
 ### **`similarity_model`**:
 מכיל את הקוד והנתונים הקשורים למודל למידת המכונה (LightGBM) המשמש לחיזוי דמיון בין אלבומים. כולל סקריפטים להכנת נתונים, אימון, הערכה ובדיקת המודל.

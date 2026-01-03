@@ -6,3 +6,7 @@ rapidfuzz
 joblib
 pandas
 numpy
+fastapi
+uvicorn
+pydantic
+python-multipart

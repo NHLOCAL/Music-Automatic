@@ -80,9 +80,37 @@ python main.py "נתיב/לתיקיית/מוזיקה1" "נתיב/אחר/למוז
 python main.py "/mnt/music_collection" "/media/external_hd/more_music" -p "/mnt/music_collection" -l DEBUG -m -g --gemini-range "50-85"
 ```
 
-### 2. ממשק משתמש גרפי (Web UI - `app.py`)
+### 2. ממשק משתמש חדש (React + FastAPI)
 
-ממשק אינטראקטיבי מבוסס Streamlit זמין להפעלה נוחה.
+בנוסף ל-Streamlit, נוספו ממשק קדמי חדש מבוסס React וממשק API ב-FastAPI המאפשרים אינטגרציה, קאשינג וזרימת עבודה מרובת שלבים.
+
+**הפעלה מהירה:**
+
+1. **Backend (FastAPI):**
+   ```bash
+   cd album_deduplicator
+   pip install -r requirements.txt
+   uvicorn api:app --reload --host 0.0.0.0 --port 8000
+   ```
+   נקודות קצה זמינות תחת `/api`, כולל `/api/scan` (הפעלה וסריקה), `/api/scan/{job_id}` (סטטוס התקדמות), `/api/scan/{job_id}/results` (תוצאות), `/api/features` (זמינות Gemini/ML) ו-`/api/actions` (הרצת פעולות מיזוג).
+
+2. **Frontend (React + Material UI):**
+   ```bash
+   cd album_deduplicator/ui
+   npm install
+   npm run dev
+   ```
+   כברירת מחדל השרת יעבוד על `http://localhost:5173` ויתחבר ל-API בנתיב `/api`. ניתן לבנות גרסת הפקה עם `npm run build`.
+
+**זרימת עבודה בממשק החדש:**
+
+1. **Configuration:** בחירת תיקיות, העדפות hashing/ML/Gemini והגדרת bitrate מועדף.
+2. **Results exploration:** הצגת זוגות דומים עם מסנני דמיון, תצוגת איכות ופרטי Gemini (אם זמינים).
+3. **Action review:** בחירת זוגות למיזוג ואישור פעולה מול ה-API.
+
+### 3. ממשק משתמש גרפי קלאסי (Streamlit - `app.py`)
+
+ממשק Streamlit המקורי עדיין זמין להפעלה נוחה.
 
 **הפעלה:**
 ודא שאתה נמצא בספריית `album_deduplicator` בטרמינל.
