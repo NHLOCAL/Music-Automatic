@@ -117,8 +117,7 @@ class FolderScanner:
 
 
 
-        updated_cache_data = {str(path): self._folder_info_to_dict(info)
-                               for path, info in processed_folders.items()}
+        updated_cache_data = {str(path): info.to_dict() for path, info in processed_folders.items()}
         self.data_store.save_data(updated_cache_data)
 
         return processed_folders
@@ -276,48 +275,10 @@ class FolderScanner:
 
 
     def _folder_info_to_dict(self, folder_info: FolderInfo) -> Dict[str, Any]:
-
-        return {
-            "path": str(folder_info.path),
-            "folder_name": folder_info.folder_name,
-            "parent_folder_name": folder_info.parent_folder_name,
-            "files": [self._file_info_to_dict(fi) for fi in folder_info.files],
-            "album_art_hash": folder_info.album_art_hash,
-            "other_files": folder_info.other_files, 
-            "file_hashes_present": folder_info.file_hashes_present,
-            "avg_bitrate": folder_info.avg_bitrate,
-            "unique_artists": sorted(list(folder_info.unique_artists)),
-            "unique_albums": sorted(list(folder_info.unique_albums)),
-            "generic_filename_score": folder_info.generic_filename_score,
-            "generic_title_score": folder_info.generic_title_score,
-            "hebrew_metadata_ratio": folder_info.hebrew_metadata_ratio,
-            "metadata_completeness_ratio": folder_info.metadata_completeness_ratio,
-            "lossless_ratio": folder_info.lossless_ratio,
-            "lyrics_ratio": folder_info.lyrics_ratio,
-
-            "quality_score": folder_info.quality_score,
-            "quality_breakdown": folder_info.quality_breakdown,
-        }
+        return folder_info.to_dict()
 
     def _file_info_to_dict(self, file_info: FileInfo) -> Dict[str, Any]:
-
-        return {
-            "filename": file_info.filename,
-            "filepath": str(file_info.filepath),
-            "extension": file_info.extension,
-            "size_mb": file_info.size_mb,
-            "file_hash": file_info.file_hash,
-            "duration": file_info.duration,
-            "bitrate": file_info.bitrate,
-            "title": file_info.title,
-            "artist": file_info.artist,
-            "album": file_info.album,
-            "albumartist": file_info.albumartist,
-            "all_tags": file_info.all_tags,
-            "metadata_complete": file_info.metadata_complete,
-            "has_lyrics": file_info.has_lyrics,
-            "is_lossless": file_info.is_lossless,
-        }
+        return file_info.to_dict()
 
     def _folder_info_from_dict(self, data: Dict[str, Any]) -> FolderInfo:
 
