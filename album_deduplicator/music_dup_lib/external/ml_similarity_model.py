@@ -56,17 +56,27 @@ class MLSimilarityModel:
         self.model_path = model_path
         self.model = None
         self.model_loaded = False
+        self.load_error: Optional[str] = None
         self._load_model()
 
     def _load_model(self):
         try:
             if not self.model_path.exists():
-                logger.warning(f"ML model file not found at: {self.model_path}. ML-based similarity will be disabled.")
+                self.load_error = f"ML model file not found at: {self.model_path}."
+                logger.warning(f"{self.load_error} ML-based similarity will be disabled.")
                 return
             self.model = joblib.load(self.model_path)
             self.model_loaded = True
+            self.load_error = None
             logger.info(f"ML similarity model loaded successfully from: {self.model_path}")
+        except ModuleNotFoundError as exc:
+            missing = exc.name or "required dependency"
+            self.load_error = f"Missing ML dependency '{missing}'. Install it to enable ML scoring."
+            logger.warning(self.load_error)
+            self.model = None
+            self.model_loaded = False
         except Exception as e:
+            self.load_error = str(e)
             logger.error(f"Error loading ML similarity model from {self.model_path}: {e}", exc_info=True)
             self.model = None
             self.model_loaded = False

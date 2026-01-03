@@ -40,6 +40,10 @@
         ```bash
         pip install google-generativeai Pillow requests
         ```
+    *   **עבור ניקוד דמיון מבוסס ML (אופציונלי):**
+        ```bash
+        pip install lightgbm
+        ```
     *   **עבור ממשק Streamlit:**
         ```bash
         pip install streamlit

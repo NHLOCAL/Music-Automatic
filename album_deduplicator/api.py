@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -33,6 +34,12 @@ except Exception:  # pragma: no cover - defensive import for environments withou
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Album Deduplicator API", version="1.0.0")
+
+
+@lru_cache(maxsize=1)
+def _cached_ml_model() -> MLSimilarityModel:
+    """Load the ML model once per process to avoid noisy errors and reloads."""
+    return MLSimilarityModel()
 
 
 class ScanRequest(BaseModel):
@@ -165,9 +172,10 @@ class _AlbumDeduplicationService:
 
             ml_model = None
             if job.request.ml_scoring:
-                ml_model = MLSimilarityModel()
+                ml_model = _cached_ml_model()
                 if not ml_model.model_loaded:
-                    job.errors.append("ML model requested but failed to load; continuing without ML scores")
+                    detail = ml_model.load_error or "ML model requested but failed to load; continuing without ML scores"
+                    job.errors.append(detail)
                     ml_model = None
 
             if ml_model:
@@ -285,7 +293,7 @@ class _AlbumDeduplicationService:
 
 
 def get_feature_flags() -> FeatureFlags:
-    ml_model = MLSimilarityModel()
+    ml_model = _cached_ml_model()
     return FeatureFlags(gemini_available=GEMINI_AVAILABLE, ml_available=ml_model.model_loaded)
 
 
