@@ -16,11 +16,13 @@ import {
 } from '@mui/material';
 import React from 'react';
 import { ComparisonDTO } from '../types';
+import { Copy } from '../locale';
 import ComparisonDetailDrawer from './ComparisonDetailDrawer';
 import QualityBadge from './QualityBadge';
 import SimilarityFilter from './SimilarityFilter';
 
 interface Props {
+  copy: Copy;
   comparisons: ComparisonDTO[];
   minimumScore: number;
   onMinimumScoreChange: (value: number) => void;
@@ -28,7 +30,7 @@ interface Props {
   onToggleSelect: (comparison: ComparisonDTO) => void;
 }
 
-const ResultsExplorer: React.FC<Props> = ({ comparisons, minimumScore, onMinimumScoreChange, selected, onToggleSelect }) => {
+const ResultsExplorer: React.FC<Props> = ({ copy, comparisons, minimumScore, onMinimumScoreChange, selected, onToggleSelect }) => {
   const [detail, setDetail] = React.useState<ComparisonDTO | undefined>(undefined);
 
   const visible = comparisons.filter((c) => (c.final_combined_score ?? c.weighted_score) >= minimumScore);
@@ -38,17 +40,17 @@ const ResultsExplorer: React.FC<Props> = ({ comparisons, minimumScore, onMinimum
     <Card variant="outlined">
       <CardContent>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }}>
-          <SimilarityFilter value={minimumScore} onChange={onMinimumScoreChange} />
-          <Typography color="text.secondary">{visible.length} pairs visible</Typography>
+          <SimilarityFilter copy={copy} value={minimumScore} onChange={onMinimumScoreChange} />
+          <Typography color="text.secondary">{copy.resultsExplorer.visible(visible.length)}</Typography>
         </Stack>
         <Box mt={2}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Pair</TableCell>
-                <TableCell>Scores</TableCell>
-                <TableCell>Gemini</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell>{copy.resultsExplorer.tableHeaders.pair}</TableCell>
+                <TableCell>{copy.resultsExplorer.tableHeaders.scores}</TableCell>
+                <TableCell>{copy.resultsExplorer.tableHeaders.gemini}</TableCell>
+                <TableCell align="right">{copy.resultsExplorer.tableHeaders.actions}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -72,7 +74,7 @@ const ResultsExplorer: React.FC<Props> = ({ comparisons, minimumScore, onMinimum
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1} alignItems="center">
-                      <QualityBadge score={c.final_combined_score ?? c.weighted_score} />
+                      <QualityBadge copy={copy} score={c.final_combined_score ?? c.weighted_score} />
                       {c.ml_similarity_score && <Chip size="small" color="info" label={`ML ${c.ml_similarity_score.toFixed(1)}%`} />}
                     </Stack>
                   </TableCell>
@@ -80,11 +82,11 @@ const ResultsExplorer: React.FC<Props> = ({ comparisons, minimumScore, onMinimum
                     {c.gemini_verdict ? (
                       <Chip size="small" color="secondary" label={c.gemini_verdict} />
                     ) : (
-                      <Chip size="small" label="Not evaluated" />
+                      <Chip size="small" label={copy.resultsExplorer.notEvaluated} />
                     )}
                   </TableCell>
                   <TableCell align="right">
-                    <Tooltip title="View details">
+                    <Tooltip title={copy.resultsExplorer.viewDetails}>
                       <IconButton onClick={(e) => { e.stopPropagation(); setDetail(c); }}>
                         <Info />
                       </IconButton>
@@ -95,7 +97,7 @@ const ResultsExplorer: React.FC<Props> = ({ comparisons, minimumScore, onMinimum
               {!visible.length && (
                 <TableRow>
                   <TableCell colSpan={4}>
-                    <Typography color="text.secondary">No comparisons meet the filter yet.</Typography>
+                    <Typography color="text.secondary">{copy.resultsExplorer.noRows}</Typography>
                   </TableCell>
                 </TableRow>
               )}
@@ -103,7 +105,7 @@ const ResultsExplorer: React.FC<Props> = ({ comparisons, minimumScore, onMinimum
           </Table>
         </Box>
       </CardContent>
-      <ComparisonDetailDrawer open={Boolean(detail)} onClose={() => setDetail(undefined)} comparison={detail} />
+      <ComparisonDetailDrawer copy={copy} open={Boolean(detail)} onClose={() => setDetail(undefined)} comparison={detail} />
     </Card>
   );
 };

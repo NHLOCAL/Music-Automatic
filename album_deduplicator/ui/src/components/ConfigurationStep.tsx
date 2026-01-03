@@ -13,9 +13,11 @@ import {
 } from '@mui/material';
 import React from 'react';
 import { FeatureFlagsDTO } from '../types';
+import { Copy } from '../locale';
 import FolderSelector from './FolderSelector';
 
 interface Props {
+  copy: Copy;
   features?: FeatureFlagsDTO;
   folders: string[];
   onFoldersChange: (next: string[]) => void;
@@ -32,6 +34,7 @@ interface Props {
 }
 
 const ConfigurationStep: React.FC<Props> = ({
+  copy,
   features,
   folders,
   onFoldersChange,
@@ -49,21 +52,21 @@ const ConfigurationStep: React.FC<Props> = ({
   <Card variant="outlined">
     <CardContent>
       <Stack spacing={3}>
-        <FolderSelector folders={folders} onChange={onFoldersChange} />
+        <FolderSelector copy={copy} folders={folders} onChange={onFoldersChange} />
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
           <FormControlLabel
             control={<Switch checked={enableHashing} onChange={(e) => onEnableHashingChange(e.target.checked)} />}
-            label="Enable hashing"
+            label={copy.configuration.enableHashing}
           />
           <FormControlLabel
             control={<Switch checked={useML} onChange={(e) => onUseMLChange(e.target.checked)} />}
             label={
               <Stack direction="row" spacing={1} alignItems="center">
                 <Bolt fontSize="small" />
-                <span>Use ML similarity</span>
+                <span>{copy.configuration.useML}</span>
                 {features && (
                   <Typography variant="caption" color={features.ml_available ? 'success.main' : 'warning.main'}>
-                    {features.ml_available ? 'Available' : 'Unavailable'}
+                    {features.ml_available ? copy.configuration.availability.available : copy.configuration.availability.unavailable}
                   </Typography>
                 )}
               </Stack>
@@ -74,10 +77,12 @@ const ConfigurationStep: React.FC<Props> = ({
             label={
               <Stack direction="row" spacing={1} alignItems="center">
                 <AutoAwesome fontSize="small" />
-                <span>Use Gemini reasoning</span>
+                <span>{copy.configuration.useGemini}</span>
                 {features && (
                   <Typography variant="caption" color={features.gemini_available ? 'success.main' : 'warning.main'}>
-                    {features.gemini_available ? 'Available' : 'Unavailable'}
+                    {features.gemini_available
+                      ? copy.configuration.availability.available
+                      : copy.configuration.availability.unavailable}
                   </Typography>
                 )}
               </Stack>
@@ -85,13 +90,13 @@ const ConfigurationStep: React.FC<Props> = ({
           />
           <TextField
             select
-            label="Preferred bitrate"
+            label={copy.configuration.preferredBitrate}
             value={preferredBitrate}
             onChange={(e) => onPreferredBitrateChange(e.target.value)}
             sx={{ minWidth: 180 }}
           >
-            <MenuItem value="high">High</MenuItem>
-            <MenuItem value="128">128 kbps</MenuItem>
+            <MenuItem value="high">{copy.configuration.bitrateHigh}</MenuItem>
+            <MenuItem value="128">{copy.configuration.bitrate128}</MenuItem>
           </TextField>
         </Stack>
         <Box display="flex" justifyContent="flex-end">
@@ -102,7 +107,7 @@ const ConfigurationStep: React.FC<Props> = ({
             disabled={!folders.length || isStarting}
             size="large"
           >
-            {isStarting ? 'Starting...' : 'Run scan'}
+            {isStarting ? copy.configuration.starting : copy.configuration.start}
           </Button>
         </Box>
       </Stack>

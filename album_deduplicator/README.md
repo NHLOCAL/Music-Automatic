@@ -101,6 +101,7 @@ python main.py "/mnt/music_collection" "/media/external_hd/more_music" -p "/mnt/
    npm run dev
    ```
    כברירת מחדל השרת יעבוד על `http://localhost:5173` ויתחבר ל-API בנתיב `/api`. ניתן לבנות גרסת הפקה עם `npm run build`.
+   הממשק מאפשר מעבר בין עברית לאנגלית בלחיצה, כולל תמיכה מלאה ב-RTL/LTR, ומספק חוויית עיצוב מודרנית ונעימה.
 
 **זרימת עבודה בממשק החדש:**
 
