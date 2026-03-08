@@ -16,7 +16,7 @@ export function SummaryScreen({ summary, onStartReview, onBackToSetup }) {
         
         <h1 style={{ fontSize: '2rem', marginBottom: '16px' }}>הסריקה הושלמה!</h1>
         <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)' }}>
-           מערכת ה-AI סיימה לנתח את הקבצים. להלן התוצאות:
+           המודל המתמטי ומנוע ה-AI סיימו לנתח את הקבצים. במסך הבא תוכל לראות גם את פירוק הציונים בצורה מלאה יותר.
         </p>
 
         <div className="summary-stats-grid">

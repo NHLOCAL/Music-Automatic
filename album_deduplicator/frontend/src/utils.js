@@ -2,6 +2,10 @@ export function formatPercent(value) {
   if (value === null || value === undefined) return "ללא נתון";
   return `${Number(value).toFixed(1)}/100`;
 }
+export function formatScore(value) {
+  if (value === null || value === undefined) return "ללא נתון";
+  return `${Number(value).toFixed(1)}`;
+}
 export function formatRatio(value) {
   if (value === null || value === undefined) return "ללא נתון";
   return `${Math.round(Number(value) * 100)}%`;
@@ -78,6 +82,51 @@ export function getClusterDisplayTitle(cluster) {
 export function getClusterListSubtitle(cluster) {
   const albumCount = cluster?.albums?.filter((album) => !album.is_deleted).length ?? 0;
   return `${albumCount} עותקים להשוואה`;
+}
+
+export function findClusterPair(cluster, folderAId, folderBId) {
+  if (!cluster || !folderAId || !folderBId) return null;
+  const pairs = Array.isArray(cluster.pairs) ? cluster.pairs : [];
+  return (
+    pairs.find((pair) => (
+      (pair.folder1_id === folderAId && pair.folder2_id === folderBId)
+      || (pair.folder1_id === folderBId && pair.folder2_id === folderAId)
+    )) ?? null
+  );
+}
+
+export function getRepresentativeClusterPair(cluster, preferredFolderId = null) {
+  if (!cluster) return null;
+  const pairs = Array.isArray(cluster.pairs) ? cluster.pairs : [];
+  if (!pairs.length) return null;
+
+  const scopedPairs = preferredFolderId
+    ? pairs.filter((pair) => pair.folder1_id === preferredFolderId || pair.folder2_id === preferredFolderId)
+    : pairs;
+  const candidates = scopedPairs.length ? scopedPairs : pairs;
+
+  return candidates
+    .slice()
+    .sort((left, right) => {
+      if (left.final_score !== right.final_score) {
+        return left.final_score - right.final_score;
+      }
+      if (left.is_identical_by_hash !== right.is_identical_by_hash) {
+        return left.is_identical_by_hash ? -1 : 1;
+      }
+      return left.pair_id.localeCompare(right.pair_id, "he");
+    })[0] ?? null;
+}
+
+export function getPairAlbumsLabel(pair, albums = []) {
+  if (!pair) return "זוג לא ידוע";
+  const albumsById = new Map(albums.map((album, index) => [album.folder_id, { album, index }]));
+  const left = albumsById.get(pair.folder1_id);
+  const right = albumsById.get(pair.folder2_id);
+
+  const leftLabel = left?.album?.name?.trim() || (left ? getAlbumOrdinalLabel(left.index) : pair.folder1_id);
+  const rightLabel = right?.album?.name?.trim() || (right ? getAlbumOrdinalLabel(right.index) : pair.folder2_id);
+  return `${leftLabel} ↔ ${rightLabel}`;
 }
 
 export function getAlbumOrdinalLabel(index) {

@@ -489,8 +489,8 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "העבר 1 תיקיות לסל המחזור" }));
 
-    await waitFor(() => expect(screen.getByRole("heading", { name: "כבר הועברו קודם" })).toBeInTheDocument());
-    expect(screen.getByText("אין כרגע קבוצות שממתינות למחיקה")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "אין כרגע קבוצות שממתינות למחיקה" })).toBeInTheDocument());
+    expect(screen.getByRole("heading", { name: "אין כרגע קבוצות שממתינות למחיקה" })).toBeInTheDocument();
     expect(screen.getAllByText("Archive Copy").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Best").length).toBeGreaterThan(0);
     expect(screen.getAllByText("תיקיות שכבר הועברו").length).toBeGreaterThan(0);

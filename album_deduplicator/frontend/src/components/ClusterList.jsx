@@ -1,6 +1,13 @@
 import React from "react";
 import { Badge } from "./UI";
-import { getClusterDisplayTitle, getClusterSortPriority, getClusterStatusMeta, hasClusterDecision } from "../utils";
+import {
+  formatScore,
+  getClusterDisplayTitle,
+  getClusterSortPriority,
+  getClusterStatusMeta,
+  getRepresentativeClusterPair,
+  hasClusterDecision,
+} from "../utils";
 
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
   const filteredClusters = clusters
@@ -44,6 +51,12 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
             const isActive = cluster.cluster_id === selectedClusterId;
             const hasDecision = hasClusterDecision(decisions, cluster.cluster_id);
             const statusMeta = getClusterStatusMeta(cluster, hasDecision && decisions[cluster.cluster_id] !== null);
+            const representativePair = getRepresentativeClusterPair(cluster, cluster.recommended_keeper_id);
+            const scoreLine = representativePair
+              ? representativePair.is_identical_by_hash
+                ? "Hash זהה • התאמה מלאה"
+                : `סופי ${formatScore(representativePair.final_score)} • AI ${representativePair.ml_score !== null && representativePair.ml_score !== undefined ? formatScore(representativePair.ml_score) : "N/A"} • מתמטי ${formatScore(representativePair.algorithmic_score)}`
+              : "הציון המלא זמין בתוך חלון ההשוואה";
             
             return (
               <div 
@@ -53,6 +66,9 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
               >
                 <div className="cluster-name" title={getClusterDisplayTitle(cluster)}>
                   {getClusterDisplayTitle(cluster)}
+                </div>
+                <div className="cluster-scoreline" title={scoreLine}>
+                  {scoreLine}
                 </div>
                 <div className="cluster-info">
                   <span>{cluster.albums.filter(a => !a.is_deleted).length} עותקים</span>

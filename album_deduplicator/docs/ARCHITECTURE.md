@@ -451,10 +451,18 @@ final_score = base_score
 
 מציג:
 
+- שכבת שקיפות scoring גלויה עם:
+  - `algorithmic_score`
+  - `ml_score`
+  - `base_score`
+  - `gemini_score`
+  - `final_score`
+- השוואת score ממוקדת בין ה-keeper הפעיל לבין כל עותק אחר ב-cluster
 - סיבות הסיווג
 - breakdown של scores
 - רשימות שירים
 - מידע על האלבומים בקבוצה
+- מגירת `advanced details` למשתמשים מתקדמים עם פירוט מלא לכל `pair`, כולל `reason_codes` ו-`technical_summary`
 
 ### delete confirmation
 

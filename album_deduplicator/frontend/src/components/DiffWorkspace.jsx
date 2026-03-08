@@ -1,7 +1,10 @@
 import React, { useMemo } from "react";
 import { Button, Badge } from "./UI";
+import { ScoreTransparencyPanel } from "./ScoreTransparencyPanel";
 import {
   buildTrackComparisonRows,
+  findClusterPair,
+  formatPercent,
   formatBitrate,
   formatDuration,
   formatSizeMb,
@@ -110,6 +113,8 @@ export function DiffWorkspace({
         </div>
 
         <div className="diff-content">
+          <ScoreTransparencyPanel cluster={cluster} currentKeeperId={currentKeeperId} />
+
           {/* Top Cards Grid */}
           <div className="comparison-grid">
             {visibleAlbums.map((album, albumIndex) => {
@@ -118,6 +123,9 @@ export function DiffWorkspace({
               const isSuggestedKeeper = !hasUserDecision && cluster.recommended_keeper_id === album.folder_id;
               const albumOrdinalLabel = getAlbumOrdinalLabel(albumIndex);
               const canDeleteSingle = Boolean(currentKeeperId) && !isKeeper;
+              const pairAgainstKeeper = !isKeeper && currentKeeperId
+                ? findClusterPair(cluster, album.folder_id, currentKeeperId)
+                : null;
 
               return (
                 <div key={album.folder_id} className={`album-box ${isKeeper ? 'is-keeper' : ''} ${isMarked ? 'is-deleted' : ''}`}>
@@ -136,6 +144,54 @@ export function DiffWorkspace({
                   </div>
                   
                   <div className="box-stats">
+                    {isKeeper ? (
+                      <div className="box-score-summary is-reference">
+                        <div className="box-score-heading">עותק הייחוס בקבוצה</div>
+                        <div className="box-score-reference-copy">
+                          כל שאר הציונים מוצגים ביחס לעותק זה, כי הוא מסומן כרגע לשמירה.
+                        </div>
+                      </div>
+                    ) : pairAgainstKeeper ? (
+                      <div className="box-score-summary">
+                        <div className="box-score-heading">ציון מול העותק שנשמר</div>
+                        <div className="box-score-grid">
+                          <div className="box-score-tile is-emphasized">
+                            <span>ציון סופי</span>
+                            <strong>{formatPercent(pairAgainstKeeper.final_score)}</strong>
+                          </div>
+                          <div className="box-score-tile">
+                            <span>המודל המתמטי</span>
+                            <strong>{formatPercent(pairAgainstKeeper.algorithmic_score)}</strong>
+                          </div>
+                          <div className="box-score-tile">
+                            <span>ציון AI</span>
+                            <strong>
+                              {pairAgainstKeeper.ml_score !== null && pairAgainstKeeper.ml_score !== undefined
+                                ? formatPercent(pairAgainstKeeper.ml_score)
+                                : pairAgainstKeeper.is_identical_by_hash
+                                  ? "לא נדרש"
+                                  : "לא זמין"}
+                            </strong>
+                          </div>
+                          <div className="box-score-tile">
+                            <span>Gemini</span>
+                            <strong>
+                              {pairAgainstKeeper.gemini_score !== null && pairAgainstKeeper.gemini_score !== undefined
+                                ? formatPercent(pairAgainstKeeper.gemini_score)
+                                : "לא הופעל"}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="box-score-summary is-muted">
+                        <div className="box-score-heading">ציון מול העותק שנשמר</div>
+                        <div className="box-score-reference-copy">
+                          אין כרגע פירוק score מלא עבור הזוג הזה.
+                        </div>
+                      </div>
+                    )}
+
                     <div className="stat-row">
                       <span className="stat-key">דירוג איכות</span>
                       {renderMetric(album, 'quality_score', v => v ? v.toFixed(1) : 'N/A', '%')}

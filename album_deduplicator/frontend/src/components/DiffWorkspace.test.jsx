@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DiffWorkspace } from "./DiffWorkspace";
@@ -8,6 +8,14 @@ const cluster = {
   confidence_bucket: "review",
   recommended_keeper_id: "folder-1",
   human_summary: "יש דמיון גבוה בין העותקים, אבל נדרשת בדיקה ידנית לפני מחיקה.",
+  technical_summary: "2 pairs הושוו. הציון הנמוך ביותר הוא 89.5/100.",
+  reason_codes: ["review_threshold"],
+  reasons: [
+    { code: "preferred_root_keeper", message: "העותק הראשון נמצא בתיקייה המועדפת." },
+  ],
+  comparison_highlights: [
+    { id: "h1", label: "איכות גבוהה יותר", album_id: "folder-1", tone: "positive", value: "320 kbps" },
+  ],
   albums: [
     {
       folder_id: "folder-1",
@@ -55,6 +63,40 @@ const cluster = {
       ],
     },
   ],
+  pairs: [
+    {
+      pair_id: "pair-1",
+      folder1_id: "folder-1",
+      folder2_id: "folder-2",
+      algorithmic_score: 92,
+      ml_score: 94,
+      base_score: 93.1,
+      gemini_score: 90,
+      final_score: 92.6,
+      gemini_verdict: "similar",
+      gemini_reason: "הרשימות כמעט זהות עם הבדל קטן באיכות.",
+      gemini_error: null,
+      is_identical_by_hash: false,
+      similarity_scores: {},
+      reason_codes: ["review_threshold"],
+    },
+    {
+      pair_id: "pair-2",
+      folder1_id: "folder-1",
+      folder2_id: "folder-3",
+      algorithmic_score: 88,
+      ml_score: 91,
+      base_score: 89.7,
+      gemini_score: null,
+      final_score: 89.7,
+      gemini_verdict: null,
+      gemini_reason: null,
+      gemini_error: null,
+      is_identical_by_hash: false,
+      similarity_scores: {},
+      reason_codes: ["review_threshold"],
+    },
+  ],
 };
 
 describe("DiffWorkspace", () => {
@@ -81,6 +123,13 @@ describe("DiffWorkspace", () => {
     expect(screen.getAllByText("עותק 2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("עותק 3").length).toBeGreaterThan(0);
     expect(screen.getByText(/ההמלצה הראשונית היא לשמור את עותק 1/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "איך המערכת הגיעה להחלטה" })).toBeInTheDocument();
+    expect(screen.getAllByText("המודל המתמטי").length).toBeGreaterThan(0);
+    expect(screen.getByText("ציון ה-AI המקומי")).toBeInTheDocument();
+    expect(screen.getByText("הציון הסופי")).toBeInTheDocument();
+    expect(screen.getAllByText("89.7/100").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("92.0/100").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("91.0/100").length).toBeGreaterThan(0);
     expect(screen.getByText("השוואת קבצים מפורטת")).toBeInTheDocument();
     expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
     expect(screen.getAllByText("02.mp3").length).toBeGreaterThan(0);
@@ -89,6 +138,32 @@ describe("DiffWorkspace", () => {
     expect(container.querySelector(".track-table-scroll")).not.toBeNull();
     expect(container.querySelector("table.tracks-table")).not.toBeNull();
     expect(container.querySelectorAll(".box-secondary-action")).toHaveLength(3);
+  });
+
+  it("reveals the advanced score breakdown for power users", () => {
+    render(
+      <DiffWorkspace
+        cluster={cluster}
+        currentKeeperId="folder-1"
+        hasUserDecision
+        selectedDeleteFolderIds={["folder-2", "folder-3"]}
+        handleDecision={vi.fn()}
+        toggleDeleteSelection={vi.fn()}
+        openExplorer={vi.fn()}
+        setSingleDeleteTarget={vi.fn()}
+        onBackToSetup={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("פירוט מלא לכל pair")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "הצג פרטים מתקדמים" }));
+
+    expect(screen.getByText("פירוט מלא לכל pair")).toBeInTheDocument();
+    expect(screen.getByText("תקציר טכני")).toBeInTheDocument();
+    expect(screen.getByText("2 pairs הושוו. הציון הנמוך ביותר הוא 89.5/100.")).toBeInTheDocument();
+    expect(screen.getAllByText("90.0/100").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Reason codes של הקבוצה:/)).toBeInTheDocument();
   });
 
   it("blocks single-delete actions when no keeper is active", () => {
