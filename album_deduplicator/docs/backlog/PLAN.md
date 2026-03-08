@@ -14,10 +14,10 @@
   - `RecommendationService` ליצירת clusters, בחירת keeper מומלץ, הסבר החלטה, וסיווג `safe` מול `review`.
   - `DeletionService` ל-preview ולביצוע `send2trash` בלבד.
 - לקבע מדיניות ניקוד:
-  - `base_score = 0.45 * algorithmic_score + 0.55 * ml_score`.
+  - `base_score = 0.35 * algorithmic_score + 0.65 * ml_score`.
   - אם `Gemini` זמין ורץ על זוג גבולי, `final_score = 0.85 * base_score + 0.15 * gemini_score`.
   - אם מודל ML לא זמין, לחפש אוטומטית קודם ב-`album_deduplicator/data`, ואם לא נמצא אז ב-`similarity_model/models`; רק אם גם שם חסר, לרדת ל-`algorithmic_score` ולסמן מצב degraded ב-API וב-UI.
-  - `Gemini` ירוץ רק על זוגות עם `85 <= base_score < 97`, שאינם `identical_by_hash`, ואינו נדרש כדי להציג תוצאות.
+  - `Gemini` ירוץ רק על זוגות עם `60 < base_score <= 90`, שאינם `identical_by_hash`, ואינו נדרש כדי להציג תוצאות.
 - לקבע מדיניות מחיקה בטוחה:
   - מחיקה קבוצתית אוטומטית תוצע רק לזוגות/קבוצות עם אותו מספר קבצי מוזיקה, וללא תמיכה ב-v1 במהדורות עם מספר שירים שונה.
   - `safe_delete` יתקבל רק אם `is_identical_by_hash == true` או `final_score >= 97`, ובנוסף יש keeper יחיד ברור לפי `preferred_root` ואז `quality_score`, בלי התנגשות החלטות בתוך cluster.

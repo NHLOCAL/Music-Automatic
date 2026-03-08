@@ -71,8 +71,8 @@ def test_scoring_service_blends_algorithmic_ml_and_gemini(monkeypatch):
 
     pair = next(iter(pairs.values()))
     assert warnings.ml_unavailable is False
-    assert pair.base_score == 85.5
-    assert round(pair.final_score, 3) == 87.675
+    assert pair.base_score == 86.5
+    assert round(pair.final_score, 3) == 88.525
     assert pair.gemini_score == 100.0
     assert "ml_blended" in pair.reason_codes
     assert "gemini_reviewed" in pair.reason_codes

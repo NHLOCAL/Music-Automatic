@@ -220,7 +220,7 @@
 - `base_score`:
 
 ```text
-base_score = 0.45 * algorithmic_score + 0.55 * ml_score
+base_score = 0.35 * algorithmic_score + 0.65 * ml_score
 ```
 
 אם אין ML:
@@ -293,8 +293,8 @@ final_score = base_score
 
 מוגדרים ב-`music_dup_lib/config.py`:
 
-- `BASE_SCORE_ALGORITHMIC_WEIGHT = 0.45`
-- `BASE_SCORE_ML_WEIGHT = 0.55`
+- `BASE_SCORE_ALGORITHMIC_WEIGHT = 0.35`
+- `BASE_SCORE_ML_WEIGHT = 0.65`
 - `FINAL_SCORE_BASE_WEIGHT = 0.85`
 - `FINAL_SCORE_GEMINI_WEIGHT = 0.15`
 - `REVIEW_MIN_SIMILARITY = 60.0`
