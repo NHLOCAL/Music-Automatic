@@ -1,61 +1,53 @@
 import React, { useMemo } from "react";
 import { formatPercent, getRepresentativeClusterPair } from "../utils";
-
 export function ScoreTransparencyPanel({ cluster, currentKeeperId }) {
-  const visibleAlbums = useMemo(
-    () => (Array.isArray(cluster?.albums) ? cluster.albums.filter((album) => !album.is_deleted) : []),
-    [cluster]
-  );
-
   const representativePair = useMemo(
     () => getRepresentativeClusterPair(cluster, currentKeeperId ?? cluster?.recommended_keeper_id ?? null),
     [cluster, currentKeeperId]
   );
-
   if (!cluster || !representativePair) return null;
-
   const aiInsightText = cluster.confidence_bucket === "safe"
-    ? `המערכת זיהתה התאמה גבוהה מאוד בין העותקים וקובעת בביטחון שאפשר למחוק כפילויות. ההבדלים מינוריים או לא קיימים.`
-    : `המערכת מזהה דמיון רב, אך נדרשת החלטה אנושית. ייתכנו שינויים באיכות השמע, באורך השירים, או שהנתונים גבוליים להכרעה אוטומטית.`;
-
+    ? `רמת התאמה גבוהה. ההבדלים בין הקבצים מינוריים או לא קיימים כלל.`
+    : `התאמה גבולית. נמצא דמיון רב אך ייתכנו שינויים באיכות השמע או באורך הקבצים. נדרשת החלטה אנושית.`;
   const geminiText = representativePair.gemini_reason || representativePair.gemini_verdict;
-
   return (
-    <div className="ai-panel">
-      <div className="ai-header">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+    <details className="ai-panel-details">
+      <summary className="ai-panel-summary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
         </svg>
-        תובנות ניתוח חכם
-      </div>
-      
-      <div className="ai-insight">
-        {aiInsightText}
-        {geminiText && (
-          <div style={{ marginTop: '8px', color: 'var(--color-warning-text)', fontSize: '0.85rem' }}>
-            <strong>הערת מודל שפה:</strong> {geminiText}
+        מידע מערכת וניתוח אלגוריתמי
+      </summary>
+      <div className="ai-panel-content">
+        <div className="ai-insight-text">
+          {aiInsightText}
+          {geminiText && (
+            <div style={{ marginTop: '8px', color: 'var(--color-warning-text)' }}>
+              <strong>הערת מודל שפה:</strong> {geminiText}
+            </div>
+          )}
+        </div>
+        <div className="ai-metrics-row">
+          <div className="ai-metric-item">
+            <span className="label">ציון סופי משוקלל</span>
+            <span className="val">{formatPercent(representativePair.final_score)}</span>
           </div>
-        )}
-      </div>
-
-      <div className="ai-details-grid">
-        <div className="ai-metric">
-          <span className="ai-metric-label">ציון סופי משוקלל</span>
-          <span className="ai-metric-val">{formatPercent(representativePair.final_score)}</span>
-        </div>
-        <div className="ai-metric">
-          <span className="ai-metric-label">השוואה מתמטית (Base)</span>
-          <span className="ai-metric-val">{formatPercent(representativePair.algorithmic_score)}</span>
-        </div>
-        <div className="ai-metric">
-          <span className="ai-metric-label">למידת מכונה (ML)</span>
-          <span className="ai-metric-val">
-            {representativePair.is_identical_by_hash 
-              ? "Hash זהה" 
-              : formatPercent(representativePair.ml_score)}
-          </span>
+          <div className="ai-metric-item">
+            <span className="label">השוואה מתמטית</span>
+            <span className="val">{formatPercent(representativePair.algorithmic_score)}</span>
+          </div>
+          <div className="ai-metric-item">
+            <span className="label">למידת מכונה</span>
+            <span className="val">
+              {representativePair.is_identical_by_hash
+                ? "Hash זהה"
+                : formatPercent(representativePair.ml_score)}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+    </details>
   );
 }

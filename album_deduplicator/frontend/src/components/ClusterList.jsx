@@ -8,7 +8,6 @@ import {
   getRepresentativeClusterPair,
   hasClusterDecision,
 } from "../utils";
-
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
   const filteredClusters = clusters
     .filter((cluster) => {
@@ -23,7 +22,6 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
       return left.index - right.index;
     })
     .map(({ cluster }) => cluster);
-
   return (
     <div className="cluster-sidebar">
       <div className="sidebar-tabs">
@@ -39,12 +37,10 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
           </div>
         </div>
       </div>
-
       <div className="cluster-scroll">
         {filteredClusters.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-            <div style={{ marginBottom: '8px', fontSize: '1.5rem' }}>✓</div>
-            אין פריטים להציג בקטגוריה זו.
+          <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+            אין פריטים להצגה
           </div>
         ) : (
           filteredClusters.map((cluster) => {
@@ -54,25 +50,21 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
             const representativePair = getRepresentativeClusterPair(cluster, cluster.recommended_keeper_id);
             const scoreLine = representativePair
               ? representativePair.is_identical_by_hash
-                ? "Hash זהה • התאמה מלאה"
-                : `סופי ${formatScore(representativePair.final_score)} • AI ${representativePair.ml_score !== null && representativePair.ml_score !== undefined ? formatScore(representativePair.ml_score) : "N/A"} • מתמטי ${formatScore(representativePair.algorithmic_score)}`
-              : "הציון המלא זמין בתוך חלון ההשוואה";
-            
+                ? "התאמה מלאה"
+                : `התאמה: ${formatScore(representativePair.final_score)}`
+              : "דורש בדיקה";
             return (
-              <div 
-                key={cluster.cluster_id} 
-                className={`cluster-card ${isActive ? "active" : ""} ${statusMeta.label === "נבדק ומוכן" ? "status-ready" : ""}`} 
+              <div
+                key={cluster.cluster_id}
+                className={`cluster-card ${isActive ? "active" : ""} ${statusMeta.label === "נבדק ומוכן" ? "status-ready" : ""}`}
                 onClick={() => setSelectedClusterId(cluster.cluster_id)}
               >
                 <div className="cluster-name" title={getClusterDisplayTitle(cluster)}>
                   {getClusterDisplayTitle(cluster)}
                 </div>
-                <div className="cluster-scoreline" title={scoreLine}>
-                  {scoreLine}
-                </div>
                 <div className="cluster-info">
-                  <span>{cluster.albums.filter(a => !a.is_deleted).length} עותקים</span>
-                  <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
+                  <span className="cluster-scoreline">{scoreLine}</span>
+                  {!isActive && <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>}
                 </div>
               </div>
             );
