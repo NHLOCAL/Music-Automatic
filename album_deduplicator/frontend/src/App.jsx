@@ -10,6 +10,7 @@ import { ClusterList } from "./components/ClusterList";
 import { DiffWorkspace } from "./components/DiffWorkspace";
 import { DeletePreview } from "./components/DeletePreview";
 import { ConfirmModal } from "./components/UI";
+import { getActiveKeeperId, hasClusterDecision } from "./utils";
 
 function normalizeFolderPaths(entries) {
   return entries.map((entry) => entry.path.trim()).filter(Boolean);
@@ -53,9 +54,10 @@ export default function App() {
   const d = useDeduplicator();
   
   const selectedCluster = d.clusters.find((cluster) => cluster.cluster_id === d.selectedClusterId) || null;
-  const currentKeeperId = selectedCluster
-    ? (d.decisions[selectedCluster.cluster_id] ?? (selectedCluster.resolution_state === "auto" ? selectedCluster.recommended_keeper_id : null))
-    : null;
+  const currentKeeperId = getActiveKeeperId(selectedCluster, d.decisions);
+  const hasSelectedClusterDecision = selectedCluster
+    ? hasClusterDecision(d.decisions, selectedCluster.cluster_id)
+    : false;
   const selectedDeleteFolderIds = selectedCluster
     ? (d.deleteSelections[selectedCluster.cluster_id] ?? selectedCluster.selected_delete_folder_ids ??[])
     :[];
@@ -121,11 +123,21 @@ export default function App() {
   };
 
   const toggleDeleteSelection = async (clusterId, folderId) => {
-    if (!selectedCluster || !currentKeeperId || folderId === currentKeeperId) return;
-    const currentSelection = new Set(selectedDeleteFolderIds);
+    const cluster = d.clusters.find((item) => item.cluster_id === clusterId);
+    const keeperId = getActiveKeeperId(cluster, d.decisions);
+    if (!cluster || !keeperId || folderId === keeperId) return;
+    const currentSelection = new Set(d.deleteSelections[clusterId] ?? cluster.selected_delete_folder_ids ?? []);
     if (currentSelection.has(folderId)) currentSelection.delete(folderId);
     else currentSelection.add(folderId);
-    await updateClusterDecision(clusterId, currentKeeperId, Array.from(currentSelection));
+    await updateClusterDecision(clusterId, keeperId, Array.from(currentSelection));
+  };
+
+  const goToSetup = () => {
+    setBulkConfirmOpen(false);
+    setSingleDeleteTarget(null);
+    d.setError("");
+    d.setSuccessSummary(null);
+    setAppView("setup");
   };
 
   const openExplorer = async (path) => {
@@ -185,7 +197,7 @@ export default function App() {
         )}
 
         {appView === 'summary' && d.summary && (
-          <SummaryScreen summary={d.summary} onStartReview={() => setAppView('review')} />
+          <SummaryScreen summary={d.summary} onStartReview={() => setAppView('review')} onBackToSetup={goToSetup} />
         )}
 
         {appView === 'review' && d.status === 'completed' && (
@@ -201,11 +213,13 @@ export default function App() {
             <DiffWorkspace
               cluster={selectedCluster}
               currentKeeperId={currentKeeperId}
+              hasUserDecision={hasSelectedClusterDecision}
               selectedDeleteFolderIds={selectedDeleteFolderIds}
               handleDecision={updateClusterDecision}
               toggleDeleteSelection={toggleDeleteSelection}
               openExplorer={openExplorer}
               setSingleDeleteTarget={setSingleDeleteTarget}
+              onBackToSetup={goToSetup}
             />
           </div>
         )}

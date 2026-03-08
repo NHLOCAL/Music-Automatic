@@ -292,6 +292,10 @@ button {
   gap: 24px;
   margin: 32px 0;
 }
+.summary-actions {
+  display: flex;
+  gap: 12px;
+}
 .stat-box {
   background: var(--app-bg);
   padding: 24px;
@@ -382,6 +386,9 @@ button {
 .cluster-item.active .text-secondary {
   color: rgba(255,255,255,0.8);
 }
+.cluster-item.active .cluster-subtitle {
+  color: rgba(255,255,255,0.82);
+}
 .cluster-item-header {
   display: flex;
   justify-content: space-between;
@@ -394,6 +401,16 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.cluster-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 8px;
 }
 .cluster-meta {
   font-size: 0.75rem;
@@ -427,6 +444,12 @@ button {
 .workspace-header {
   padding: 24px 32px 16px;
   border-bottom: 1px solid var(--panel-border);
+}
+.workspace-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 .workspace-header h2 {
   font-size: 1.25rem;
@@ -536,20 +559,60 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
-.track-row {
-  display: flex;
-  padding: 8px 12px;
+.tracklist-caption {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+.track-compare-table {
+  display: grid;
+  background: var(--surface-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.track-grid-header-cell,
+.track-grid-label,
+.track-grid-cell {
+  padding: 12px 14px;
   border-bottom: 1px solid var(--panel-border);
+}
+.track-grid-header-cell {
+  background: var(--sidebar-bg);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.track-grid-label {
+  background: #fbfbfc;
+}
+.track-grid-title,
+.track-cell-title,
+.track-grid-album-name {
   font-size: 0.875rem;
+  font-weight: 600;
 }
-.track-row:last-child { border-bottom: none; }
-.track-name {
-  flex: 1;
+.track-grid-meta,
+.track-cell-meta,
+.track-grid-album-path {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.45;
 }
-.track-status {
-  width: 100px;
-  text-align: left;
+.track-grid-album-path {
+  direction: ltr;
+  text-align: right;
+  word-break: break-all;
+  font-family: var(--font-mono);
+}
+.track-grid-cell {
+  min-height: 116px;
+}
+.track-grid-cell.is-missing {
+  background: #fff8f8;
+  display: flex;
+  align-items: center;
 }
 .status-missing {
   color: var(--accent-danger);
@@ -640,4 +703,16 @@ kbd {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+@media (max-width: 1100px) {
+  .cards-grid,
+  .summary-actions,
+  .workspace-toolbar,
+  .tracklist-header {
+    flex-direction: column;
+  }
+
+  .tracklist-header {
+    align-items: flex-start;
+  }
 }

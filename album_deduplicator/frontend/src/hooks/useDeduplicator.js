@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, startTransition } from "react";
 import * as api from "../api";
+import { getActiveKeeperId } from "../utils";
 export function useDeduplicator() {
   const [sessionId, setSessionId] = useState(null);
   const [status, setStatus] = useState("idle");
@@ -30,8 +31,8 @@ export function useDeduplicator() {
         setDecisions((prev) => {
           const next = { ...prev };
           clustersData.clusters.forEach(c => {
-            if (!(c.cluster_id in next)) {
-              next[c.cluster_id] = c.resolution_state === "auto" ? c.recommended_keeper_id : null;
+            if (!(c.cluster_id in next) && c.resolution_state === "auto" && c.recommended_keeper_id) {
+              next[c.cluster_id] = c.recommended_keeper_id;
             }
           });
           return next;
@@ -80,7 +81,7 @@ export function useDeduplicator() {
   const handleDecision = async (clusterId, keeperId, deleteFolderIds = null) => {
     if (!sessionId) return;
     const cluster = clusters.find((item) => item.cluster_id === clusterId);
-    const currentKeeperId = decisions[clusterId] ?? (cluster?.resolution_state === "auto" ? cluster?.recommended_keeper_id : null);
+    const currentKeeperId = getActiveKeeperId(cluster, decisions);
     const visibleFolderIds = cluster
       ? cluster.albums.filter((album) => !album.is_deleted).map((album) => album.folder_id)
       : [];

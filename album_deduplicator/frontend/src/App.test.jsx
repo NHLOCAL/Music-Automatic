@@ -195,6 +195,30 @@ const previewResponse = {
   manual_selected_count: 0,
 };
 
+const reviewClusterResponse = {
+  clusters: [
+    {
+      ...clusterResponse.clusters[0],
+      confidence_bucket: "review",
+      selected_delete_folder_ids: [],
+      human_summary: 'האלבומים נראים דומים מאוד, אבל עדיין חסר ביטחון מספיק למחיקה אוטומטית. ההמלצה הראשונית היא לשמור את "Best".',
+      resolution_state: "skipped",
+    },
+  ],
+};
+
+const emptyPreviewResponse = {
+  items: [],
+  total_count: 0,
+  total_size_mb: 0,
+  auto_selected_count: 0,
+  manual_selected_count: 0,
+};
+
+const emptyClusterResponse = {
+  clusters: [],
+};
+
 describe("App", () => {
   beforeEach(() => {
     MockEventSource.instances = [];
@@ -279,6 +303,8 @@ describe("App", () => {
     await waitFor(() =>
       expect(screen.getAllByText('נמצאו עותקים כמעט זהים. מומלץ לשמור את "Best".').length).toBeGreaterThan(0),
     );
+    expect(screen.getAllByText("Best מול Archive Copy").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("שם קובץ: 01.mp3").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "מחק עכשיו (D)" }));
 
@@ -332,5 +358,94 @@ describe("App", () => {
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: "הסריקה הושלמה בהצלחה" })).toBeInTheDocument(),
     );
+  });
+
+  it("allows marking a review copy for deletion using the recommended keeper", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return String(url).includes("bucket=review")
+          ? jsonResponse(reviewClusterResponse)
+          : jsonResponse(emptyClusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(emptyPreviewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/decisions")) {
+        return jsonResponse({
+          items: [
+            {
+              folder_id: "folder-drop",
+              folder_path: "D:/Archive/Best",
+              folder_name: "Archive Copy",
+              keeper_folder_id: "folder-keep",
+              keeper_folder_name: "Best",
+              keeper_folder_path: "C:/Music/Best",
+              cluster_id: "cluster-1",
+              estimated_size_mb: 45,
+              selection_source: "user_selected",
+            },
+          ],
+          total_count: 1,
+          total_size_mb: 45,
+          auto_selected_count: 0,
+          manual_selected_count: 1,
+        });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse({
+          ...sessionSummary,
+          counts: {
+            ...sessionSummary.counts,
+            safe_clusters: 0,
+            review_clusters: 1,
+          },
+        });
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByPlaceholderText("C:\\Music"), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("D:\\Archive"), {
+      target: { value: "D:\\Archive" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "הסריקה הושלמה בהצלחה" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
+    fireEvent.click(screen.getByText("לסקירה"));
+
+    await waitFor(() => expect(screen.getByText("מומלץ לשמירה")).toBeInTheDocument());
+    fireEvent.click(screen.getAllByRole("button", { name: "סמן למחיקה" })[1]);
+
+    await waitFor(() => {
+      const decisionRequest = fetchMock.mock.calls.find(([url]) =>
+        String(url).includes("/api/analysis-sessions/session-1/decisions"),
+      );
+      expect(decisionRequest).toBeTruthy();
+      expect(JSON.parse(decisionRequest[1].body)).toEqual({
+        decisions: [
+          {
+            cluster_id: "cluster-1",
+            keeper_id: "folder-keep",
+            delete_folder_ids: ["folder-drop"],
+          },
+        ],
+      });
+    });
   });
 });

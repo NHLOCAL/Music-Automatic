@@ -1,8 +1,18 @@
 import React, { useMemo } from "react";
 import { Button, Badge } from "./UI";
-import { buildTrackComparisonRows, formatSizeMb, getMetricWinners } from "../utils";
+import { buildTrackComparisonRows, formatBitrate, formatDuration, formatSizeMb, getClusterDisplayTitle, getMetricWinners } from "../utils";
 
-export function DiffWorkspace({ cluster, currentKeeperId, selectedDeleteFolderIds, handleDecision, toggleDeleteSelection, openExplorer, setSingleDeleteTarget }) {
+export function DiffWorkspace({
+  cluster,
+  currentKeeperId,
+  hasUserDecision,
+  selectedDeleteFolderIds,
+  handleDecision,
+  toggleDeleteSelection,
+  openExplorer,
+  setSingleDeleteTarget,
+  onBackToSetup,
+}) {
   if (!cluster) {
     return (
       <div className="centered-view">
@@ -21,6 +31,9 @@ export function DiffWorkspace({ cluster, currentKeeperId, selectedDeleteFolderId
   const visibleAlbums = cluster.albums.filter((a) => !a.is_deleted);
   const metricWinners = useMemo(() => getMetricWinners(visibleAlbums), [visibleAlbums]);
   const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
+  const trackGridStyle = {
+    gridTemplateColumns: `minmax(220px, 1.1fr) repeat(${Math.max(visibleAlbums.length, 1)}, minmax(220px, 1fr))`,
+  };
 
   const renderMetricDiff = (album, key, formatFn) => {
     const isWinner = metricWinners[key] === album.folder_id;
@@ -35,30 +48,47 @@ export function DiffWorkspace({ cluster, currentKeeperId, selectedDeleteFolderId
   return (
     <div className="workspace-main">
       <div className="workspace-header">
-        <h2>השוואת נתונים</h2>
-        <p>{cluster.human_summary}</p>
+        <div className="workspace-toolbar">
+          <div>
+            <h2>{getClusterDisplayTitle(cluster)}</h2>
+            <p>{cluster.human_summary}</p>
+          </div>
+          <Button variant="secondary" onClick={onBackToSetup}>סריקה חדשה</Button>
+        </div>
       </div>
       <div className="diff-container">
         <div className="cards-grid">
           {visibleAlbums.map((album) => {
             const isKeeper = currentKeeperId === album.folder_id;
             const isMarked = selectedDeleteFolderIds.includes(album.folder_id);
+            const isSuggestedKeeper = !hasUserDecision && cluster.recommended_keeper_id === album.folder_id;
+            const keeperBadge = isKeeper
+              ? (cluster.resolution_state === "auto" || hasUserDecision ? "נשמר" : "מומלץ לשמירה")
+              : null;
+            const keeperButtonLabel = isKeeper
+              ? (cluster.resolution_state === "auto" || hasUserDecision ? "נבחר לשמירה" : "אשר לשמירה")
+              : "בחר לשמירה";
 
             return (
               <div key={album.folder_id} className={`album-card ${isKeeper ? 'is-keeper' : ''} ${isMarked ? 'is-deleted' : ''}`}>
                 <div className="card-header">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <h3 title={album.name}>{album.name}</h3>
-                    {isKeeper && <Badge tone="success">נשמר</Badge>}
+                    {keeperBadge && <Badge tone={isSuggestedKeeper ? "warning" : "success"}>{keeperBadge}</Badge>}
                     {isMarked && <Badge tone="danger">מסומן למחיקה</Badge>}
                   </div>
                   <div className="card-path" title={album.path}>{album.path}</div>
                   <div className="card-actions">
                     <Button variant={isKeeper ? "secondary" : "primary"} style={{ flex: 1 }} onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}>
-                      {isKeeper ? "נבחר כשומר" : "הגדר כשומר"}
+                      {keeperButtonLabel}
                     </Button>
-                    <Button variant={isMarked ? "secondary" : "ghost"} disabled={isKeeper} onClick={() => toggleDeleteSelection(cluster.cluster_id, album.folder_id)} title="סמן למחיקה (X)">
-                      {isMarked ? "בטל מחיקה" : "סמן למחיקה"}
+                    <Button
+                      variant={isMarked ? "secondary" : "ghost"}
+                      disabled={isKeeper || !currentKeeperId}
+                      onClick={() => toggleDeleteSelection(cluster.cluster_id, album.folder_id)}
+                      title={currentKeeperId ? "סמן למחיקה (X)" : "בחר עותק לשמירה לפני סימון למחיקה"}
+                    >
+                      {isMarked ? "בטל סימון" : "סמן למחיקה"}
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => openExplorer(album.path)} title="פתח סייר (O)">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
@@ -69,15 +99,15 @@ export function DiffWorkspace({ cluster, currentKeeperId, selectedDeleteFolderId
                 <table className="diff-table">
                   <tbody>
                     <tr>
-                      <td className="diff-label">איכות משוקללת</td>
-                      <td>{renderMetricDiff(album, 'quality_score', v => v ? `${v.toFixed(1)}%` : 'N/A')}</td>
+                      <td className="diff-label">איכות כללית</td>
+                      <td>{renderMetricDiff(album, 'quality_score', v => v ? `${v.toFixed(1)}%` : 'ללא נתון')}</td>
                     </tr>
                     <tr>
-                      <td className="diff-label">ביטרייט</td>
-                      <td>{renderMetricDiff(album, 'avg_bitrate', v => v ? `${Math.round(v)} kbps` : 'N/A')}</td>
+                      <td className="diff-label">קצב נתונים ממוצע</td>
+                      <td>{renderMetricDiff(album, 'avg_bitrate', v => v ? `${Math.round(v)} kbps` : 'ללא נתון')}</td>
                     </tr>
                     <tr>
-                      <td className="diff-label">נפח כולל</td>
+                      <td className="diff-label">גודל כולל</td>
                       <td>{renderMetricDiff(album, 'total_size_mb', formatSizeMb)}</td>
                     </tr>
                     <tr>
@@ -104,21 +134,46 @@ export function DiffWorkspace({ cluster, currentKeeperId, selectedDeleteFolderId
         </div>
 
         <div className="tracklist-section">
-          <div className="tracklist-header">רשימת שירים והבדלים</div>
-          <div style={{ background: 'var(--surface-bg)', border: '1px solid var(--panel-border)', borderRadius: 'var(--radius-md)' }}>
-            {trackRows.map(row => (
-              <div key={row.key} className="track-row">
-                <div className="track-name">{row.title}</div>
-                {visibleAlbums.map(album => (
-                  <div key={album.folder_id} className="track-status">
-                    {row.presence[album.folder_id] ? (
-                      <span className="status-ok">✓ קיים</span>
-                    ) : (
-                      <span className="status-missing">חסר</span>
-                    )}
-                  </div>
-                ))}
+          <div className="tracklist-header">
+            <span>רשימת שירים והבדלים</span>
+            <span className="tracklist-caption">כל עמודה מציגה את נתוני הפריט באותו מיקום בכל עותק</span>
+          </div>
+          <div className="track-compare-table" style={trackGridStyle}>
+            <div className="track-grid-header-cell">מיקום / שיר</div>
+            {visibleAlbums.map((album) => (
+              <div key={album.folder_id} className="track-grid-header-cell">
+                <div className="track-grid-album-name">{album.name}</div>
+                <div className="track-grid-album-path" title={album.path}>{album.path}</div>
               </div>
+            ))}
+
+            {trackRows.map((row) => (
+              <React.Fragment key={row.key}>
+                <div className="track-grid-label">
+                  <div className="track-grid-title">{row.title}</div>
+                  <div className="track-grid-meta">{row.artist}</div>
+                  <div className="track-grid-meta">{formatDuration(row.duration)}</div>
+                </div>
+                {visibleAlbums.map((album) => {
+                  const entry = row.entries[album.folder_id];
+
+                  return (
+                    <div key={album.folder_id} className={`track-grid-cell ${entry ? "" : "is-missing"}`}>
+                      {entry ? (
+                        <>
+                          <div className="track-cell-title">{entry.title}</div>
+                          <div className="track-cell-meta">שם קובץ: {entry.filename}</div>
+                          <div className="track-cell-meta">אורך: {formatDuration(entry.duration)}</div>
+                          <div className="track-cell-meta">גודל: {formatSizeMb(entry.size_mb)}</div>
+                          <div className="track-cell-meta">קצב נתונים: {formatBitrate(entry.bitrate)}</div>
+                        </>
+                      ) : (
+                        <span className="status-missing">חסר בעותק זה</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </React.Fragment>
             ))}
           </div>
         </div>

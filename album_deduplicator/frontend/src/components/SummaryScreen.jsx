@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "./UI";
 
-export function SummaryScreen({ summary, onStartReview }) {
+export function SummaryScreen({ summary, onStartReview, onBackToSetup }) {
   if (!summary?.counts) return null;
 
   const { safe_clusters, review_clusters } = summary.counts;
@@ -30,9 +30,14 @@ export function SummaryScreen({ summary, onStartReview }) {
           </div>
         </div>
 
-        <Button variant="primary" size="lg" style={{ width: '100%' }} onClick={onStartReview}>
-          התחל לעבור על התוצאות
-        </Button>
+        <div className="summary-actions">
+          <Button variant="secondary" size="lg" style={{ flex: 1 }} onClick={onBackToSetup}>
+            חזרה להתחלה
+          </Button>
+          <Button variant="primary" size="lg" style={{ flex: 1 }} onClick={onStartReview}>
+            התחל לעבור על התוצאות
+          </Button>
+        </div>
       </div>
     </div>
   );
