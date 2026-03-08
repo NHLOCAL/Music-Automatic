@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DiffWorkspace } from "./DiffWorkspace";
 
@@ -58,6 +58,10 @@ const cluster = {
 };
 
 describe("DiffWorkspace", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("renders numbered copies, numbered summary text, and a scrollable track comparison table", () => {
     const { container } = render(
       <DiffWorkspace
@@ -85,5 +89,26 @@ describe("DiffWorkspace", () => {
     expect(container.querySelector(".track-table-scroll")).not.toBeNull();
     expect(container.querySelector("table.tracks-table")).not.toBeNull();
     expect(container.querySelectorAll(".box-secondary-action")).toHaveLength(3);
+  });
+
+  it("blocks single-delete actions when no keeper is active", () => {
+    render(
+      <DiffWorkspace
+        cluster={cluster}
+        currentKeeperId={null}
+        hasUserDecision
+        selectedDeleteFolderIds={[]}
+        handleDecision={vi.fn()}
+        toggleDeleteSelection={vi.fn()}
+        openExplorer={vi.fn()}
+        setSingleDeleteTarget={vi.fn()}
+        onBackToSetup={vi.fn()}
+      />,
+    );
+
+    const blockedButtons = screen.getAllByRole("button", { name: "בחר קודם עותק לשמירה" });
+    expect(blockedButtons).toHaveLength(3);
+    blockedButtons.forEach((button) => expect(button).toBeDisabled());
+    expect(screen.queryAllByRole("button", { name: "מחק תיקייה זו כעת" })).toHaveLength(0);
   });
 });

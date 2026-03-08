@@ -58,6 +58,7 @@ export function useKeyboardShortcuts({
       }
       if (event.key.toLowerCase() === "d") {
         event.preventDefault();
+        if (!currentKeeperId) return;
         const candidate = selectedCluster.albums.find(a => !a.is_deleted && a.folder_id !== currentKeeperId);
         if (candidate) {
           setSingleDeleteTarget({ clusterId: selectedCluster.cluster_id, folderId: candidate.folder_id, name: candidate.name });

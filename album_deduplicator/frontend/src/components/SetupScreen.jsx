@@ -44,7 +44,7 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
               <div className="folder-actions">
                 {runtimeInfo?.isElectron && (
                   <Button type="button" variant="secondary" size="sm" onClick={onPickFolders}>
-                    + בחר תיקיות (Browser)
+                    + בחר כמה תיקיות
                   </Button>
                 )}
                 <Button type="button" variant="ghost" size="sm" onClick={addFolder}>
@@ -59,6 +59,7 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
                   <div className="input-field" style={{ display: 'flex', alignItems: 'center' }}>
                      <input
                         type="text"
+                        aria-label={`תיקייה לסריקה ${idx + 1}`}
                         style={{ border: 'none', background: 'transparent', width: '100%', height: '100%', outline: 'none' }}
                         placeholder={`נתיב לתיקייה ${idx + 1}...`}
                         value={folder.path}
@@ -83,6 +84,7 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
                <div className="input-field" style={{ display: 'flex', alignItems: 'center' }}>
                  <input
                     type="text"
+                    aria-label="תיקייה מועדפת לשמירה"
                     style={{ border: 'none', background: 'transparent', width: '100%', height: '100%', outline: 'none' }}
                     placeholder="למשל: C:\Music\Best"
                     value={form.preferred_root}

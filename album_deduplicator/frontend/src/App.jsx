@@ -19,7 +19,7 @@ function normalizeFolderPaths(entries) {
 function mergeFolderInputs(currentEntries, nextPaths) {
   const uniqueNextPaths = Array.from(new Set(nextPaths.map((item) => item.trim()).filter(Boolean)));
   if (!uniqueNextPaths.length) return currentEntries;
-  const nextEntries = [...currentEntries];
+  const nextEntries = currentEntries.map((entry) => ({ ...entry }));
   const existingPaths = new Set(nextEntries.map((entry) => entry.path.trim()).filter(Boolean));
   
   uniqueNextPaths.forEach((path) => {

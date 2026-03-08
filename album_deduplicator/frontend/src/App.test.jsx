@@ -219,6 +219,10 @@ const emptyClusterResponse = {
   clusters: [],
 };
 
+function getScanFolderInputs() {
+  return screen.getAllByRole("textbox", { name: /תיקייה לסריקה/i });
+}
+
 describe("App", () => {
   beforeEach(() => {
     MockEventSource.instances = [];
@@ -240,11 +244,11 @@ describe("App", () => {
 
     expect(screen.getByText("Music Automatic")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "התחל סריקה חכמה" })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("C:\\Music")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("D:\\Archive")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("הגדרות מתקדמות"));
-    expect(screen.getByText("אימות AI למקרים גבוליים")).toBeInTheDocument();
+    expect(screen.getByText("אימות AI (Gemini)")).toBeInTheDocument();
   });
 
   it("uses the electron bridge to pick scan folders", async () => {
@@ -258,9 +262,9 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ בחר כמה תיקיות" }));
 
     await waitFor(() =>
-      expect(screen.getByPlaceholderText("C:\\Music")).toHaveValue("C:\\Music"),
+      expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toHaveValue("C:\\Music"),
     );
-    expect(screen.getByPlaceholderText("D:\\Archive")).toHaveValue("D:\\Archive");
+    expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" })).toHaveValue("D:\\Archive");
   });
 
   it("merges multiple picked scan folders without duplicating existing paths", async () => {
@@ -271,14 +275,14 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByPlaceholderText("C:\\Music"), {
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
       target: { value: "C:\\Music" },
     });
 
     fireEvent.click(screen.getByRole("button", { name: "+ בחר כמה תיקיות" }));
 
     await waitFor(() => {
-      const pathInputs = screen.getAllByRole("textbox");
+      const pathInputs = getScanFolderInputs();
       expect(pathInputs[0]).toHaveValue("C:\\Music");
       expect(pathInputs[1]).toHaveValue("D:\\Archive");
       expect(pathInputs[2]).toHaveValue("E:\\Collection");
@@ -306,10 +310,11 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByPlaceholderText("C:\\Music"), {
+    const folderInputs = getScanFolderInputs();
+    fireEvent.change(folderInputs[0], {
       target: { value: "C:\\Music" },
     });
-    fireEvent.change(screen.getByPlaceholderText("D:\\Archive"), {
+    fireEvent.change(folderInputs[1], {
       target: { value: "D:\\Archive" },
     });
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
@@ -318,22 +323,22 @@ describe("App", () => {
     MockEventSource.instances[0].emit("completed", { status: "completed" });
 
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "הסריקה הושלמה בהצלחה" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: "הסריקה הושלמה!" })).toBeInTheDocument(),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
 
     await waitFor(() =>
-      expect(screen.getAllByText('נמצאו עותקים כמעט זהים. מומלץ לשמור את "Best".').length).toBeGreaterThan(0),
+      expect(screen.getByText(/מומלץ לשמור את עותק 1/i)).toBeInTheDocument(),
     );
-    expect(screen.getAllByText("Best מול Archive Copy").length).toBeGreaterThan(0);
-    expect(screen.getByText("בטוח למחיקה")).toBeInTheDocument();
-    expect(screen.getAllByText("שם קובץ").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Best vs Archive Copy").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("בטוח למחיקה").length).toBeGreaterThan(0);
+    expect(screen.getByText("השוואת קבצים מפורטת")).toBeInTheDocument();
     expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
-    expect(screen.getByText("זהה")).toBeInTheDocument();
-    expect(screen.getByText("שונה")).toBeInTheDocument();
+    expect(screen.getByText("שוני בנתונים")).toBeInTheDocument();
+    expect(screen.getByText("קובץ חסר")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "מחק עכשיו (D)" }));
+    fireEvent.click(screen.getByRole("button", { name: "מחק תיקייה זו כעת" }));
 
     expect(screen.getByText("העברה בודדת לסל המחזור")).toBeInTheDocument();
     expect(screen.getByText('התיקייה "Archive Copy" תועבר מיד לסל המחזור בלי להמתין לאישור המרוכז.')).toBeInTheDocument();
@@ -364,10 +369,11 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByPlaceholderText("C:\\Music"), {
+    const folderInputs = getScanFolderInputs();
+    fireEvent.change(folderInputs[0], {
       target: { value: "C:\\Music" },
     });
-    fireEvent.change(screen.getByPlaceholderText("D:\\Archive"), {
+    fireEvent.change(folderInputs[1], {
       target: { value: "D:\\Archive" },
     });
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
@@ -375,7 +381,7 @@ describe("App", () => {
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
     MockEventSource.instances[0].emit("completed", { status: "completed" });
 
-    expect(screen.queryByText("הסריקה הושלמה בהצלחה")).not.toBeInTheDocument();
+    expect(screen.queryByText("הסריקה הושלמה!")).not.toBeInTheDocument();
     expect(screen.getByText("ממתין")).toBeInTheDocument();
 
     sessionRequest.resolve(jsonResponse(sessionSummary));
@@ -383,7 +389,7 @@ describe("App", () => {
     previewRequest.resolve(jsonResponse(previewResponse));
 
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "הסריקה הושלמה בהצלחה" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: "הסריקה הושלמה!" })).toBeInTheDocument(),
     );
   });
 
@@ -438,10 +444,11 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByPlaceholderText("C:\\Music"), {
+    const folderInputs = getScanFolderInputs();
+    fireEvent.change(folderInputs[0], {
       target: { value: "C:\\Music" },
     });
-    fireEvent.change(screen.getByPlaceholderText("D:\\Archive"), {
+    fireEvent.change(folderInputs[1], {
       target: { value: "D:\\Archive" },
     });
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
@@ -450,14 +457,15 @@ describe("App", () => {
     MockEventSource.instances[0].emit("completed", { status: "completed" });
 
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "הסריקה הושלמה בהצלחה" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: "הסריקה הושלמה!" })).toBeInTheDocument(),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
     fireEvent.click(screen.getByText("לסקירה"));
 
-    await waitFor(() => expect(screen.getByText("מומלץ לשמירה")).toBeInTheDocument());
-    fireEvent.click(screen.getAllByRole("button", { name: "סמן למחיקה" })[1]);
+    await waitFor(() => expect(screen.getAllByText("Best vs Archive Copy").length).toBeGreaterThan(0));
+    const deleteButtons = screen.getAllByRole("button", { name: "סמן למחיקה" });
+    fireEvent.click(deleteButtons.find((button) => !button.disabled));
 
     await waitFor(() => {
       const decisionRequest = fetchMock.mock.calls.find(([url]) =>
@@ -474,5 +482,71 @@ describe("App", () => {
         ],
       });
     });
+  });
+
+  it("does not open single-delete confirmation when no keeper is active", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const reviewClusterWithoutKeeperResponse = {
+      clusters: [
+        {
+          ...reviewClusterResponse.clusters[0],
+          recommended_keeper_id: null,
+        },
+      ],
+    };
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return String(url).includes("bucket=review")
+          ? jsonResponse(reviewClusterWithoutKeeperResponse)
+          : jsonResponse(emptyClusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(emptyPreviewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse({
+          ...sessionSummary,
+          counts: {
+            ...sessionSummary.counts,
+            safe_clusters: 0,
+            review_clusters: 1,
+          },
+        });
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    const folderInputs = getScanFolderInputs();
+    fireEvent.change(folderInputs[0], {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.change(folderInputs[1], {
+      target: { value: "D:\\Archive" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "הסריקה הושלמה!" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
+    fireEvent.click(screen.getByText("לסקירה"));
+
+    await waitFor(() => expect(screen.getAllByText("Best vs Archive Copy").length).toBeGreaterThan(0));
+
+    expect(screen.getAllByRole("button", { name: "בחר קודם עותק לשמירה" }).length).toBeGreaterThan(0);
+
+    fireEvent.keyDown(window, { key: "d" });
+
+    expect(screen.queryByText("העברה בודדת לסל המחזור")).not.toBeInTheDocument();
   });
 });

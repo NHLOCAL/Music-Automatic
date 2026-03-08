@@ -117,6 +117,7 @@ export function DiffWorkspace({
               const isMarked = selectedDeleteFolderIds.includes(album.folder_id);
               const isSuggestedKeeper = !hasUserDecision && cluster.recommended_keeper_id === album.folder_id;
               const albumOrdinalLabel = getAlbumOrdinalLabel(albumIndex);
+              const canDeleteSingle = Boolean(currentKeeperId) && !isKeeper;
 
               return (
                 <div key={album.folder_id} className={`album-box ${isKeeper ? 'is-keeper' : ''} ${isMarked ? 'is-deleted' : ''}`}>
@@ -193,9 +194,11 @@ export function DiffWorkspace({
                         variant="danger" 
                         style={{ width: '100%', opacity: 0.88 }} 
                         size="sm"
+                        disabled={!canDeleteSingle}
+                        title={!canDeleteSingle ? "יש לבחור קודם עותק לשמירה" : undefined}
                         onClick={() => setSingleDeleteTarget({ clusterId: cluster.cluster_id, folderId: album.folder_id, name: album.name })}
                       >
-                        מחק תיקייה זו כעת
+                        {canDeleteSingle ? "מחק תיקייה זו כעת" : "בחר קודם עותק לשמירה"}
                       </Button>
                     )}
                   </div>
