@@ -156,3 +156,4 @@ o1_project/RecycleBin
 music_data.json
 **/logs/**
 **/repomix-output.*
+.vscode/settings.json
