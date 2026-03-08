@@ -1,154 +1,127 @@
 import React, { useMemo } from "react";
-import { Badge, Button } from "./UI";
+import { Button, Badge } from "./UI";
 import { buildTrackComparisonRows, formatSizeMb, getMetricWinners } from "../utils";
 
-function formatBitrate(val) { return val ? `${Math.round(val)} kbps` : 'N/A'; }
-function formatRatio(val) { return val !== null ? `${Math.round(val * 100)}%` : 'N/A'; }
-
-export function DiffWorkspace({
-  cluster,
-  currentKeeperId,
-  selectedDeleteFolderIds,
-  handleDecision,
-  toggleDeleteSelection,
-  openExplorer,
-  setSingleDeleteTarget,
-}) {
+export function DiffWorkspace({ cluster, currentKeeperId, selectedDeleteFolderIds, handleDecision, toggleDeleteSelection, openExplorer, setSingleDeleteTarget }) {
   if (!cluster) {
     return (
-      <div className="empty-state">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14M16 3v18M8 3v18M4 12h16" />
+      <div className="centered-view">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" color="var(--text-tertiary)" style={{ marginBottom: '16px' }}>
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="9" y1="3" x2="9" y2="21"></line>
         </svg>
-        <h3>בחר קבוצת אלבומים להשוואה</h3>
-        <p>השתמש בחצים במקלדת כדי לנווט, <kbd>Space</kbd> לדילוג.</p>
+        <h3 style={{ color: 'var(--text-secondary)' }}>בחר קבוצה להשוואה מתוך הרשימה</h3>
+        <p style={{ color: 'var(--text-tertiary)', marginTop: '8px', fontSize: '0.875rem' }}>
+          ניתן לנווט עם <kbd>↑</kbd> <kbd>↓</kbd>
+        </p>
       </div>
     );
   }
 
-  const visibleAlbums = cluster.albums.filter((album) => !album.is_deleted);
+  const visibleAlbums = cluster.albums.filter((a) => !a.is_deleted);
   const metricWinners = useMemo(() => getMetricWinners(visibleAlbums), [visibleAlbums]);
   const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
 
+  const renderMetricDiff = (album, key, formatFn) => {
+    const isWinner = metricWinners[key] === album.folder_id;
+    const isLoser = metricWinners[key] !== null && !isWinner;
+    const val = formatFn(album[key]);
+    
+    if (isWinner) return <span className="diff-value diff-positive">{val}</span>;
+    if (isLoser) return <span className="diff-value diff-negative">{val}</span>;
+    return <span className="diff-value">{val}</span>;
+  };
+
   return (
-    <div className="diff-workspace">
-      <div className="diff-header">
-        <h2>השוואת עותקים</h2>
-        <div className="diff-header-meta">
-           <Badge tone={cluster.confidence_bucket === "safe" ? "success" : "warning"}>
-            {cluster.confidence_bucket === "safe" ? "בטוח למחיקה" : "דורש סקירה"}
-          </Badge>
-          <p>{cluster.human_summary}</p>
+    <div className="workspace-main">
+      <div className="workspace-header">
+        <h2>השוואת נתונים</h2>
+        <p>{cluster.human_summary}</p>
+      </div>
+      <div className="diff-container">
+        <div className="cards-grid">
+          {visibleAlbums.map((album) => {
+            const isKeeper = currentKeeperId === album.folder_id;
+            const isMarked = selectedDeleteFolderIds.includes(album.folder_id);
+
+            return (
+              <div key={album.folder_id} className={`album-card ${isKeeper ? 'is-keeper' : ''} ${isMarked ? 'is-deleted' : ''}`}>
+                <div className="card-header">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <h3 title={album.name}>{album.name}</h3>
+                    {isKeeper && <Badge tone="success">נשמר</Badge>}
+                    {isMarked && <Badge tone="danger">מסומן למחיקה</Badge>}
+                  </div>
+                  <div className="card-path" title={album.path}>{album.path}</div>
+                  <div className="card-actions">
+                    <Button variant={isKeeper ? "secondary" : "primary"} style={{ flex: 1 }} onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}>
+                      {isKeeper ? "נבחר כשומר" : "הגדר כשומר"}
+                    </Button>
+                    <Button variant={isMarked ? "secondary" : "ghost"} disabled={isKeeper} onClick={() => toggleDeleteSelection(cluster.cluster_id, album.folder_id)} title="סמן למחיקה (X)">
+                      {isMarked ? "בטל מחיקה" : "סמן למחיקה"}
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => openExplorer(album.path)} title="פתח סייר (O)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    </Button>
+                  </div>
+                </div>
+                
+                <table className="diff-table">
+                  <tbody>
+                    <tr>
+                      <td className="diff-label">איכות משוקללת</td>
+                      <td>{renderMetricDiff(album, 'quality_score', v => v ? `${v.toFixed(1)}%` : 'N/A')}</td>
+                    </tr>
+                    <tr>
+                      <td className="diff-label">ביטרייט</td>
+                      <td>{renderMetricDiff(album, 'avg_bitrate', v => v ? `${Math.round(v)} kbps` : 'N/A')}</td>
+                    </tr>
+                    <tr>
+                      <td className="diff-label">נפח כולל</td>
+                      <td>{renderMetricDiff(album, 'total_size_mb', formatSizeMb)}</td>
+                    </tr>
+                    <tr>
+                      <td className="diff-label">עטיפת אלבום</td>
+                      <td>
+                        <span className={`diff-value ${album.has_album_art ? 'diff-positive' : 'diff-negative'}`}>
+                          {album.has_album_art ? "קיימת" : "חסרה"}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                
+                {!isKeeper && isMarked && (
+                  <div style={{ padding: '16px', background: 'var(--sidebar-bg)', borderTop: '1px solid var(--panel-border)', borderRadius: '0 0 var(--radius-md) var(--radius-md)' }}>
+                    <Button variant="danger" style={{ width: '100%' }} onClick={() => setSingleDeleteTarget({ clusterId: cluster.cluster_id, folderId: album.folder_id, name: album.name })}>
+                      מחק עכשיו (D)
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-      </div>
 
-      <div className="diff-grid">
-        {visibleAlbums.map((album) => {
-          const isKeeper = currentKeeperId === album.folder_id;
-          const isMarkedForDelete = selectedDeleteFolderIds.includes(album.folder_id);
-
-          return (
-            <div key={album.folder_id} className={`album-card ${isKeeper ? 'is-keeper' : ''} ${isMarkedForDelete ? 'is-deleted' : ''}`}>
-              <div className="album-card-header">
-                <div className="album-title-wrap">
-                  <h4>{album.name}</h4>
-                  {isKeeper && <Badge tone="success">נשמר</Badge>}
-                  {isMarkedForDelete && <Badge tone="danger">מסומן למחיקה</Badge>}
-                </div>
-                <div className="album-path">{album.path}</div>
-                <div className="album-actions">
-                  <Button 
-                    variant={isKeeper ? "secondary" : "primary"} 
-                    onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}
-                  >
-                    {isKeeper ? "נבחר" : "בחר כשומר"}
-                  </Button>
-                  <Button 
-                    variant={isMarkedForDelete ? "secondary" : "ghost"}
-                    disabled={isKeeper}
-                    onClick={() => toggleDeleteSelection(cluster.cluster_id, album.folder_id)}
-                  >
-                    {isMarkedForDelete ? "בטל מחיקה" : "סמן למחיקה"} <kbd>X</kbd>
-                  </Button>
-                  <Button variant="ghost" onClick={() => openExplorer(album.path)} title="פתח סייר">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                  </Button>
-                </div>
-              </div>
-
-              <div className="metrics-list">
-                <div className="metric-row">
-                  <span className="metric-label">איכות</span>
-                  <span className={`metric-value ${metricWinners['quality_score'] === album.folder_id ? 'positive' : ''}`}>
-                    {album.quality_score ? `${album.quality_score.toFixed(1)}%` : 'N/A'}
-                  </span>
-                </div>
-                <div className="metric-row">
-                  <span className="metric-label">ביטרייט</span>
-                  <span className={`metric-value ${metricWinners['avg_bitrate'] === album.folder_id ? 'positive' : ''}`}>
-                    {formatBitrate(album.avg_bitrate)}
-                  </span>
-                </div>
-                <div className="metric-row">
-                  <span className="metric-label">משקל כולל</span>
-                  <span className="metric-value">{formatSizeMb(album.total_size_mb)}</span>
-                </div>
-                <div className="metric-row">
-                  <span className="metric-label">קובצי מוזיקה</span>
-                  <span className="metric-value">{album.file_count}</span>
-                </div>
-                 <div className="metric-row">
-                  <span className="metric-label">עטיפת אלבום</span>
-                  <span className={`metric-value ${album.has_album_art ? 'positive' : 'negative'}`}>
-                    {album.has_album_art ? "קיימת" : "חסרה"}
-                  </span>
-                </div>
-                <div className="metric-row">
-                  <span className="metric-label">Lossless</span>
-                  <span className="metric-value">{formatRatio(album.lossless_ratio)}</span>
-                </div>
-              </div>
-              
-              {!isKeeper && isMarkedForDelete && (
-                <div style={{ padding: '0 20px 20px' }}>
-                   <Button variant="danger" style={{ width: '100%' }} onClick={() => setSingleDeleteTarget({ clusterId: cluster.cluster_id, folderId: album.folder_id, name: album.name })}>
-                      מחק עכשיו
-                   </Button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="tracklist-section">
-        <div className="tracklist-header">השוואת רשימת שירים (הדגשת חוסרים)</div>
-        <table className="track-table">
-          <thead>
-            <tr>
-              <th style={{ textAlign: 'right' }}>שם שיר</th>
-              {visibleAlbums.map(album => (
-                <th key={album.folder_id}>{album.name}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+        <div className="tracklist-section">
+          <div className="tracklist-header">רשימת שירים והבדלים</div>
+          <div style={{ background: 'var(--surface-bg)', border: '1px solid var(--panel-border)', borderRadius: 'var(--radius-md)' }}>
             {trackRows.map(row => (
-              <tr key={row.key}>
-                <td>{row.title}</td>
+              <div key={row.key} className="track-row">
+                <div className="track-name">{row.title}</div>
                 {visibleAlbums.map(album => (
-                  <td key={album.folder_id}>
+                  <div key={album.folder_id} className="track-status">
                     {row.presence[album.folder_id] ? (
-                      <span className="track-presence exists">✓</span>
+                      <span className="status-ok">✓ קיים</span>
                     ) : (
-                      <span className="track-presence missing">חסר</span>
+                      <span className="status-missing">חסר</span>
                     )}
-                  </td>
+                  </div>
                 ))}
-              </tr>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
     </div>
   );

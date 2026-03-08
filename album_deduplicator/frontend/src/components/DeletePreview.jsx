@@ -4,18 +4,18 @@ import { formatSizeMb } from "../utils";
 
 export function DeletePreview({ preview, onConfirm, isExecuting }) {
   if (preview.total_count === 0) return null;
-
+  
   return (
-    <div className="bottom-bar">
-      <div className="bottom-bar-info">
-        <div className="delete-count">{preview.total_count}</div>
-        <div className="bottom-bar-text">
+    <div className="floating-action-bar">
+      <div className="fab-info">
+        <div className="fab-count">{preview.total_count}</div>
+        <div className="fab-text">
           <h4>מוכנים להעברה לסל המחזור</h4>
-          <p>יתפנו כ-{formatSizeMb(preview.total_size_mb)}.</p>
+          <p>יתפנו כ-{formatSizeMb(preview.total_size_mb)} במצטבר</p>
         </div>
       </div>
       <Button variant="danger" onClick={onConfirm} disabled={isExecuting}>
-        {isExecuting ? "מוחק..." : "העבר לסל"} <kbd style={{ marginLeft: '8px', border: 'none', background: 'rgba(255,255,255,0.2)', color: 'white' }}>Enter</kbd>
+        {isExecuting ? "מעביר לסל..." : "העבר לסל (Enter)"}
       </Button>
     </div>
   );

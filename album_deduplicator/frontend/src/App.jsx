@@ -3,64 +3,62 @@ import { useDeduplicator } from "./hooks/useDeduplicator";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import * as api from "./api";
 import { getRuntimeInfo, getRuntimeSnapshot, openDesktopPath, pickPreferredRoot, pickScanFolders } from "./desktop";
-import { ScanPanel } from "./components/ScanPanel";
+import { SetupScreen } from "./components/SetupScreen";
+import { ScanningScreen } from "./components/ScanningScreen";
+import { SummaryScreen } from "./components/SummaryScreen";
 import { ClusterList } from "./components/ClusterList";
 import { DiffWorkspace } from "./components/DiffWorkspace";
 import { DeletePreview } from "./components/DeletePreview";
 import { ConfirmModal } from "./components/UI";
 
-let folderInputCounter = 0;
-function createFolderInput(path = "") {
-  folderInputCounter += 1;
-  return { id: `folder-input-${folderInputCounter}`, path };
-}
-function createInitialFolderInputs() {
-  return [createFolderInput(""), createFolderInput("")];
-}
 function normalizeFolderPaths(entries) {
   return entries.map((entry) => entry.path.trim()).filter(Boolean);
 }
+
 function mergeFolderInputs(currentEntries, nextPaths) {
   const uniqueNextPaths = Array.from(new Set(nextPaths.map((item) => item.trim()).filter(Boolean)));
   if (!uniqueNextPaths.length) return currentEntries;
   const nextEntries = [...currentEntries];
   const existingPaths = new Set(nextEntries.map((entry) => entry.path.trim()).filter(Boolean));
+  
   uniqueNextPaths.forEach((path) => {
     if (existingPaths.has(path)) return;
     const emptyEntry = nextEntries.find((entry) => !entry.path.trim());
     if (emptyEntry) emptyEntry.path = path;
-    else nextEntries.push(createFolderInput(path));
+    else nextEntries.push({ id: `folder-${Date.now()}-${Math.random()}`, path });
     existingPaths.add(path);
   });
+  
   return nextEntries;
 }
 
 export default function App() {
+  const [appView, setAppView] = useState('setup');
+  
   const [form, setForm] = useState({
-    folders: createInitialFolderInputs(),
+    folders:[{ id: 'f1', path: "" }, { id: 'f2', path: "" }],
     preferred_root: "",
     force_rescan: false,
     clear_cache: false,
     bitrate_mode: "128",
     gemini_enabled: false,
   });
-  const[loading, setLoading] = useState(false);
-  const [executingDelete, setExecutingDelete] = useState(false);
+
+  const[executingDelete, setExecutingDelete] = useState(false);
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
-  const[singleDeleteTarget, setSingleDeleteTarget] = useState(null);
+  const [singleDeleteTarget, setSingleDeleteTarget] = useState(null);
   const[focusedAlbumId, setFocusedAlbumId] = useState(null);
   const [runtimeInfo, setRuntimeInfo] = useState(getRuntimeSnapshot());
+  
   const d = useDeduplicator();
-
+  
   const selectedCluster = d.clusters.find((cluster) => cluster.cluster_id === d.selectedClusterId) || null;
   const currentKeeperId = selectedCluster
     ? (d.decisions[selectedCluster.cluster_id] ?? (selectedCluster.resolution_state === "auto" ? selectedCluster.recommended_keeper_id : null))
     : null;
   const selectedDeleteFolderIds = selectedCluster
-    ? (d.deleteSelections[selectedCluster.cluster_id] ?? selectedCluster.selected_delete_folder_ids ?? [])
+    ? (d.deleteSelections[selectedCluster.cluster_id] ?? selectedCluster.selected_delete_folder_ids ??[])
     :[];
-
-  const normalizedFolderPaths = normalizeFolderPaths(form.folders);
 
   useEffect(() => {
     let active = true;
@@ -68,9 +66,13 @@ export default function App() {
     return () => { active = false; };
   },[]);
 
+  useEffect(() => {
+    if (d.status === 'running') setAppView('scanning');
+    if (d.status === 'completed' && d.summary && appView === 'scanning') setAppView('summary');
+  }, [d.status, d.summary, appView]);
+
   const handleScanSubmit = async (event) => {
     event.preventDefault();
-    setLoading(true);
     d.setError("");
     d.setSuccessSummary(null);
     try {
@@ -83,10 +85,9 @@ export default function App() {
       d.setDeleteSelections({});
       d.setPreview({ items:[], total_count: 0, total_size_mb: 0 });
       d.setSelectedClusterId(null);
+      setAppView('scanning');
     } catch (err) {
       d.setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -110,7 +111,9 @@ export default function App() {
     try {
       await api.executeSingleDelete(d.sessionId, target.clusterId, target.folderId);
       await d.refreshData(d.sessionId, d.selectedTab);
-    } catch (err) { d.setError(err.message); }
+    } catch (err) { 
+      d.setError(err.message); 
+    }
   };
 
   const updateClusterDecision = async (clusterId, keeperId, deleteFolderIds = null) => {
@@ -129,7 +132,19 @@ export default function App() {
     try {
       const opened = await openDesktopPath(path);
       if (!opened) await api.openInExplorer(path);
-    } catch (err) { d.setError(err.message); }
+    } catch (err) { 
+      d.setError(err.message); 
+    }
+  };
+
+  const handlePickFolders = async () => {
+    const paths = await pickScanFolders();
+    if (paths.length) setForm(prev => ({...prev, folders: mergeFolderInputs(prev.folders, paths)}));
+  };
+
+  const handlePickPreferredRoot = async () => {
+    const path = await pickPreferredRoot();
+    if (path) setForm(prev => ({...prev, folders: mergeFolderInputs(prev.folders, [path]), preferred_root: path}));
   };
 
   useKeyboardShortcuts({
@@ -152,42 +167,37 @@ export default function App() {
   });
 
   return (
-    <div className="app-shell" dir="rtl">
-      <div className="app-layout">
-        <ScanPanel
-          form={form}
-          normalizedFolderPaths={normalizedFolderPaths}
-          setForm={setForm}
-          onSubmit={handleScanSubmit}
-          loading={loading}
-          progress={d.progress}
-          summary={d.summary}
-          runtimeInfo={runtimeInfo}
-          onPickFolders={async () => { const p = await pickScanFolders(); if(p.length) setForm(c => ({...c, folders: mergeFolderInputs(c.folders, p)})); }}
-          onPickPreferredRoot={async () => { const p = await pickPreferredRoot(); if(p) setForm(c => ({...c, folders: mergeFolderInputs(c.folders, [p]), preferred_root: p})); }}
-          onAddFolderRow={(path) => setForm(c => ({...c, folders:[...c.folders, createFolderInput(path)]}))}
-          onRemoveFolderRow={(id) => setForm(c => { const rem = c.folders.filter(f => f.id !== id); return {...c, folders: rem.length ? rem : createInitialFolderInputs()}; })}
-          onUpdateFolderPath={(id, path) => setForm(c => ({...c, folders: c.folders.map(f => f.id === id ? {...f, path} : f)}))}
-        />
-        
-        <main className="main-workspace">
-          <header className="workspace-header">
-            <div className="tabs">
-              <button className={`tab ${d.selectedTab === "safe" ? "active" : ""}`} onClick={() => d.setSelectedTab("safe")} disabled={d.status !== "completed"}>בטוח למחיקה</button>
-              <button className={`tab ${d.selectedTab === "review" ? "active" : ""}`} onClick={() => d.setSelectedTab("review")} disabled={d.status !== "completed"}>דורש סקירה</button>
-              <button className={`tab ${d.selectedTab === "all" ? "active" : ""}`} onClick={() => d.setSelectedTab("all")} disabled={d.status !== "completed"}>כל התוצאות</button>
-            </div>
-          </header>
+    <div className="app-container" dir="rtl">
+      <div className="window-content">
+        {appView === 'setup' && (
+          <SetupScreen 
+            form={form} 
+            setForm={setForm} 
+            onSubmit={handleScanSubmit} 
+            onPickFolders={handlePickFolders}
+            onPickPreferredRoot={handlePickPreferredRoot}
+            runtimeInfo={runtimeInfo}
+          />
+        )}
 
-          <div className="workspace-body">
-            {d.status === "completed" && (
-              <ClusterList
-                clusters={d.clusters}
-                selectedClusterId={d.selectedClusterId}
-                setSelectedClusterId={d.setSelectedClusterId}
-                decisions={d.decisions}
-              />
-            )}
+        {appView === 'scanning' && (
+          <ScanningScreen progress={d.progress} />
+        )}
+
+        {appView === 'summary' && d.summary && (
+          <SummaryScreen summary={d.summary} onStartReview={() => setAppView('review')} />
+        )}
+
+        {appView === 'review' && d.status === 'completed' && (
+          <div className="workspace-layout">
+            <ClusterList
+              clusters={d.clusters}
+              selectedClusterId={d.selectedClusterId}
+              setSelectedClusterId={d.setSelectedClusterId}
+              decisions={d.decisions}
+              selectedTab={d.selectedTab}
+              setSelectedTab={d.setSelectedTab}
+            />
             <DiffWorkspace
               cluster={selectedCluster}
               currentKeeperId={currentKeeperId}
@@ -198,10 +208,16 @@ export default function App() {
               setSingleDeleteTarget={setSingleDeleteTarget}
             />
           </div>
-        </main>
+        )}
       </div>
 
-      <DeletePreview preview={d.preview} onConfirm={() => setBulkConfirmOpen(true)} isExecuting={executingDelete} />
+      {appView === 'review' && d.preview.total_count > 0 && (
+        <DeletePreview 
+          preview={d.preview} 
+          onConfirm={() => setBulkConfirmOpen(true)} 
+          isExecuting={executingDelete} 
+        />
+      )}
 
       {bulkConfirmOpen && (
         <ConfirmModal
@@ -216,13 +232,20 @@ export default function App() {
 
       {singleDeleteTarget && (
         <ConfirmModal
-          title="העברה בודדת"
-          body={`התיקייה "${singleDeleteTarget.name}" תועבר לסל המחזור מיד.`}
+          title="העברה בודדת לסל המחזור"
+          body={`התיקייה "${singleDeleteTarget.name}" תועבר מיד לסל המחזור בלי להמתין לאישור המרוכז.`}
           confirmText="מחק עכשיו"
           onConfirm={() => executeSingleDelete(singleDeleteTarget)}
           onCancel={() => setSingleDeleteTarget(null)}
           isDanger
         />
+      )}
+
+      {d.error && (
+        <div style={{ position: 'fixed', bottom: 20, right: 20, background: 'var(--accent-danger)', color: 'white', padding: '12px 24px', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-float)', zIndex: 9999, display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span>{d.error}</span>
+          <button style={{ textDecoration: 'underline', opacity: 0.8 }} onClick={() => d.setError("")}>סגור</button>
+        </div>
       )}
     </div>
   );

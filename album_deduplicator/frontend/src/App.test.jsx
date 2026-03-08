@@ -35,6 +35,16 @@ function jsonResponse(payload) {
   };
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 function createDesktopBridge(overrides = {}) {
   return {
     runtime: {
@@ -204,13 +214,12 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("button", { name: "התחל סריקה חכמה" })).toBeInTheDocument();
-    expect(screen.getByText("React + API")).toBeInTheDocument();
-    expect(screen.getByLabelText("ספריית מקור")).toBeInTheDocument();
-    expect(screen.getByLabelText("ספריית ארכיון")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "התחל סריקה" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("C:\\Music")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("D:\\Archive")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "הגדרות מתקדמות" }));
-    expect(screen.getByText("הפעל אימות AI (Gemini) למקרים גבוליים")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("הגדרות מתקדמות"));
+    expect(screen.getByText("אימות AI למקרים גבוליים (Gemini)")).toBeInTheDocument();
   });
 
   it("uses the electron bridge to pick scan folders", async () => {
@@ -221,13 +230,12 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "בחר כמה תיקיות" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ בחר תיקיות" }));
 
     await waitFor(() =>
-      expect(screen.getByLabelText("ספריית מקור")).toHaveValue("C:\\Music"),
+      expect(screen.getByPlaceholderText("C:\\Music")).toHaveValue("C:\\Music"),
     );
-    expect(screen.getByLabelText("ספריית ארכיון")).toHaveValue("D:\\Archive");
-    expect(screen.getByText("Electron + React")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("D:\\Archive")).toHaveValue("D:\\Archive");
   });
 
   it("loads a completed session and opens the single-delete confirmation", async () => {
@@ -251,24 +259,78 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText("ספריית מקור"), {
+    fireEvent.change(screen.getByPlaceholderText("C:\\Music"), {
       target: { value: "C:\\Music" },
     });
-    fireEvent.change(screen.getByLabelText("ספריית ארכיון"), {
+    fireEvent.change(screen.getByPlaceholderText("D:\\Archive"), {
       target: { value: "D:\\Archive" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
 
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
     MockEventSource.instances[0].emit("completed", { status: "completed" });
 
     await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "הסריקה הושלמה בהצלחה" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
+
+    await waitFor(() =>
       expect(screen.getAllByText('נמצאו עותקים כמעט זהים. מומלץ לשמור את "Best".').length).toBeGreaterThan(0),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "מחק עכשיו" }));
+    fireEvent.click(screen.getByRole("button", { name: "מחק עכשיו (D)" }));
 
     expect(screen.getByText("העברה בודדת לסל המחזור")).toBeInTheDocument();
     expect(screen.getByText('התיקייה "Archive Copy" תועבר מיד לסל המחזור בלי להמתין לאישור המרוכז.')).toBeInTheDocument();
+  });
+
+  it("waits for summary data before switching from scanning to summary", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const sessionRequest = deferred();
+    const clustersRequest = deferred();
+    const previewRequest = deferred();
+
+    const fetchMock = vi.fn((url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return Promise.resolve(jsonResponse({ session_id: "session-1", status: "queued" }));
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return clustersRequest.promise;
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return previewRequest.promise;
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return sessionRequest.promise;
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByPlaceholderText("C:\\Music"), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("D:\\Archive"), {
+      target: { value: "D:\\Archive" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    expect(screen.queryByText("הסריקה הושלמה בהצלחה")).not.toBeInTheDocument();
+    expect(screen.getByText("ממתין")).toBeInTheDocument();
+
+    sessionRequest.resolve(jsonResponse(sessionSummary));
+    clustersRequest.resolve(jsonResponse(clusterResponse));
+    previewRequest.resolve(jsonResponse(previewResponse));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "הסריקה הושלמה בהצלחה" })).toBeInTheDocument(),
+    );
   });
 });
