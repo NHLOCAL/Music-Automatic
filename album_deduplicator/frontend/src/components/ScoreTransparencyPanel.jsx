@@ -102,7 +102,7 @@ export function ScoreTransparencyPanel({ cluster, currentKeeperId }) {
         <ScoreMetricCard
           label="ציון משולב"
           value={renderScoreValue(representativePair?.base_score, "ללא נתון")}
-          hint="45% מתמטי + 55% AI מקומי"
+          hint="35% מתמטי + 65% AI מקומי"
           tone="warning"
         />
         <ScoreMetricCard
