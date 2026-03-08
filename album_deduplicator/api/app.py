@@ -88,6 +88,7 @@ def create_app() -> FastAPI:
                 force_rescan=payload.force_rescan,
                 clear_cache=payload.clear_cache,
                 gemini_enabled=payload.gemini_enabled,
+                full_hash_scan=payload.full_hash_scan,
             )
         )
         store.start_analysis(session.session_id)

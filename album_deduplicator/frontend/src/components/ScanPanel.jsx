@@ -101,6 +101,10 @@ export function ScanPanel({
               סריקה מחדש מהדיסק (התעלם מ-Cache)
             </label>
             <label className="checkbox-label">
+              <input type="checkbox" checked={form.full_hash_scan} onChange={(e) => setForm({ ...form, full_hash_scan: e.target.checked })} disabled={loading}/>
+              סריקת Hash מלאה (איטית יותר, כבויה כברירת מחדל)
+            </label>
+            <label className="checkbox-label">
               <input type="checkbox" checked={form.gemini_enabled} onChange={(e) => setForm({ ...form, gemini_enabled: e.target.checked })} disabled={loading}/>
               אימות AI למקרים גבוליים (Gemini)
             </label>

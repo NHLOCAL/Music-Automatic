@@ -177,6 +177,39 @@ def test_api_session_flow(monkeypatch, tmp_path):
     assert response.json()["status"] == "queued"
 
 
+def test_api_session_flow_accepts_full_hash_scan(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_start_analysis(session_id: str):
+        session = store.get_session(session_id)
+        seen["full_hash_scan"] = session.options.full_hash_scan
+        seen["disable_hash"] = session.options.disable_hash
+        session.status = "completed"
+
+    monkeypatch.setattr(store, "start_analysis", fake_start_analysis)
+    music_root = tmp_path / "music"
+    archive_root = tmp_path / "archive"
+    music_root.mkdir()
+    archive_root.mkdir()
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/analysis-sessions",
+        json={
+            "folders": [str(music_root), str(archive_root)],
+            "preferred_root": str(music_root),
+            "force_rescan": False,
+            "clear_cache": False,
+            "full_hash_scan": True,
+            "bitrate_mode": "128",
+            "gemini_enabled": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen == {"full_hash_scan": True, "disable_hash": False}
+
+
 def test_api_cluster_decisions_and_delete_execution(monkeypatch):
     session = store.create_session(
         AnalysisOptions(

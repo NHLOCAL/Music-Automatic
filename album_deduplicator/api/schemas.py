@@ -10,6 +10,7 @@ class AnalysisSessionCreateRequest(BaseModel):
     preferred_root: Optional[str] = None
     force_rescan: bool = False
     clear_cache: bool = False
+    full_hash_scan: bool = False
     bitrate_mode: Literal["128", "high"] = "128"
     gemini_enabled: bool = False
 

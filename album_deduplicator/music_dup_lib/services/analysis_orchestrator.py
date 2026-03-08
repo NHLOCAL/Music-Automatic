@@ -27,6 +27,7 @@ class AnalysisOptions:
     clear_cache: bool = False
     gemini_enabled: bool = False
     disable_hash: bool = False
+    full_hash_scan: bool = False
 
 
 @dataclass
@@ -54,7 +55,11 @@ class AnalysisOrchestrator:
         if options.clear_cache and config.COMPARISON_RESULTS_CACHE_FILE.exists():
             config.COMPARISON_RESULTS_CACHE_FILE.unlink()
 
-        file_processor = FileProcessor(enable_hashing=not options.disable_hash)
+        hash_strategy = self._hash_strategy_for_options(options)
+        file_processor = FileProcessor(
+            enable_hashing=not options.disable_hash,
+            full_hash_scan=options.full_hash_scan,
+        )
         folder_scanner = FolderScanner(
             file_processor=file_processor,
             data_store=self.data_store,
@@ -69,7 +74,7 @@ class AnalysisOrchestrator:
         comparison_results = comparison_engine.find_similar_folders(scanned_folders)
         cached_results_map = {}
         if not options.force_rescan and not options.clear_cache:
-            cached_results_map = self.data_store.load_comparison_results()
+            cached_results_map = self.data_store.load_comparison_results(cache_profile=hash_strategy)
 
         scoring_service = ScoringService(
             preferred_bitrate=options.bitrate_mode,
@@ -85,7 +90,7 @@ class AnalysisOrchestrator:
         )
 
         if comparison_results:
-            self.data_store.save_comparison_results(comparison_results)
+            self.data_store.save_comparison_results(comparison_results, cache_profile=hash_strategy)
 
         recommendation_service = RecommendationService(preferred_root=options.preferred_root)
         album_summaries = recommendation_service.build_album_summaries(scanned_folders)
@@ -113,6 +118,13 @@ class AnalysisOrchestrator:
         )
         self._emit(progress_handler, "complete", "הניתוח הושלם", 1, 1)
         return snapshot
+
+    def _hash_strategy_for_options(self, options: AnalysisOptions) -> str:
+        if options.disable_hash:
+            return "none"
+        if options.full_hash_scan:
+            return "full"
+        return "partial"
 
     def _emit(
         self,

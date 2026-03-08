@@ -55,8 +55,12 @@ logger = logging.getLogger(__name__)
 class FileProcessor:
 
 
-    def __init__(self, enable_hashing: bool = config.ENABLE_HASHING):
+    def __init__(self, enable_hashing: bool = config.ENABLE_HASHING, full_hash_scan: bool = False):
         self.enable_hashing = enable_hashing
+        self.full_hash_scan = full_hash_scan if enable_hashing else False
+        self.hashing_strategy = "none"
+        if self.enable_hashing:
+            self.hashing_strategy = "full" if self.full_hash_scan else "partial"
         self._album_art_hash_cache: Dict[Path, Optional[str]] = {}
 
     def process_file(self, filepath: Path) -> Optional[FileInfo]:
@@ -72,7 +76,7 @@ class FileProcessor:
 
         filename = filepath.name
         size_mb = get_file_size_mb(filepath)
-        file_hash = self._calculate_partial_hash(filepath) if self.enable_hashing else None
+        file_hash = self._calculate_hash(filepath) if self.enable_hashing else None
 
         metadata = self._extract_metadata(filepath)
 
@@ -200,6 +204,28 @@ class FileProcessor:
         return metadata
 
 
+    def _calculate_hash(self, filepath: Path) -> Optional[str]:
+        if self.full_hash_scan:
+            return self._calculate_full_hash(filepath)
+        return self._calculate_partial_hash(filepath)
+
+    def _calculate_full_hash(self, filepath: Path) -> Optional[str]:
+        try:
+            hasher = hashlib.sha256()
+            with open(filepath, 'rb') as f:
+                while True:
+                    chunk = f.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    hasher.update(chunk)
+            return hasher.hexdigest()
+        except OSError as e:
+            logger.error(f"Error calculating full hash for {filepath}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error during full hashing for {filepath}: {e}", exc_info=True)
+            return None
+
     def _calculate_partial_hash(self, filepath: Path) -> Optional[str]:
 
         try:
@@ -257,7 +283,7 @@ class FileProcessor:
             return {
                 'name': filepath.name,
                 'size_bytes': filepath.stat().st_size,
-                'hash': self._calculate_partial_hash(filepath) if self.enable_hashing else None
+                'hash': self._calculate_hash(filepath) if self.enable_hashing else None
             }
         except OSError as e:
             logger.error(f"Error processing other file info for {filepath}: {e}")

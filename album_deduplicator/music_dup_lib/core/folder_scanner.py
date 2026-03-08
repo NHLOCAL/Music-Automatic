@@ -84,6 +84,15 @@ class FolderScanner:
                          cached_folder_dict = cached_data[folder_path_str]
 
                          if isinstance(cached_folder_dict, dict) and 'path' in cached_folder_dict:
+                              cached_hash_strategy = cached_folder_dict.get("hashing_strategy", "partial")
+                              if cached_hash_strategy != self.file_processor.hashing_strategy:
+                                   logger.info(
+                                       "Rescanning %s because cache hash strategy %s does not match requested %s.",
+                                       folder_path,
+                                       cached_hash_strategy,
+                                       self.file_processor.hashing_strategy,
+                                   )
+                                   raise ValueError("hash strategy mismatch")
                               folder_info = self._folder_info_from_dict(cached_folder_dict)
 
                               if folder_info.path.is_dir():
@@ -294,6 +303,7 @@ class FolderScanner:
             "metadata_completeness_ratio": folder_info.metadata_completeness_ratio,
             "lossless_ratio": folder_info.lossless_ratio,
             "lyrics_ratio": folder_info.lyrics_ratio,
+            "hashing_strategy": self.file_processor.hashing_strategy,
 
             "quality_score": folder_info.quality_score,
             "quality_breakdown": folder_info.quality_breakdown,
