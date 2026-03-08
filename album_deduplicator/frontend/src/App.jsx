@@ -215,29 +215,31 @@ export default function App() {
               selectedTab={d.selectedTab}
               setSelectedTab={d.setSelectedTab}
             />
-            <DiffWorkspace
-              key={`${d.selectedTab}-${d.selectedClusterId ?? "empty"}`}
-              cluster={selectedCluster}
-              currentKeeperId={currentKeeperId}
-              hasUserDecision={hasSelectedClusterDecision}
-              selectedDeleteFolderIds={selectedDeleteFolderIds}
-              handleDecision={updateClusterDecision}
-              toggleDeleteSelection={toggleDeleteSelection}
-              openExplorer={openExplorer}
-              setSingleDeleteTarget={setSingleDeleteTarget}
-              onBackToSetup={goToSetup}
-            />
+            <div className="workspace-main">
+              <DiffWorkspace
+                key={`${d.selectedTab}-${d.selectedClusterId ?? "empty"}`}
+                cluster={selectedCluster}
+                currentKeeperId={currentKeeperId}
+                hasUserDecision={hasSelectedClusterDecision}
+                selectedDeleteFolderIds={selectedDeleteFolderIds}
+                handleDecision={updateClusterDecision}
+                toggleDeleteSelection={toggleDeleteSelection}
+                openExplorer={openExplorer}
+                setSingleDeleteTarget={setSingleDeleteTarget}
+                onBackToSetup={goToSetup}
+              />
+
+              {d.preview.total_count > 0 && (
+                <DeletePreview 
+                  preview={d.preview} 
+                  onConfirm={() => setBulkConfirmOpen(true)} 
+                  isExecuting={executingDelete} 
+                />
+              )}
+            </div>
           </div>
         )}
       </div>
-
-      {appView === 'review' && d.preview.total_count > 0 && (
-        <DeletePreview 
-          preview={d.preview} 
-          onConfirm={() => setBulkConfirmOpen(true)} 
-          isExecuting={executingDelete} 
-        />
-      )}
 
       {bulkConfirmOpen && (
         <ConfirmModal
