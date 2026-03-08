@@ -1,14 +1,14 @@
 # תוכנית: ממשק מודרני עם React + API, מחיקה בטוחה, ו-AI כברירת מחדל
 
 ## Summary
-- להחליף את ממשק ה-Streamlit בממשק `React` מודרני, בעברית, desktop-first אך רספונסיבי, עם זרימה קצרה וברורה: בחירת תיקיות, סריקה, סקירת תוצאות, אישור מחיקה.
+- הוחלף ממשק ה-`Streamlit` בממשק `React` מודרני, בעברית, desktop-first אך רספונסיבי, עם זרימה קצרה וברורה: בחירת תיקיות, סריקה, סקירת תוצאות, אישור מחיקה.
 - להוסיף שכבת `FastAPI` מסודרת מעל הלוגיקה הקיימת, כך שהפרונטנד לא יריץ ישירות את מנוע הסריקה/ההשוואה, וה-CLI וה-API ישתמשו באותם services.
 - להפוך את ה-ML המקומי לברירת מחדל אמיתית: תמיד לחשב `algorithmic_score` וגם `ml_score`, ולשלב אותם קבוע ל-`base_score` במקום שה-ML יחליף את הניקוד המתמטי.
 - להשאיר `Gemini` כאימות גבולי בלבד: לא חובה, לא חוסם שימוש, ולא קובע לבדו מחיקה אוטומטית.
 - לשנות את חוויית המחיקה כך שהפעולה הראשית תהיה “שמור את האלבום המומלץ”, עם מסך “Safe to delete” נפרד ומוגן, ולא רשימת selectboxes על כל זוג.
 
 ## Implementation Changes
-- לפרק את האורקסטרציה הקיימת מתוך `main.py` ו-`app.py` לשכבת services:
+- לפרק את האורקסטרציה הקיימת מתוך `main.py` וממשק ה-`Streamlit` הישן לשכבת services:
   - `AnalysisOrchestrator` לניהול סריקה, השוואה, איכות, scoring, cache ו-progress.
   - `ScoringService` לחישוב `algorithmic_score`, `ml_score`, `base_score`, `gemini_score`, `final_score`.
   - `RecommendationService` ליצירת clusters, בחירת keeper מומלץ, הסבר החלטה, וסיווג `safe` מול `review`.
@@ -83,7 +83,7 @@
 
 ## Assumptions and Defaults
 - היישום הוא local single-user על Windows, עם UI עברי כברירת מחדל.
-- מחליפים את `Streamlit` כ-UI ראשי; אפשר להשאירו זמנית כ-legacy עד השלמת המעבר, אבל ה-flow החדש ייבנה רק על React + API.
+- ה-UI הראשי הוא `React + API`, ללא fallback של `Streamlit`.
 - ה-CLI יישאר, אך ישתמש באותה שכבת services כדי למנוע לוגיקה כפולה.
 - אין תמיכה ב-v1 בזיהוי והשוואה של אלבומים עם מספר קבצים שונה, לפי ההעדפה שנקבעה.
 - ברירת המחדל למחיקה אוטומטית היא שמרנית מאוד: `safe_delete` רק מעל `97` או `identical_by_hash`.

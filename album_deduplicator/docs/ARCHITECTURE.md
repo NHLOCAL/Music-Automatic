@@ -28,7 +28,7 @@
 5. `Frontend`:
    ממשק `React` שרץ ב-renderer של Electron ומתקשר מול ה-API.
 6. `Entrypoints`:
-   `Electron Desktop`, `CLI`, שרת API, ו-`Streamlit` ישן שנשאר כ-legacy.
+   `Electron Desktop`, `CLI`, ושרת API.
 
 ## מבנה תיקיות
 
@@ -53,9 +53,6 @@
   - חישוב `quality_score` לכל אלבום.
 - `data_store.py`
   - cache של תיקיות ושל תוצאות השוואה.
-- `action_handler.py`
-  - לוגיקה ישנה למיזוג/מחיקה אינטראקטיבית.
-  - אינה מהווה עוד נתיב הביצוע הראשי של ה-UI החדש.
 
 ### `music_dup_lib/external`
 
@@ -106,7 +103,7 @@
 
 שכבת השרת:
 
-- `app.py`
+- `api/app.py`
   - אפליקציית `FastAPI`.
   - endpoints ציבוריים.
   - `SSE` לאירועי progress.
@@ -168,9 +165,6 @@
   - entrypoint פשוט לשרת API.
 - `frontend/electron/main.cjs`
   - entrypoint הראשי של אפליקציית ה-desktop.
-- `app.py`
-  - `Streamlit` ישן.
-  - נשאר זמני כ-legacy, לא ה-flow הראשי.
 
 ## זרימת נתונים מלאה
 
@@ -522,7 +516,6 @@ npm run dist:desktop
 
 - אין persistence ל-session store מעבר לחיי השרת.
 - אין תמיכה ב-v1 בזיהוי אלבומים עם מספר שירים שונה.
-- `Streamlit` עדיין קיים ועלול להמשיך לבלבל עד להסרה מלאה.
 - אין כרגע auth או multi-user isolation, כי המוצר מיועד local single-user.
 - חבילת `Electron` עדיין מניחה קיום `Python` מקומי כאשר backend ארוז כ-source resources; אריזת backend ל-executable היא הרחבה טבעית לשלב הבא.
 
@@ -532,5 +525,4 @@ npm run dist:desktop
 - background job manager מסודר במקום threads
 - תמיכה ב-near-duplicates עם file counts שונים
 - diff חזותי חכם בין tracklists
-- הסרה מלאה של `Streamlit`
 - הרחבת בדיקות e2e מול fixture directories אמיתיים

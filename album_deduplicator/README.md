@@ -24,7 +24,7 @@
 
 לתיאור מלא של מבנה המערכת, שכבות האחריות, זרימת הנתונים, contracts של ה-API ומדיניות ה-scoring:
 
-- [ARCHITECTURE.md](c:/Users/me/Documents/GitHub/Music-Automatic/album_deduplicator/ARCHITECTURE.md)
+- [ARCHITECTURE.md](c:/Users/me/Documents/GitHub/Music-Automatic/album_deduplicator/docs/ARCHITECTURE.md)
 
 ## מבנה עיקרי
 
@@ -39,8 +39,10 @@
 - `frontend/`
   - אפליקציית `React + Vite`
   - מעטפת `Electron` תחת `frontend/electron`
-- `app.py`
-  - ממשק `Streamlit` ישן, נשאר כ-legacy בלבד
+- `main.py`
+  - ממשק `CLI` שמפעיל את אותה שכבת services של ה-API
+- `api/app.py`
+  - שרת `FastAPI` הרשמי
 
 ## התקנה
 
