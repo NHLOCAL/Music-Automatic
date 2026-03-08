@@ -131,16 +131,15 @@ def test_api_session_flow(monkeypatch, tmp_path):
     def fake_start_analysis(session_id: str):
         session = store.get_session(session_id)
         session.snapshot = build_snapshot()
-        session.decisions = {
-            next(iter(session.snapshot.clusters.values())).cluster_id: next(
-                iter(session.snapshot.clusters.values())
-            ).recommended_keeper_id
-        }
+        cluster = next(iter(session.snapshot.clusters.values()))
+        session.decisions = {cluster.cluster_id: cluster.recommended_keeper_id}
+        session.delete_selections = {cluster.cluster_id: set(cluster.deletable_folder_ids)}
         session.preview = DeletionService().build_preview(
             session.snapshot.clusters,
             session.snapshot.albums,
             session.decisions,
             resolution_states={next(iter(session.snapshot.clusters.values())).cluster_id: "auto"},
+            delete_selections=session.delete_selections,
         )
         session.resolution_states = {next(iter(session.snapshot.clusters.values())).cluster_id: "auto"}
         session.status = "completed"
@@ -190,11 +189,13 @@ def test_api_cluster_decisions_and_delete_execution(monkeypatch):
     cluster = next(iter(session.snapshot.clusters.values()))
     session.decisions = {cluster.cluster_id: cluster.recommended_keeper_id}
     session.resolution_states = {cluster.cluster_id: "auto"}
+    session.delete_selections = {cluster.cluster_id: set(cluster.deletable_folder_ids)}
     session.preview = DeletionService().build_preview(
         session.snapshot.clusters,
         session.snapshot.albums,
         session.decisions,
         resolution_states=session.resolution_states,
+        delete_selections=session.delete_selections,
     )
     session.status = "completed"
 
@@ -235,6 +236,7 @@ def test_api_cluster_decisions_and_delete_execution(monkeypatch):
     assert clusters_response.status_code == 200
     assert len(clusters_response.json()["clusters"]) == 1
     assert clusters_response.json()["clusters"][0]["human_summary"]
+    assert clusters_response.json()["clusters"][0]["selected_delete_folder_ids"] == [cluster.deletable_folder_ids[0]]
 
     preview_response = client.get(f"/api/analysis-sessions/{session.session_id}/delete-preview")
     assert preview_response.status_code == 200
@@ -253,6 +255,7 @@ def test_api_cluster_decisions_and_delete_execution(monkeypatch):
         session.snapshot.albums,
         {cluster.cluster_id: cluster.recommended_keeper_id},
         resolution_states={cluster.cluster_id: "auto"},
+        delete_selections={cluster.cluster_id: set(cluster.deletable_folder_ids)},
     )
     delete_response = client.post(
         f"/api/analysis-sessions/{session.session_id}/delete-executions",
@@ -274,11 +277,13 @@ def test_api_delete_single_updates_preview(monkeypatch):
     cluster = next(iter(session.snapshot.clusters.values()))
     session.decisions = {cluster.cluster_id: cluster.recommended_keeper_id}
     session.resolution_states = {cluster.cluster_id: "user_selected"}
+    session.delete_selections = {cluster.cluster_id: set(cluster.deletable_folder_ids)}
     session.preview = DeletionService().build_preview(
         session.snapshot.clusters,
         session.snapshot.albums,
         session.decisions,
         resolution_states=session.resolution_states,
+        delete_selections=session.delete_selections,
     )
     session.status = "completed"
 

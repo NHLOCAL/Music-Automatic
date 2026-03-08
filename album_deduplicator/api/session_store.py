@@ -45,6 +45,7 @@ class SessionState:
     lock: threading.Lock = field(default_factory=threading.Lock)
     resolution_states: Dict[str, str] = field(default_factory=dict)
     deleted_folder_ids: Set[str] = field(default_factory=set)
+    delete_selections: Dict[str, Set[str]] = field(default_factory=dict)
 
 
 class SessionStore:
@@ -83,17 +84,27 @@ class SessionStore:
                     cluster_id: "auto" if cluster.confidence_bucket == "safe" and cluster.recommended_keeper_id else "skipped"
                     for cluster_id, cluster in snapshot.clusters.items()
                 }
+                delete_selections = {
+                    cluster_id: self._default_delete_selection(
+                        cluster,
+                        decisions.get(cluster_id),
+                        set(),
+                    )
+                    for cluster_id, cluster in snapshot.clusters.items()
+                }
                 self._apply_resolution_states(snapshot, resolution_states, set())
                 preview = self._deletion_service.build_preview(
                     clusters=snapshot.clusters,
                     albums=snapshot.albums,
                     decisions=decisions,
                     resolution_states=resolution_states,
+                    delete_selections=delete_selections,
                 )
                 with session.lock:
                     session.snapshot = snapshot
                     session.decisions = decisions
                     session.resolution_states = resolution_states
+                    session.delete_selections = delete_selections
                     session.preview = preview
                     session.status = "completed"
                     session.progress = {
@@ -117,18 +128,43 @@ class SessionStore:
         thread = threading.Thread(target=target, daemon=True)
         thread.start()
 
-    def apply_decisions(self, session_id: str, decisions: Dict[str, Optional[str]]) -> DeletePreview:
+    def apply_decisions(
+        self,
+        session_id: str,
+        decisions: Dict[str, Optional[str]],
+        delete_selections: Optional[Dict[str, Set[str]]] = None,
+    ) -> DeletePreview:
         session = self._require_session(session_id)
         with session.lock:
             for cluster_id, keeper_id in decisions.items():
+                previous_keeper_id = session.decisions.get(cluster_id)
                 session.decisions[cluster_id] = keeper_id
                 session.resolution_states[cluster_id] = "user_selected" if keeper_id else "skipped"
+                cluster = session.snapshot.clusters.get(cluster_id)
+                if cluster is None:
+                    session.delete_selections[cluster_id] = set()
+                    continue
+                if keeper_id is None:
+                    session.delete_selections[cluster_id] = set()
+                    continue
+                requested_selection = None
+                if delete_selections and cluster_id in delete_selections:
+                    requested_selection = delete_selections[cluster_id]
+                elif previous_keeper_id == keeper_id and cluster_id in session.delete_selections:
+                    requested_selection = session.delete_selections[cluster_id]
+                session.delete_selections[cluster_id] = self._normalize_delete_selection(
+                    cluster=cluster,
+                    keeper_id=keeper_id,
+                    requested_folder_ids=requested_selection,
+                    deleted_folder_ids=session.deleted_folder_ids,
+                )
             self._apply_resolution_states(session.snapshot, session.resolution_states, session.deleted_folder_ids)
             session.preview = self._deletion_service.build_preview(
                 clusters=session.snapshot.clusters,
                 albums=session.snapshot.albums,
                 decisions=session.decisions,
                 resolution_states=session.resolution_states,
+                delete_selections=session.delete_selections,
                 excluded_folder_ids=session.deleted_folder_ids,
             )
             return session.preview
@@ -143,16 +179,15 @@ class SessionStore:
         removed_ids = {result.folder_id for result in execution.results if result.success}
         with session.lock:
             session.deleted_folder_ids.update(removed_ids)
-            session.preview.items = [item for item in session.preview.items if item.folder_id not in removed_ids]
-            session.preview.total_size_mb = round(
-                sum(item.estimated_size_mb for item in session.preview.items),
-                2,
-            )
-            session.preview.auto_selected_count = sum(
-                1 for item in session.preview.items if item.selection_source == "auto"
-            )
-            session.preview.manual_selected_count = sum(
-                1 for item in session.preview.items if item.selection_source != "auto"
+            for selection in session.delete_selections.values():
+                selection.difference_update(removed_ids)
+            session.preview = self._deletion_service.build_preview(
+                clusters=session.snapshot.clusters,
+                albums=session.snapshot.albums,
+                decisions=session.decisions,
+                resolution_states=session.resolution_states,
+                delete_selections=session.delete_selections,
+                excluded_folder_ids=session.deleted_folder_ids,
             )
             self._apply_resolution_states(session.snapshot, session.resolution_states, session.deleted_folder_ids)
         self._push_event(
@@ -191,11 +226,14 @@ class SessionStore:
         removed_ids = {result.folder_id for result in execution.results if result.success}
         with session.lock:
             session.deleted_folder_ids.update(removed_ids)
+            for selection in session.delete_selections.values():
+                selection.difference_update(removed_ids)
             session.preview = self._deletion_service.build_preview(
                 clusters=session.snapshot.clusters,
                 albums=session.snapshot.albums,
                 decisions=session.decisions,
                 resolution_states=session.resolution_states,
+                delete_selections=session.delete_selections,
                 excluded_folder_ids=session.deleted_folder_ids,
             )
             self._apply_resolution_states(session.snapshot, session.resolution_states, session.deleted_folder_ids)
@@ -250,3 +288,31 @@ class SessionStore:
                 resolution_states[cluster_id] = "deleted"
             else:
                 cluster.resolution_state = resolution_states.get(cluster_id, cluster.resolution_state)
+
+    def _default_delete_selection(
+        self,
+        cluster,
+        keeper_id: Optional[str],
+        deleted_folder_ids: Set[str],
+    ) -> Set[str]:
+        if keeper_id is None:
+            return set()
+        return {
+            folder_id
+            for folder_id in cluster.folder_ids
+            if folder_id != keeper_id and folder_id not in deleted_folder_ids
+        }
+
+    def _normalize_delete_selection(
+        self,
+        cluster,
+        keeper_id: Optional[str],
+        requested_folder_ids: Optional[Set[str]],
+        deleted_folder_ids: Set[str],
+    ) -> Set[str]:
+        if keeper_id is None or keeper_id not in cluster.folder_ids:
+            return set()
+        allowed_folder_ids = self._default_delete_selection(cluster, keeper_id, deleted_folder_ids)
+        if requested_folder_ids is None:
+            return allowed_folder_ids
+        return {folder_id for folder_id in requested_folder_ids if folder_id in allowed_folder_ids}

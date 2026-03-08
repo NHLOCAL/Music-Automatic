@@ -25,6 +25,7 @@ class DeletionService:
         albums: Dict[str, AlbumSummary],
         decisions: Dict[str, Optional[str]],
         resolution_states: Optional[Dict[str, str]] = None,
+        delete_selections: Optional[Dict[str, set[str]]] = None,
         excluded_folder_ids: Optional[set[str]] = None,
     ) -> DeletePreview:
         items: Dict[str, DeletePreviewItem] = {}
@@ -40,8 +41,21 @@ class DeletionService:
                 continue
             keeper_album = albums[keeper_id]
             selection_source = (resolution_states or {}).get(cluster_id, cluster.resolution_state)
+            selected_folder_ids = (
+                delete_selections.get(cluster_id)
+                if delete_selections and cluster_id in delete_selections
+                else {
+                    folder_id
+                    for folder_id in cluster.folder_ids
+                    if folder_id != keeper_id and folder_id not in excluded
+                }
+            )
             for folder_id in cluster.folder_ids:
-                if folder_id == keeper_id or folder_id in excluded:
+                if (
+                    folder_id == keeper_id
+                    or folder_id in excluded
+                    or folder_id not in selected_folder_ids
+                ):
                     continue
                 album = albums[folder_id]
                 preview_item = DeletePreviewItem(

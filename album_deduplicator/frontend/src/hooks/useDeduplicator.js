@@ -9,6 +9,7 @@ export function useDeduplicator() {
   const [summary, setSummary] = useState(null);
   const [clusters, setClusters] = useState([]);
   const [decisions, setDecisions] = useState({});
+  const [deleteSelections, setDeleteSelections] = useState({});
   const [preview, setPreview] = useState({ items: [], total_count: 0, total_size_mb: 0, auto_selected_count: 0, manual_selected_count: 0 });
   const [selectedClusterId, setSelectedClusterId] = useState(null);
   const [error, setError] = useState("");
@@ -32,6 +33,13 @@ export function useDeduplicator() {
             if (!(c.cluster_id in next)) {
               next[c.cluster_id] = c.resolution_state === "auto" ? c.recommended_keeper_id : null;
             }
+          });
+          return next;
+        });
+        setDeleteSelections((prev) => {
+          const next = { ...prev };
+          clustersData.clusters.forEach((cluster) => {
+            next[cluster.cluster_id] = cluster.selected_delete_folder_ids ?? [];
           });
           return next;
         });
@@ -69,12 +77,35 @@ export function useDeduplicator() {
       refreshData(sessionId, selectedTab);
     }
   }, [selectedTab, sessionId, status, refreshData]);
-  const handleDecision = async (clusterId, keeperId) => {
+  const handleDecision = async (clusterId, keeperId, deleteFolderIds = null) => {
     if (!sessionId) return;
+    const cluster = clusters.find((item) => item.cluster_id === clusterId);
+    const currentKeeperId = decisions[clusterId] ?? (cluster?.resolution_state === "auto" ? cluster?.recommended_keeper_id : null);
+    const visibleFolderIds = cluster
+      ? cluster.albums.filter((album) => !album.is_deleted).map((album) => album.folder_id)
+      : [];
     const nextDecisions = { ...decisions, [clusterId]: keeperId };
+    let nextDeleteFolderIds = [];
+    if (keeperId) {
+      if (deleteFolderIds !== null) {
+        nextDeleteFolderIds = deleteFolderIds.filter((folderId) => folderId !== keeperId);
+      } else if (currentKeeperId === keeperId && Object.prototype.hasOwnProperty.call(deleteSelections, clusterId)) {
+        nextDeleteFolderIds = (deleteSelections[clusterId] ?? []).filter((folderId) => folderId !== keeperId);
+      } else {
+        nextDeleteFolderIds = visibleFolderIds.filter((folderId) => folderId !== keeperId);
+      }
+    }
+    const nextDeleteSelections = { ...deleteSelections, [clusterId]: nextDeleteFolderIds };
     setDecisions(nextDecisions);
+    setDeleteSelections(nextDeleteSelections);
     try {
-      const payload = { decisions: Object.entries(nextDecisions).map(([cid, kid]) => ({ cluster_id: cid, keeper_id: kid })) };
+      const payload = {
+        decisions: Object.entries(nextDecisions).map(([cid, kid]) => ({
+          cluster_id: cid,
+          keeper_id: kid,
+          delete_folder_ids: kid ? (nextDeleteSelections[cid] ?? []) : [],
+        })),
+      };
       const nextPreview = await api.updateDecisions(sessionId, payload);
       setPreview(nextPreview);
       await refreshData(sessionId, selectedTab);
@@ -84,7 +115,7 @@ export function useDeduplicator() {
   };
   return {
     sessionId, setSessionId, status, setStatus, progress, summary, clusters, setClusters,
-    decisions, setDecisions, preview, setPreview, selectedClusterId, setSelectedClusterId,
+    decisions, setDecisions, deleteSelections, setDeleteSelections, preview, setPreview, selectedClusterId, setSelectedClusterId,
     error, setError, successSummary, setSuccessSummary, selectedTab, setSelectedTab,
     refreshData, handleDecision
   };

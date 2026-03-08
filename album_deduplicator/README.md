@@ -7,6 +7,9 @@
 - `FastAPI` משמש כ-backend רשמי עם sessions, `SSE` להתקדמות, ו-DTOs יציבים לפרונטנד.
 - `Electron` משמש כמעטפת desktop הראשית: הוא פותח חלון, מרים את ה-backend, ומספק יכולות מערכת דרך `preload bridge`.
 - `React` משמש כ-renderer הראשי החדש, עם tabs של `בטוח למחיקה`, `דורש סקירה`, ו-`כל התוצאות`.
+- מסך הסריקה מציג roots בשדות נפרדים עם הוספה/הסרה ברורה, במקום שדה טקסט יחיד.
+- סביבת ה-review מאפשרת לפתוח כל תיקייה מיידית, לסמן עותקים ספציפיים למחיקה, או לבצע מחיקה בודדת מיידית מתוך ה-cluster.
+- ה-layout עודכן לגלילה מלאה ויציבה בכל הפאנלים, גם כאשר פס ה-preview התחתון פתוח.
 - ה-ML המקומי פעיל כברירת מחדל ומשולב תמיד עם הציון האלגוריתמי:
   - `base_score = 0.45 * algorithmic + 0.55 * ml`
 - `Gemini` הוא enhancement בלבד לזוגות גבוליים:
@@ -112,6 +115,8 @@ python main.py "C:/Music" "D:/Archive" -p "C:/Music"
 - `POST /api/analysis-sessions/{session_id}/decisions`
 - `GET /api/analysis-sessions/{session_id}/delete-preview`
 - `POST /api/analysis-sessions/{session_id}/delete-executions`
+- `POST /api/analysis-sessions/{session_id}/delete-single`
+- `POST /api/system/open-explorer`
 
 ## בדיקות
 

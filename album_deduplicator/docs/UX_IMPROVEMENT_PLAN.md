@@ -62,9 +62,9 @@
 ## 4. משימות לפיתוח (Frontend - React + CSS)
 
 - [ ] **הטמעת ספריות UI מודרניות:** שימוש ב-Tailwind CSS או ספריה כמו Radix UI / MUI לעיצוב נקי ונגיש.
-- [ ] **פיתוח קומפוננטת Visual Diff:** יצירת מנגנון שמשווה שני אוביקטי `AlbumSummary` ומדגיש את השדות השונים (Bitrate, File Count, Cover Art) בצבעים תואמים.
-- [ ] **שילוב פקודות מערכת מתוך הדפדפן:** 
-    *   הוספת Endpoint ב-FastAPI: `POST /api/system/open-explorer` שיקבל נתיב ויפתח אותו ב-Windows Explorer (באמצעות `os.startfile`).
-    *   הוספת Endpoint למחיקה בודדת: `POST /api/analysis-sessions/{id}/delete-single` לטובת מחיקה מיידית ללא המתנה לסוף.
-- [ ] **הטמעת אירועי מקלדת (Keyboard Listeners):** הוספת Hook שמנהל את הניווט באמצעות חיצים ברמת ה-App.
-- [ ] **עיצוב מחדש של ה-Progress Bar:** המרה לסדרת שלבים ויזואלית (Steps) עם טקסטים דינמיים מתוך ה-SSE events.
+- [x] **פיתוח קומפוננטת Visual Diff:** נבנתה תצוגת השוואה רוחבית שמדגישה שדות עדיפים/חלשים בין כל עותקי ה-`AlbumSummary` בקבוצה.
+- [x] **שילוב פקודות מערכת מתוך הדפדפן:** 
+    *   נוסף Endpoint ב-FastAPI: `POST /api/system/open-explorer` לפתיחת נתיב ב-Windows Explorer.
+    *   נוסף Endpoint למחיקה בודדת: `POST /api/analysis-sessions/{id}/delete-single` לטובת מחיקה מיידית ללא המתנה לסוף.
+- [x] **הטמעת אירועי מקלדת (Keyboard Listeners):** קיים Hook שמנהל ניווט בין clusters, בחירת keeper, skip, פתיחה ב-Explorer וסימון למחיקה.
+- [x] **עיצוב מחדש של ה-Progress Bar:** מסך הסריקה מציג כעת שלבים ויזואליים עם טקסטים דינמיים מתוך ה-progress events.

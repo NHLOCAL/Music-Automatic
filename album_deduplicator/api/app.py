@@ -158,6 +158,11 @@ def create_app() -> FastAPI:
         preview = store.apply_decisions(
             session_id,
             {decision.cluster_id: decision.keeper_id for decision in payload.decisions},
+            {
+                decision.cluster_id: set(decision.delete_folder_ids or [])
+                for decision in payload.decisions
+                if decision.delete_folder_ids is not None
+            },
         )
         return _preview_model(preview)
 
@@ -290,6 +295,7 @@ def _cluster_model(session, cluster_id: str) -> ClusterSummaryModel:
         cluster_id=cluster.cluster_id,
         confidence_bucket=cluster.confidence_bucket,
         recommended_keeper_id=cluster.recommended_keeper_id,
+        selected_delete_folder_ids=sorted(session.delete_selections.get(cluster_id, set())),
         human_summary=cluster.human_summary,
         resolution_state=cluster.resolution_state,
         recommended_keeper_reason=cluster.recommended_keeper_reason,

@@ -120,6 +120,7 @@ class ClusterSummaryModel(BaseModel):
     cluster_id: str
     confidence_bucket: Literal["safe", "review"]
     recommended_keeper_id: Optional[str]
+    selected_delete_folder_ids: List[str] = Field(default_factory=list)
     human_summary: str
     resolution_state: Literal["auto", "user_selected", "skipped", "deleted"]
     recommended_keeper_reason: Optional[str] = None
@@ -139,6 +140,7 @@ class ClusterListResponse(BaseModel):
 class DecisionItem(BaseModel):
     cluster_id: str
     keeper_id: Optional[str] = None
+    delete_folder_ids: Optional[List[str]] = None
 
 
 class DecisionsRequest(BaseModel):

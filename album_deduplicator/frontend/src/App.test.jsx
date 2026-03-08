@@ -96,6 +96,7 @@ const clusterResponse = {
       cluster_id: "cluster-1",
       confidence_bucket: "safe",
       recommended_keeper_id: "folder-keep",
+      selected_delete_folder_ids: ["folder-drop"],
       human_summary: 'נמצאו עותקים כמעט זהים. מומלץ לשמור את "Best".',
       resolution_state: "auto",
       recommended_keeper_reason: "האלבום המומלץ נמצא בתיקייה המועדפת.",
@@ -205,6 +206,8 @@ describe("App", () => {
 
     expect(screen.getByRole("button", { name: "התחל סריקה חכמה" })).toBeInTheDocument();
     expect(screen.getByText("React + API")).toBeInTheDocument();
+    expect(screen.getByLabelText("ספריית מקור")).toBeInTheDocument();
+    expect(screen.getByLabelText("ספריית ארכיון")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "הגדרות מתקדמות" }));
     expect(screen.getByText("הפעל אימות AI (Gemini) למקרים גבוליים")).toBeInTheDocument();
@@ -218,11 +221,12 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "בחר תיקיות" }));
+    fireEvent.click(screen.getByRole("button", { name: "בחר כמה תיקיות" }));
 
     await waitFor(() =>
-      expect(screen.getByLabelText("תיקיות לסריקה")).toHaveValue("C:\\Music\nD:\\Archive"),
+      expect(screen.getByLabelText("ספריית מקור")).toHaveValue("C:\\Music"),
     );
+    expect(screen.getByLabelText("ספריית ארכיון")).toHaveValue("D:\\Archive");
     expect(screen.getByText("Electron + React")).toBeInTheDocument();
   });
 
@@ -247,8 +251,11 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText("תיקיות לסריקה"), {
-      target: { value: "C:\\Music\nD:\\Archive" },
+    fireEvent.change(screen.getByLabelText("ספריית מקור"), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.change(screen.getByLabelText("ספריית ארכיון"), {
+      target: { value: "D:\\Archive" },
     });
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
 
@@ -262,6 +269,6 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "מחק עכשיו" }));
 
     expect(screen.getByText("העברה בודדת לסל המחזור")).toBeInTheDocument();
-    expect(screen.getByText('התיקייה "Archive Copy" תועבר מיד לסל המחזור.')).toBeInTheDocument();
+    expect(screen.getByText('התיקייה "Archive Copy" תועבר מיד לסל המחזור בלי להמתין לאישור המרוכז.')).toBeInTheDocument();
   });
 });

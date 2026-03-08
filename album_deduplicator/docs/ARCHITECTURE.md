@@ -115,7 +115,7 @@
   - חוזי API מבוססי `Pydantic`.
 - `session_store.py`
   - ניהול `analysis sessions` בזיכרון.
-  - שמירת progress, snapshot, decisions ו-preview.
+  - שמירת progress, snapshot, decisions, סימוני מחיקה פרטניים ו-preview.
   - background execution לכל session.
 
 ### `frontend/electron`
@@ -142,11 +142,15 @@
   - מזהה אם היישום רץ בתוך `Electron`
   - יצירת session.
   - האזנה ל-`SSE`.
+  - ניהול roots בשדות נפרדים עם add/remove ברור.
   - הצגת tabs:
     - `בטוח למחיקה`
     - `דורש סקירה`
     - `כל התוצאות`
   - שינוי keeper ידני.
+  - סימון פרטני של עותקים למחיקה.
+  - פתיחה מיידית של נתיבים ב-Explorer.
+  - מחיקה בודדת מיידית מתוך ה-cluster.
   - delete confirmation.
 - `src/styles.css`
   - שפה חזותית מלאה של ה-UI.
@@ -264,7 +268,9 @@ final_score = base_score
 
 - clusters ב-`safe` מקבלים החלטה ראשונית אוטומטית:
   - `decision = recommended_keeper_id`
+- clusters ב-`safe` מסמנים כברירת מחדל את כל שאר חברי ה-cluster למחיקה.
 - clusters ב-`review` מתחילים ב-`skip`
+- המשתמש יכול לבטל או להוסיף סימוני מחיקה פרטניים לכל cluster
 - `DeletionService` יוצר preview מרוכז של מה יימחק ומה יישמר
 
 ### 7. ביצוע מחיקה
@@ -367,14 +373,24 @@ final_score = base_score
 - breakdown של pairs
 - reason codes
 - recommended keeper
+- selected delete folder ids
 
 ### `POST /api/analysis-sessions/{session_id}/decisions`
 
 שומר החלטות user:
 
 - `cluster_id -> keeper_id | null`
+- `cluster_id -> delete_folder_ids[]`
 
 ומחזיר preview חדש.
+
+### `POST /api/analysis-sessions/{session_id}/delete-single`
+
+מבצע מחיקה מיידית של תיקייה בודדת מתוך cluster, כל עוד נבחר keeper פעיל.
+
+### `POST /api/system/open-explorer`
+
+פותח path ישירות ב-Windows Explorer לטובת אימות ידני מהיר.
 
 ### `GET /api/analysis-sessions/{session_id}/delete-preview`
 
@@ -411,8 +427,10 @@ final_score = base_score
 
 ### מסך התחלה
 
-- הזנת roots
+- הזנת roots בשדות נפרדים
 - root מועדף
+- כפתורי הוספה/הסרה לשדות roots
+- בחירת תיקיות native ב-Electron
 - כפתור ניתוח אחד
 - advanced drawer נסתר
 
@@ -421,7 +439,8 @@ final_score = base_score
 - ברירת מחדל: tab של `בטוח למחיקה`
 - כל cluster מוצג כ-card
 - הפעולה הראשית היא בחירת keeper
-- אין selectbox פר pair
+- סימון פרטני של כל עותק למחיקה או להשארה
+- פתיחת תיקיות ומחיקה בודדת זמינות ישירות מכל כרטיס עותק
 
 ### side panel
 

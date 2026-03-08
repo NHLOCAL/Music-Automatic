@@ -2,7 +2,8 @@ import { useEffect } from "react";
 export function useKeyboardShortcuts({
   status, clusters, selectedCluster, selectedClusterId, setSelectedClusterId,
   currentKeeperId, focusedAlbumId, setFocusedAlbumId, handleDecision,
-  preview, setBulkConfirmOpen, singleDeleteTarget, setSingleDeleteTarget, executeSingleDelete, openExplorer
+  preview, setBulkConfirmOpen, singleDeleteTarget, setSingleDeleteTarget, executeSingleDelete, openExplorer,
+  toggleDeleteSelection,
 }) {
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -40,7 +41,7 @@ export function useKeyboardShortcuts({
       }
       if (event.key === " ") {
         event.preventDefault();
-        handleDecision(selectedCluster.cluster_id, null);
+        handleDecision(selectedCluster.cluster_id, null, []);
         return;
       }
       if (event.key === "Enter") {
@@ -61,9 +62,18 @@ export function useKeyboardShortcuts({
         if (candidate) {
           setSingleDeleteTarget({ clusterId: selectedCluster.cluster_id, folderId: candidate.folder_id, name: candidate.name });
         }
+        return;
+      }
+      if (event.key.toLowerCase() === "x") {
+        event.preventDefault();
+        const candidate = selectedCluster.albums.find((album) => album.folder_id === focusedAlbumId)
+          ?? selectedCluster.albums.find((album) => !album.is_deleted && album.folder_id !== currentKeeperId);
+        if (candidate && candidate.folder_id !== currentKeeperId) {
+          toggleDeleteSelection(selectedCluster.cluster_id, candidate.folder_id);
+        }
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [clusters, currentKeeperId, focusedAlbumId, preview.total_count, selectedCluster, singleDeleteTarget, status, executeSingleDelete, handleDecision, openExplorer, setBulkConfirmOpen, setFocusedAlbumId, setSelectedClusterId, setSingleDeleteTarget]);
+  }, [clusters, currentKeeperId, focusedAlbumId, preview.total_count, selectedCluster, singleDeleteTarget, status, executeSingleDelete, handleDecision, openExplorer, setBulkConfirmOpen, setFocusedAlbumId, setSelectedClusterId, setSingleDeleteTarget, toggleDeleteSelection]);
 }   

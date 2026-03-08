@@ -36,6 +36,11 @@ export function formatMetricValue(type, value) {
   if (type === "ratio") return formatRatio(value);
   if (type === "bitrate") return formatBitrate(value);
   if (type === "size") return formatSizeMb(value);
+  if (type === "duration") return formatDuration(value);
+  if (type === "count") {
+    if (value === null || value === undefined) return "N/A";
+    return String(value);
+  }
   if (value === null || value === undefined) return "N/A";
   return String(value);
 }
@@ -74,4 +79,30 @@ export function buildTrackComparisonRows(albums) {
     });
   });
   return Array.from(rows.values()).sort((a, b) => a.title.localeCompare(b.title, "he"));
+}
+
+export function getPairNarratives(pairs, albums) {
+  const albumNames = Object.fromEntries(albums.map((album) => [album.folder_id, album.name]));
+  return pairs.map((pair) => {
+    const finalScore = Number(pair.final_score ?? pair.base_score ?? 0);
+    const isSafe = finalScore >= 97 || pair.is_identical_by_hash;
+    const scoreLabel = pair.is_identical_by_hash ? "זהים לחלוטין" : `${finalScore.toFixed(1)}% דמיון`;
+    let description = "זוהו קווי דמיון משמעותיים בין שני העותקים.";
+    if (pair.is_identical_by_hash) {
+      description = "הקבצים והמבנה תואמים לחלוטין, ולכן אפשר להתייחס אליהם כאל עותקים זהים.";
+    } else if (pair.gemini_reason) {
+      description = pair.gemini_reason;
+    } else if (pair.reason_codes?.includes("safe_threshold")) {
+      description = "הציון הסופי עבר את סף המחיקה הבטוחה, כך שהמערכת בטוחה יחסית בהמלצה.";
+    } else if (pair.reason_codes?.includes("review_threshold")) {
+      description = "העותקים דומים מאוד, אבל נדרש אישור משתמש לפני מחיקה כי הזיהוי עדיין גבולי.";
+    }
+    return {
+      id: pair.pair_id,
+      title: `${albumNames[pair.folder1_id] ?? "עותק A"} מול ${albumNames[pair.folder2_id] ?? "עותק B"}`,
+      description,
+      scoreLabel,
+      tone: isSafe ? "success" : "warning",
+    };
+  });
 }
