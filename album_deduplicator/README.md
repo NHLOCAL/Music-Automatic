@@ -47,6 +47,10 @@
 
 - [ARCHITECTURE.md](c:/Users/me/Documents/GitHub/Music-Automatic/album_deduplicator/docs/ARCHITECTURE.md)
 
+לתיעוד מסודר של ולידציית מודל ה-`ML`, מגבלות ה-dataset הנוכחי, והמטריקה הנכונה לקביעת סף `safe delete`:
+
+- [ML_VALIDATION.md](c:/Users/me/Documents/GitHub/Music-Automatic/album_deduplicator/docs/ML_VALIDATION.md)
+
 ## מבנה עיקרי
 
 - `music_dup_lib/services/`
