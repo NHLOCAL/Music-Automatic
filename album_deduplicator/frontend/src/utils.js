@@ -326,7 +326,9 @@ export function buildDeletionWorkflowModel(clusters = [], preview = null, decisi
       return left.order - right.order;
     });
 
-  const visibleGroups = allGroups.filter((group) => group.pendingCount > 0);
+  const pendingGroups = allGroups.filter((group) => group.pendingCount > 0 || group.failedCount > 0);
+  const historyGroups = allGroups.filter((group) => group.deletedCount > 0);
+  const visibleGroups = allGroups.filter((group) => group.pendingCount > 0 || group.deletedCount > 0 || group.failedCount > 0);
 
   const deletedCount = allGroups.reduce((sum, group) => sum + group.deletedCount, 0);
   const deletedSizeMb = allGroups.reduce((sum, group) => sum + group.deletedSizeMb, 0);
@@ -339,6 +341,8 @@ export function buildDeletionWorkflowModel(clusters = [], preview = null, decisi
   return {
     groups: visibleGroups,
     allGroups,
+    pendingGroups,
+    historyGroups,
     summary: {
       pendingCount: safePreview.total_count ?? previewItems.length,
       pendingSizeMb: safePreview.total_size_mb ?? 0,
@@ -352,6 +356,8 @@ export function buildDeletionWorkflowModel(clusters = [], preview = null, decisi
       unresolvedClusters,
       partiallyCompletedClusters,
       visibleGroupCount: visibleGroups.length,
+      pendingGroupCount: pendingGroups.length,
+      historyGroupCount: historyGroups.length,
       allGroupCount: allGroups.length,
     },
     previewByFolderId,
