@@ -1,6 +1,6 @@
 export function formatPercent(value) {
   if (value === null || value === undefined) return "ללא נתון";
-  return `${Number(value).toFixed(1)}%`;
+  return `${Number(value).toFixed(1)}/100`;
 }
 export function formatRatio(value) {
   if (value === null || value === undefined) return "ללא נתון";
@@ -23,14 +23,16 @@ export function formatSizeMb(value) {
   if (value >= 1024) return `${(value / 1024).toFixed(2)} GB`;
   return `${Number(value).toFixed(1)} MB`;
 }
+
 export const METRICS = [
-  { key: "quality_score", label: "איכות כללית", type: "percent" },
-  { key: "avg_bitrate", label: "קצב נתונים ממוצע", type: "bitrate" },
-  { key: "file_count", label: "מספר קבצים", type: "count" },
-  { key: "total_size_mb", label: "גודל כולל", type: "size" },
-  { key: "lossless_ratio", label: "קבצים באיכות מקור", type: "ratio" },
-  { key: "lyrics_ratio", label: "קבצים עם מילים", type: "ratio" },
+  { key: "quality_score", label: "דירוג איכות מומלץ", type: "percent" },
+  { key: "avg_bitrate", label: "איכות שמע (Bitrate)", type: "bitrate" },
+  { key: "file_count", label: "כמות קבצים", type: "count" },
+  { key: "total_size_mb", label: "גודל התיקייה", type: "size" },
+  { key: "lossless_ratio", label: "קובצי אודיו ללא כיווץ", type: "ratio" },
+  { key: "lyrics_ratio", label: "מילים מובנות לשירים", type: "ratio" },
 ];
+
 export function formatMetricValue(type, value) {
   if (type === "percent") return formatPercent(value);
   if (type === "ratio") return formatRatio(value);
@@ -44,9 +46,11 @@ export function formatMetricValue(type, value) {
   if (value === null || value === undefined) return "ללא נתון";
   return String(value);
 }
+
 export function hasClusterDecision(decisions, clusterId) {
   return Object.prototype.hasOwnProperty.call(decisions, clusterId);
 }
+
 export function getActiveKeeperId(cluster, decisions = {}) {
   if (!cluster) return null;
   if (hasClusterDecision(decisions, cluster.cluster_id)) {
@@ -54,6 +58,7 @@ export function getActiveKeeperId(cluster, decisions = {}) {
   }
   return cluster.recommended_keeper_id ?? null;
 }
+
 export function getClusterDisplayTitle(cluster) {
   if (!cluster?.albums?.length) return "קבוצת השוואה";
   const names = Array.from(
@@ -66,39 +71,30 @@ export function getClusterDisplayTitle(cluster) {
   );
   if (!names.length) return "קבוצת השוואה";
   if (names.length === 1) return names[0];
-  if (names.length === 2) return `${names[0]} מול ${names[1]}`;
-  return `${names[0]} מול ${names[1]} ועוד ${names.length - 2}`;
+  if (names.length === 2) return `${names[0]} vs ${names[1]}`;
+  return `${names[0]} ועוד ${names.length - 1} עותקים`;
 }
 
 export function getClusterListSubtitle(cluster) {
   const albumCount = cluster?.albums?.filter((album) => !album.is_deleted).length ?? 0;
-  const bucket = cluster?.confidence_bucket;
-  if (bucket === "safe") {
-    return `${albumCount} עותקים כמעט זהים. אפשר לאשר במהירות.`;
-  }
-  if (bucket === "review") {
-    return `${albumCount} עותקים דומים. כדאי לבדוק את ההבדלים לפני מחיקה.`;
-  }
-  return `${albumCount} עותקים להשוואה.`;
+  return `${albumCount} עותקים להשוואה`;
 }
 
 export function getClusterStatusMeta(cluster, hasDecision) {
   if (!cluster) {
-    return { label: "ממתין", tone: "neutral" };
+    return { label: "ממתין לסקירה", tone: "neutral" };
   }
-
   if (cluster.confidence_bucket === "safe") {
     return cluster.resolution_state === "auto" || hasDecision
       ? { label: "בטוח למחיקה", tone: "success" }
-      : { label: "מוכן לאישור", tone: "warning" };
+      : { label: "דורש אישור מחיקה", tone: "warning" };
   }
-
   if (hasDecision) {
-    return { label: "נבדק ידנית", tone: "neutral" };
+    return { label: "נבדק ומוכן", tone: "success" };
   }
-
-  return { label: "ממתין לבדיקה", tone: "warning" };
+  return { label: "ממתין לסקירה", tone: "neutral" };
 }
+
 export function getMetricWinners(albums) {
   const winners = {};
   METRICS.forEach((metric) => {
@@ -116,6 +112,7 @@ export function getMetricWinners(albums) {
   });
   return winners;
 }
+
 export function buildTrackComparisonRows(albums) {
   const rows = new Map();
   albums.forEach((album) => {
@@ -125,7 +122,7 @@ export function buildTrackComparisonRows(albums) {
         rows.set(key, {
           key,
           title: track.title || track.filename,
-          artist: track.artist || "ללא אמן",
+          artist: track.artist || "אמן לא ידוע",
           duration: track.duration,
           entries: {},
         });
@@ -133,7 +130,7 @@ export function buildTrackComparisonRows(albums) {
       rows.get(key).entries[album.folder_id] = {
         filename: track.filename,
         title: track.title || track.filename,
-        artist: track.artist || "ללא אמן",
+        artist: track.artist || "אמן לא ידוע",
         duration: track.duration,
         size_mb: track.size_mb,
         bitrate: track.bitrate,
@@ -157,7 +154,6 @@ export function getTrackFieldTone(row, albumIds, field) {
     .filter(Boolean)
     .map((entry) => normalizeTrackValue(field, entry[field]))
     .filter((value) => value !== null);
-
   if (values.length <= 1) return "same";
   return new Set(values).size === 1 ? "same" : "different";
 }
@@ -167,30 +163,4 @@ export function getTrackRowTone(row, albumIds) {
   return comparableFields.some((field) => getTrackFieldTone(row, albumIds, field) === "different")
     ? "different"
     : "same";
-}
-
-export function getPairNarratives(pairs, albums) {
-  const albumNames = Object.fromEntries(albums.map((album) => [album.folder_id, album.name]));
-  return pairs.map((pair) => {
-    const finalScore = Number(pair.final_score ?? pair.base_score ?? 0);
-    const isSafe = finalScore >= 97 || pair.is_identical_by_hash;
-    const scoreLabel = pair.is_identical_by_hash ? "זהים לחלוטין" : `${finalScore.toFixed(1)}% דמיון`;
-    let description = "זוהו קווי דמיון משמעותיים בין שני העותקים.";
-    if (pair.is_identical_by_hash) {
-      description = "הקבצים והמבנה תואמים לחלוטין, ולכן אפשר להתייחס אליהם כאל עותקים זהים.";
-    } else if (pair.gemini_reason) {
-      description = pair.gemini_reason;
-    } else if (pair.reason_codes?.includes("safe_threshold")) {
-      description = "הציון הסופי עבר את סף המחיקה הבטוחה, כך שהמערכת בטוחה יחסית בהמלצה.";
-    } else if (pair.reason_codes?.includes("review_threshold")) {
-      description = "העותקים דומים מאוד, אבל נדרש אישור משתמש לפני מחיקה כי הזיהוי עדיין גבולי.";
-    }
-    return {
-      id: pair.pair_id,
-      title: `${albumNames[pair.folder1_id] ?? "עותק A"} מול ${albumNames[pair.folder2_id] ?? "עותק B"}`,
-      description,
-      scoreLabel,
-      tone: isSafe ? "success" : "warning",
-    };
-  });
 }
