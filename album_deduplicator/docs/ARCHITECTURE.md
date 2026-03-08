@@ -164,7 +164,8 @@
   - מחיקה בודדת מיידית מתוך ה-cluster.
   - delete confirmation.
 - `src/styles.css`
-  - שפה חזותית מלאה של ה-UI.
+  - entrypoint של הסטיילים בפרונטאנד.
+  - מייבא partials תחת `src/styles/` עבור `base`, מסכי setup/scan/summary, סביבת העבודה, ומסך finalize.
 - `src/desktop.js`
   - abstraction ליכולות desktop ול-runtime metadata.
 - `src/App.test.jsx`
