@@ -6,16 +6,17 @@ export function DeletePreview({ preview, onConfirm, isExecuting }) {
   if (preview.total_count === 0) return null;
   
   return (
-    <div className="floating-action-bar">
+    <div className="fab-container">
       <div className="fab-info">
-        <div className="fab-count">{preview.total_count}</div>
-        <div className="fab-text">
-          <h4>מוכנים להעברה לסל המחזור</h4>
-          <p>יתפנו כ-{formatSizeMb(preview.total_size_mb)} במצטבר</p>
+        <div className="fab-badge">{preview.total_count}</div>
+        <div>
+           <div style={{ fontWeight: 600, fontSize: '1rem' }}>מוכנים להעברה לסל המחזור</div>
+           <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>חיסכון צפוי: {formatSizeMb(preview.total_size_mb)}</div>
         </div>
       </div>
-      <Button variant="danger" onClick={onConfirm} disabled={isExecuting}>
-        {isExecuting ? "מעביר לסל..." : "העבר לסל (Enter)"}
+      
+      <Button variant="danger" size="lg" onClick={onConfirm} disabled={isExecuting}>
+        {isExecuting ? "מבצע..." : "העבר לסל המחזור"}
       </Button>
     </div>
   );

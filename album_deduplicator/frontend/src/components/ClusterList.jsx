@@ -1,6 +1,6 @@
 import React from "react";
 import { Badge } from "./UI";
-import { getClusterDisplayTitle, getClusterListSubtitle, getClusterStatusMeta, hasClusterDecision } from "../utils";
+import { getClusterDisplayTitle, getClusterStatusMeta, hasClusterDecision } from "../utils";
 
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
   const filteredClusters = clusters.filter(c => {
@@ -9,24 +9,26 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
   });
 
   return (
-    <div className="sidebar">
-      <div className="sidebar-header">
-        <div className="segmented-control">
-          <div className={`segment ${selectedTab === 'safe' ? 'active' : ''}`} onClick={() => setSelectedTab('safe')}>
+    <div className="cluster-sidebar">
+      <div className="sidebar-tabs">
+        <div className="tab-group">
+          <div className={`tab-item ${selectedTab === 'safe' ? 'active' : ''}`} onClick={() => setSelectedTab('safe')}>
             בטוחים
           </div>
-          <div className={`segment ${selectedTab === 'review' ? 'active' : ''}`} onClick={() => setSelectedTab('review')}>
+          <div className={`tab-item ${selectedTab === 'review' ? 'active' : ''}`} onClick={() => setSelectedTab('review')}>
             לסקירה
           </div>
-          <div className={`segment ${selectedTab === 'all' ? 'active' : ''}`} onClick={() => setSelectedTab('all')}>
-            כולם
+          <div className={`tab-item ${selectedTab === 'all' ? 'active' : ''}`} onClick={() => setSelectedTab('all')}>
+            הכל
           </div>
         </div>
       </div>
-      <div className="cluster-list">
+
+      <div className="cluster-scroll">
         {filteredClusters.length === 0 ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-            אין אלבומים בקטגוריה זו.
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+            <div style={{ marginBottom: '8px', fontSize: '1.5rem' }}>✓</div>
+            אין פריטים להציג בקטגוריה זו.
           </div>
         ) : (
           filteredClusters.map((cluster) => {
@@ -35,15 +37,17 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
             const statusMeta = getClusterStatusMeta(cluster, hasDecision && decisions[cluster.cluster_id] !== null);
             
             return (
-              <div key={cluster.cluster_id} className={`cluster-item ${isActive ? "active" : ""}`} onClick={() => setSelectedClusterId(cluster.cluster_id)}>
-                <div className="cluster-title" title={getClusterDisplayTitle(cluster)}>
+              <div 
+                key={cluster.cluster_id} 
+                className={`cluster-card ${isActive ? "active" : ""}`} 
+                onClick={() => setSelectedClusterId(cluster.cluster_id)}
+              >
+                <div className="cluster-name" title={getClusterDisplayTitle(cluster)}>
                   {getClusterDisplayTitle(cluster)}
                 </div>
-                <div className="cluster-subtitle" title={cluster.human_summary}>
-                  {getClusterListSubtitle(cluster)}
-                </div>
-                <div className="cluster-meta">
-                  <Badge tone={isActive ? "neutral" : statusMeta.tone}>{statusMeta.label}</Badge>
+                <div className="cluster-info">
+                  <span>{cluster.albums.filter(a => !a.is_deleted).length} עותקים</span>
+                  <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
                 </div>
               </div>
             );

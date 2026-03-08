@@ -3,38 +3,38 @@ import { Button } from "./UI";
 
 export function SummaryScreen({ summary, onStartReview, onBackToSetup }) {
   if (!summary?.counts) return null;
-
   const { safe_clusters, review_clusters } = summary.counts;
-  const total = safe_clusters + review_clusters;
-
+  
   return (
     <div className="centered-view">
-      <div className="summary-card">
-        <div className="icon-hero" style={{ color: 'var(--accent-success)', background: 'var(--accent-success-bg)' }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      <div className="summary-container">
+        <div className="success-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
         </div>
-        <h1>הסריקה הושלמה בהצלחה</h1>
-        <p>נמצאו סך הכל {total} קבוצות של אלבומים כפולים.</p>
         
-        <div className="summary-stats">
-          <div className="stat-box success">
-            <div className="stat-number">{safe_clusters}</div>
-            <div className="stat-label">בטוחים למחיקה</div>
+        <h1 style={{ fontSize: '2rem', marginBottom: '16px' }}>הסריקה הושלמה!</h1>
+        <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)' }}>
+           מערכת ה-AI סיימה לנתח את הקבצים. להלן התוצאות:
+        </p>
+
+        <div className="summary-stats-grid">
+          <div className="stat-card highlight">
+            <div className="stat-value">{safe_clusters}</div>
+            <div className="stat-label">עותקים בטוחים למחיקה</div>
           </div>
-          <div className="stat-box warning">
-            <div className="stat-number">{review_clusters}</div>
+          <div className="stat-card">
+            <div className="stat-value" style={{ color: 'var(--color-warning-text)' }}>{review_clusters}</div>
             <div className="stat-label">דורשים סקירה</div>
           </div>
         </div>
 
-        <div className="summary-actions">
+        <div style={{ display: 'flex', gap: '16px' }}>
           <Button variant="secondary" size="lg" style={{ flex: 1 }} onClick={onBackToSetup}>
-            חזרה להתחלה
+            סריקה חדשה
           </Button>
-          <Button variant="primary" size="lg" style={{ flex: 1 }} onClick={onStartReview}>
+          <Button variant="primary" size="lg" style={{ flex: 2 }} onClick={onStartReview}>
             התחל לעבור על התוצאות
           </Button>
         </div>
