@@ -128,7 +128,8 @@ export function getMetricWinners(albums) {
 export function buildTrackComparisonRows(albums) {
   const rows = new Map();
   albums.forEach((album) => {
-    album.tracks.forEach((track) => {
+    const tracks = Array.isArray(album.tracks) ? album.tracks : [];
+    tracks.forEach((track) => {
       const key = [track.title || track.filename, track.artist || "", Math.round(track.duration || 0)].join("|");
       if (!rows.has(key)) {
         rows.set(key, {

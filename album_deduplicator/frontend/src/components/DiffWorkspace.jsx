@@ -43,11 +43,16 @@ export function DiffWorkspace({
   const metricWinners = useMemo(() => getMetricWinners(visibleAlbums), [visibleAlbums]);
   const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
   const albumIds = visibleAlbums.map((album) => album.folder_id);
-  
-  // Dynamic grid style based on number of albums
-  const trackGridStyle = {
-    gridTemplateColumns: `minmax(250px, 1.2fr) repeat(${Math.max(visibleAlbums.length, 1)}, minmax(200px, 1fr))`,
-  };
+  const activeKeeperIndex = visibleAlbums.findIndex((album) => album.folder_id === currentKeeperId);
+  const activeKeeperLabel = activeKeeperIndex >= 0 ? getAlbumOrdinalLabel(activeKeeperIndex) : null;
+
+  const subtitleText = useMemo(() => {
+    if (!activeKeeperLabel) return cluster.human_summary;
+    if (cluster.confidence_bucket === "safe") {
+      return `נמצאו ${visibleAlbums.length} עותקים כמעט זהים. מומלץ לשמור את ${activeKeeperLabel} ולבדוק מולו את שאר העותקים בקבוצה.`;
+    }
+    return `נדרשת בדיקה ידנית לפני מחיקה. ההמלצה הראשונית היא לשמור את ${activeKeeperLabel} ולהשוות מולו את שאר העותקים.`;
+  }, [activeKeeperLabel, cluster.confidence_bucket, cluster.human_summary, visibleAlbums.length]);
 
   const renderMetric = (album, key, formatFn, unit = "") => {
     const isWinner = metricWinners[key] === album.folder_id;
@@ -66,17 +71,16 @@ export function DiffWorkspace({
     );
   };
 
-  const renderTrackCell = (row, albumId, rowIndex) => {
+  const renderTrackCell = (row, albumId) => {
     const entry = row.entries[albumId];
-    const rowToneClass = rowIndex % 2 === 1 ? "row-alt" : "";
-    if (!entry) return <div className={`td-cell track-data-cell missing-track ${rowToneClass}`}>חסר קובץ</div>;
+    if (!entry) return <td className="track-cell missing-track">חסר קובץ</td>;
 
     const bitrateDiff = getTrackFieldTone(row, albumIds, "bitrate") === "different";
     const sizeDiff = getTrackFieldTone(row, albumIds, "size_mb") === "different";
     const durationDiff = getTrackFieldTone(row, albumIds, "duration") === "different";
 
     return (
-      <div className={`td-cell track-data-cell ${rowToneClass}`}>
+      <td className="track-cell">
         <div className="td-main" title={entry.filename}>{entry.filename}</div>
         <div style={{ display: 'flex', gap: '8px', marginTop: '4px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
           <span className={bitrateDiff ? "diff-highlight" : ""}>{formatBitrate(entry.bitrate)}</span>
@@ -85,7 +89,7 @@ export function DiffWorkspace({
           <span>•</span>
           <span className={durationDiff ? "diff-highlight" : ""}>{formatDuration(entry.duration)}</span>
         </div>
-      </div>
+      </td>
     );
   };
 
@@ -100,7 +104,7 @@ export function DiffWorkspace({
                 {cluster.confidence_bucket === "safe" ? "בטוח למחיקה" : "לסקירה"}
               </Badge>
             </div>
-            <p>{cluster.human_summary}</p>
+            <p>{subtitleText}</p>
           </div>
           <Button variant="secondary" onClick={onBackToSetup}>סריקה חדשה</Button>
         </div>
@@ -210,42 +214,48 @@ export function DiffWorkspace({
               </div>
             </div>
 
-            <div className="track-grid-scroll">
-              <div className="tracks-grid" style={trackGridStyle}>
-                <div className="th-cell">שיר / אמן</div>
-                {visibleAlbums.map((album, albumIndex) => (
-                  <div key={album.folder_id} className="th-cell track-column-header">
-                    <span className="track-column-index">{albumIndex + 1}</span>
-                    <div className="track-column-copy">
-                      <span className="track-column-label">{getAlbumOrdinalLabel(albumIndex)}</span>
-                      <span className="track-column-name" title={album.name}>{album.name}</span>
-                    </div>
-                  </div>
-                ))}
-
-                {trackRows.length > 0 ? (
-                  trackRows.flatMap((row, rowIndex) => [
-                    (
-                      <div key={`${row.key}-meta`} className={`td-cell track-meta-cell ${rowIndex % 2 === 1 ? "row-alt" : ""}`}>
-                        <div className="td-main">{row.title}</div>
-                        <div className="td-sub">{row.artist}</div>
-                      </div>
-                    ),
-                    ...visibleAlbums.map((album) => (
-                      <React.Fragment key={`${row.key}-${album.folder_id}`}>
-                        {renderTrackCell(row, album.folder_id, rowIndex)}
-                      </React.Fragment>
-                    )),
-                  ])
-                ) : (
-                  <>
-                    <div className="track-empty-state">לא נמצאו קבצי שמע להצגה בקבוצה זו.</div>
-                    {visibleAlbums.map((album) => (
-                      <div key={`empty-${album.folder_id}`} className="track-empty-filler"></div>
+            <div className="track-table-scroll">
+              <table className="tracks-table">
+                <thead>
+                  <tr>
+                    <th className="track-head-main">שיר / אמן</th>
+                    {visibleAlbums.map((album, albumIndex) => (
+                      <th key={album.folder_id}>
+                        <div className="track-column-header">
+                          <span className="track-column-index">{albumIndex + 1}</span>
+                          <div className="track-column-copy">
+                            <span className="track-column-label">{getAlbumOrdinalLabel(albumIndex)}</span>
+                            <span className="track-column-name" title={album.name}>{album.name}</span>
+                          </div>
+                        </div>
+                      </th>
                     ))}
-                  </>
-                )}
-              </div>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trackRows.length > 0 ? (
+                    trackRows.map((row, rowIndex) => (
+                      <tr key={row.key} className={rowIndex % 2 === 1 ? "track-row-alt" : ""}>
+                        <td className="track-meta-cell">
+                          <div className="td-main">{row.title}</div>
+                          <div className="td-sub">{row.artist}</div>
+                        </td>
+                        {visibleAlbums.map((album) => (
+                          <React.Fragment key={`${row.key}-${album.folder_id}`}>
+                            {renderTrackCell(row, album.folder_id)}
+                          </React.Fragment>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="track-empty-state" colSpan={visibleAlbums.length + 1}>
+                        לא נמצאו קבצי שמע להצגה בקבוצה זו.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
 

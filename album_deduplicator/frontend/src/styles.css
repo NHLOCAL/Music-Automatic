@@ -707,23 +707,27 @@ button {
   margin-bottom: 12px;
 }
 .album-index-badge {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #111827 0%, #334155 100%);
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), transparent 45%),
+    linear-gradient(160deg, #0f172a 0%, #1d4ed8 100%);
   color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 800;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 16px 30px -18px rgba(29, 78, 216, 0.9);
   flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 .album-order-label {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--text-secondary);
 }
 .box-title {
@@ -817,27 +821,36 @@ button {
 }
 .dot.diff { background: var(--color-warning); }
 .dot.missing { background: var(--color-danger); }
-.track-grid-scroll {
+.track-table-scroll {
   overflow: auto;
   max-height: min(58vh, 640px);
   overscroll-behavior: contain;
 }
-
-.tracks-grid {
-  display: grid;
-  min-width: 100%;
+.tracks-table {
   width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
 }
-.th-cell {
-  background: var(--bg-surface);
-  padding: 12px 16px;
-  border-bottom: 2px solid var(--border-subtle);
-  font-weight: 600;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
+.tracks-table thead th {
   position: sticky;
   top: 0;
   z-index: 10;
+  background: var(--bg-surface);
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--border-subtle);
+  border-left: 1px solid var(--border-subtle);
+  text-align: right;
+  vertical-align: middle;
+  min-width: 220px;
+}
+.tracks-table thead th:first-child {
+  min-width: 280px;
+}
+.track-head-main {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-secondary);
 }
 .track-column-header {
   display: flex;
@@ -846,16 +859,19 @@ button {
   min-width: 220px;
 }
 .track-column-index {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: #e2e8f0;
-  color: var(--text-main);
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.45), transparent 40%),
+    linear-gradient(160deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e3a8a;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   flex-shrink: 0;
+  border: 1px solid rgba(59, 130, 246, 0.18);
 }
 .track-column-copy {
   display: flex;
@@ -874,17 +890,19 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.td-cell {
+.tracks-table tbody td {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-subtle);
   border-left: 1px solid var(--border-subtle);
   font-size: 0.9rem;
+  vertical-align: top;
+  background: var(--bg-surface);
 }
 .track-meta-cell,
-.track-data-cell {
+.track-cell {
   min-height: 74px;
 }
-.td-cell.row-alt {
+.track-row-alt td {
   background: #f9fafb;
 }
 .td-main {
@@ -894,22 +912,18 @@ button {
   font-size: 0.8rem;
   color: var(--text-secondary);
 }
-.td-cell.missing-track {
+.track-cell.missing-track {
   background: var(--color-danger-bg) !important;
   color: var(--color-danger-text);
   font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  text-align: center;
+  vertical-align: middle;
 }
 .track-empty-state {
   padding: 24px 16px;
   color: var(--text-secondary);
   background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
-}
-.track-empty-filler {
-  border-bottom: 1px solid var(--border-subtle);
+  text-align: center;
 }
 .diff-highlight {
   background-color: var(--color-warning-bg);

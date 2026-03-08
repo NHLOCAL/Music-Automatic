@@ -58,7 +58,7 @@ const cluster = {
 };
 
 describe("DiffWorkspace", () => {
-  it("renders numbered copies and a scrollable track comparison grid", () => {
+  it("renders numbered copies, numbered summary text, and a scrollable track comparison table", () => {
     const { container } = render(
       <DiffWorkspace
         cluster={cluster}
@@ -76,12 +76,14 @@ describe("DiffWorkspace", () => {
     expect(screen.getAllByText("עותק 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("עותק 2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("עותק 3").length).toBeGreaterThan(0);
+    expect(screen.getByText(/ההמלצה הראשונית היא לשמור את עותק 1/i)).toBeInTheDocument();
     expect(screen.getByText("השוואת קבצים מפורטת")).toBeInTheDocument();
     expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
     expect(screen.getAllByText("02.mp3").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "עותק שמור" })).toBeDisabled();
     expect(screen.getAllByRole("button", { name: "מחק תיקייה זו כעת" })).toHaveLength(2);
-    expect(container.querySelector(".track-grid-scroll")).not.toBeNull();
+    expect(container.querySelector(".track-table-scroll")).not.toBeNull();
+    expect(container.querySelector("table.tracks-table")).not.toBeNull();
     expect(container.querySelectorAll(".box-secondary-action")).toHaveLength(3);
   });
 });
