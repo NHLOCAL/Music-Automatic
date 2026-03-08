@@ -1,3 +1,4 @@
+import importlib
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -85,6 +86,7 @@ def build_snapshot():
             has_album_art=True,
             lossless_ratio=0.0,
             lyrics_ratio=0.0,
+            total_size_mb=5.0,
         ),
         folder2_id: AlbumSummary(
             folder_id=folder2_id,
@@ -97,6 +99,7 @@ def build_snapshot():
             has_album_art=True,
             lossless_ratio=0.0,
             lyrics_ratio=0.0,
+            total_size_mb=5.0,
         ),
     }
     clusters = {
@@ -109,6 +112,10 @@ def build_snapshot():
             reason_codes=["preferred_root_keeper", "cluster_safe"],
             reasons=[RecommendationReason(code="preferred_root_keeper", message="root preferred")],
             deletable_folder_ids=[folder2_id],
+            human_summary="נמצאו עותקים כמעט זהים. מומלץ לשמור את keep.",
+            resolution_state="auto",
+            recommended_keeper_reason="root preferred",
+            technical_summary="1 זוג הושווה.",
         )
     }
     return AnalysisSnapshot(
@@ -133,14 +140,19 @@ def test_api_session_flow(monkeypatch, tmp_path):
             session.snapshot.clusters,
             session.snapshot.albums,
             session.decisions,
+            resolution_states={next(iter(session.snapshot.clusters.values())).cluster_id: "auto"},
         )
+        session.resolution_states = {next(iter(session.snapshot.clusters.values())).cluster_id: "auto"}
         session.status = "completed"
         session.progress = {
             "step": "completed",
+            "stage": "complete",
             "message": "הניתוח הושלם",
+            "human_message": "הניתוח הסתיים. אפשר להתחיל לעבור על הקבוצות.",
             "current": 1,
             "total": 1,
             "percent": 100.0,
+            "warnings": [],
         }
 
     monkeypatch.setattr(store, "start_analysis", fake_start_analysis)
@@ -177,10 +189,12 @@ def test_api_cluster_decisions_and_delete_execution(monkeypatch):
     session.snapshot = build_snapshot()
     cluster = next(iter(session.snapshot.clusters.values()))
     session.decisions = {cluster.cluster_id: cluster.recommended_keeper_id}
+    session.resolution_states = {cluster.cluster_id: "auto"}
     session.preview = DeletionService().build_preview(
         session.snapshot.clusters,
         session.snapshot.albums,
         session.decisions,
+        resolution_states=session.resolution_states,
     )
     session.status = "completed"
 
@@ -190,22 +204,24 @@ def test_api_cluster_decisions_and_delete_execution(monkeypatch):
         lambda session_id, folder_ids: type(
             "Execution",
             (),
-            {
-                "moved_count": len(folder_ids),
-                "failed_count": 0,
-                "results": [
-                    type(
-                        "Result",
-                        (),
-                        {
-                            "folder_id": folder_ids[0],
-                            "folder_path": Path("D:/music/drop"),
-                            "success": True,
-                            "message": "ok",
-                        },
-                    )()
-                ],
-            },
+                {
+                    "moved_count": len(folder_ids),
+                    "failed_count": 0,
+                    "total_size_mb": 5.0,
+                    "results": [
+                        type(
+                            "Result",
+                            (),
+                            {
+                                "folder_id": folder_ids[0],
+                                "folder_path": Path("D:/music/drop"),
+                                "success": True,
+                                "message": "ok",
+                                "size_mb": 5.0,
+                            },
+                        )()
+                    ],
+                },
         )(),
     )
 
@@ -213,14 +229,17 @@ def test_api_cluster_decisions_and_delete_execution(monkeypatch):
     status_response = client.get(f"/api/analysis-sessions/{session.session_id}")
     assert status_response.status_code == 200
     assert status_response.json()["counts"]["safe_clusters"] == 1
+    assert status_response.json()["progress"]["stage"] == "queued"
 
     clusters_response = client.get(f"/api/analysis-sessions/{session.session_id}/clusters?bucket=safe")
     assert clusters_response.status_code == 200
     assert len(clusters_response.json()["clusters"]) == 1
+    assert clusters_response.json()["clusters"][0]["human_summary"]
 
     preview_response = client.get(f"/api/analysis-sessions/{session.session_id}/delete-preview")
     assert preview_response.status_code == 200
     assert preview_response.json()["total_count"] == 1
+    assert preview_response.json()["total_size_mb"] == 5.0
 
     decisions_response = client.post(
         f"/api/analysis-sessions/{session.session_id}/decisions",
@@ -233,6 +252,7 @@ def test_api_cluster_decisions_and_delete_execution(monkeypatch):
         session.snapshot.clusters,
         session.snapshot.albums,
         {cluster.cluster_id: cluster.recommended_keeper_id},
+        resolution_states={cluster.cluster_id: "auto"},
     )
     delete_response = client.post(
         f"/api/analysis-sessions/{session.session_id}/delete-executions",
@@ -240,3 +260,54 @@ def test_api_cluster_decisions_and_delete_execution(monkeypatch):
     )
     assert delete_response.status_code == 200
     assert delete_response.json()["moved_count"] == 1
+
+
+def test_api_delete_single_updates_preview(monkeypatch):
+    session = store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+    session.snapshot = build_snapshot()
+    cluster = next(iter(session.snapshot.clusters.values()))
+    session.decisions = {cluster.cluster_id: cluster.recommended_keeper_id}
+    session.resolution_states = {cluster.cluster_id: "user_selected"}
+    session.preview = DeletionService().build_preview(
+        session.snapshot.clusters,
+        session.snapshot.albums,
+        session.decisions,
+        resolution_states=session.resolution_states,
+    )
+    session.status = "completed"
+
+    monkeypatch.setattr(
+        "music_dup_lib.services.deletion_service.send2trash",
+        lambda path: None,
+    )
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/analysis-sessions/{session.session_id}/delete-single",
+        json={"cluster_id": cluster.cluster_id, "folder_id": cluster.deletable_folder_ids[0]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["moved_count"] == 1
+    preview_response = client.get(f"/api/analysis-sessions/{session.session_id}/delete-preview")
+    assert preview_response.json()["total_count"] == 0
+
+
+def test_api_open_explorer(monkeypatch, tmp_path):
+    api_app_module = importlib.import_module("api.app")
+    opened = {}
+    monkeypatch.setattr(api_app_module.os, "startfile", lambda path: opened.setdefault("path", path), raising=False)
+
+    client = TestClient(app)
+    response = client.post("/api/system/open-explorer", json={"path": str(tmp_path)})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "opened"
+    assert opened["path"] == str(tmp_path.resolve())

@@ -7,13 +7,14 @@ from .dto import (
     AnalysisSnapshot,
     AnalysisStatus,
     AnalysisWarnings,
+    ComparisonHighlight,
     DeleteExecution,
     DeleteExecutionItem,
     DeletePreview,
     DeletePreviewItem,
     PairAnalysis,
+    ResolutionState,
     RecommendationReason,
 )
 from .recommendation_service import RecommendationService
 from .scoring_service import ScoringService
-

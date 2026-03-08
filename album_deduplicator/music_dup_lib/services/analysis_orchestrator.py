@@ -32,7 +32,9 @@ class AnalysisOptions:
 @dataclass
 class AnalysisProgressEvent:
     step: str
+    stage: str
     message: str
+    human_message: str
     current: int
     total: int
 
@@ -125,8 +127,30 @@ class AnalysisOrchestrator:
         progress_handler(
             AnalysisProgressEvent(
                 step=step,
+                stage=self._stage_for_step(step),
                 message=message,
+                human_message=self._human_message_for_step(step, message),
                 current=current,
                 total=total,
             )
         )
+
+    def _stage_for_step(self, step: str) -> str:
+        mapping = {
+            "setup": "setup",
+            "scan": "scan",
+            "quality": "quality",
+            "scoring": "compare",
+            "complete": "complete",
+        }
+        return mapping.get(step, step)
+
+    def _human_message_for_step(self, step: str, fallback: str) -> str:
+        messages = {
+            "setup": "מכין את סביבת העבודה וההגדרות לפני תחילת הסריקה.",
+            "scan": "סורק תיקיות ומזהה אלבומים שאפשר להשוות.",
+            "quality": "מחשב איכות, עטיפות ונתוני שמע כדי להבין איזה עותק עדיף לשמור.",
+            "scoring": "משווה בין האלבומים ובודק אם מדובר בכפילויות בטוחות או במקרים גבוליים.",
+            "complete": "הניתוח הסתיים. אפשר להתחיל לעבור על הקבוצות הבטוחות והקבוצות שדורשות סקירה.",
+        }
+        return messages.get(step, fallback)

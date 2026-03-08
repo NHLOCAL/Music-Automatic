@@ -47,7 +47,9 @@ class ScoringService:
 
         if not self.ml_model.model_loaded:
             warnings.ml_unavailable = True
-            warnings.warnings.append("מודל ה-ML לא נמצא. המערכת משתמשת בציון האלגוריתמי בלבד.")
+            warnings.warnings.append(
+                "מודל החיזוי המקומי לא זמין כרגע. המערכת עדיין שמישה, אבל תמליץ בזהירות גבוהה יותר."
+            )
 
         gemini_analyzer = None
         if self.use_gemini:
@@ -56,11 +58,15 @@ class ScoringService:
                     gemini_analyzer = GeminiAnalyzer()
                 except Exception as exc:
                     warnings.gemini_unavailable = True
-                    warnings.warnings.append(f"Gemini לא זמין: {exc}")
+                    warnings.warnings.append(
+                        f"אימות Gemini לזוגות גבוליים לא זמין כרגע. התוצאות עדיין מוצגות, אבל בלי חוות דעת חיצונית. ({exc})"
+                    )
                     logger.warning("Gemini initialization failed: %s", exc, exc_info=True)
             else:
                 warnings.gemini_unavailable = True
-                warnings.warnings.append("Gemini לא זמין. הזוגות הגבוליים יוצגו ללא אימות חיצוני.")
+                warnings.warnings.append(
+                    "Gemini לא זמין. זוגות גבוליים עדיין יוצגו, אבל ההחלטה תתבסס רק על scoring פנימי."
+                )
 
         total_pairs = len(comparison_results)
         pairs: Dict[str, PairAnalysis] = {}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import queue
 from pathlib import Path
 from typing import Literal
@@ -17,6 +18,7 @@ from api.schemas import (
     AnalysisSessionCreateRequest,
     AnalysisSessionCreatedResponse,
     ClusterListResponse,
+    ComparisonHighlightModel,
     ClusterSummaryModel,
     CountsResponse,
     DecisionItem,
@@ -29,9 +31,11 @@ from api.schemas import (
     DegradedFlags,
     FolderSummaryModel,
     ModeSummary,
+    OpenExplorerRequest,
     PairScoreBreakdownModel,
     ProgressState,
     RecommendationReasonModel,
+    SingleDeleteRequest,
     SessionStatusResponse,
     TrackInfoModel,
 )
@@ -166,16 +170,53 @@ def create_app() -> FastAPI:
         return DeleteExecutionResponse(
             moved_count=execution.moved_count,
             failed_count=execution.failed_count,
+            total_size_mb=execution.total_size_mb,
             results=[
                 DeleteExecutionItemModel(
                     folder_id=result.folder_id,
                     folder_path=str(result.folder_path),
                     success=result.success,
                     message=result.message,
+                    size_mb=result.size_mb,
                 )
                 for result in execution.results
             ],
         )
+
+    @app.post("/api/analysis-sessions/{session_id}/delete-single", response_model=DeleteExecutionResponse)
+    def delete_single(session_id: str, payload: SingleDeleteRequest) -> DeleteExecutionResponse:
+        _get_session_or_404(session_id)
+        try:
+            execution = store.execute_single_delete(session_id, payload.cluster_id, payload.folder_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return DeleteExecutionResponse(
+            moved_count=execution.moved_count,
+            failed_count=execution.failed_count,
+            total_size_mb=execution.total_size_mb,
+            results=[
+                DeleteExecutionItemModel(
+                    folder_id=result.folder_id,
+                    folder_path=str(result.folder_path),
+                    success=result.success,
+                    message=result.message,
+                    size_mb=result.size_mb,
+                )
+                for result in execution.results
+            ],
+        )
+
+    @app.post("/api/system/open-explorer")
+    def open_explorer(payload: OpenExplorerRequest) -> dict:
+        path = Path(payload.path).resolve()
+        if not path.exists():
+            raise HTTPException(status_code=400, detail="Path does not exist.")
+        if not hasattr(os, "startfile"):
+            raise HTTPException(status_code=501, detail="Explorer integration is only available on Windows.")
+        os.startfile(str(path))
+        return {"status": "opened", "path": str(path)}
 
     return app
 
@@ -205,6 +246,8 @@ def _cluster_model(session, cluster_id: str) -> ClusterSummaryModel:
             has_album_art=album.has_album_art,
             lossless_ratio=album.lossless_ratio,
             lyrics_ratio=album.lyrics_ratio,
+            total_size_mb=album.total_size_mb,
+            is_deleted=album.folder_id in session.deleted_folder_ids,
             tracks=[
                 TrackInfoModel(
                     filename=file_info.filename,
@@ -243,11 +286,25 @@ def _cluster_model(session, cluster_id: str) -> ClusterSummaryModel:
         cluster_id=cluster.cluster_id,
         confidence_bucket=cluster.confidence_bucket,
         recommended_keeper_id=cluster.recommended_keeper_id,
+        human_summary=cluster.human_summary,
+        resolution_state=cluster.resolution_state,
+        recommended_keeper_reason=cluster.recommended_keeper_reason,
         reason_codes=cluster.reason_codes,
         reasons=[
             RecommendationReasonModel(code=reason.code, message=reason.message)
             for reason in cluster.reasons
         ],
+        comparison_highlights=[
+            ComparisonHighlightModel(
+                id=highlight.id,
+                label=highlight.label,
+                album_id=highlight.album_id,
+                tone=highlight.tone,
+                value=highlight.value,
+            )
+            for highlight in cluster.comparison_highlights
+        ],
+        technical_summary=cluster.technical_summary,
         deletable_folder_ids=cluster.deletable_folder_ids,
         albums=albums,
         pairs=pairs,
@@ -265,10 +322,15 @@ def _preview_model(preview) -> DeletePreviewResponse:
                 keeper_folder_name=item.keeper_folder_name,
                 keeper_folder_path=str(item.keeper_folder_path),
                 cluster_id=item.cluster_id,
+                estimated_size_mb=item.estimated_size_mb,
+                selection_source=item.selection_source,
             )
             for item in preview.items
         ],
         total_count=preview.total_count,
+        total_size_mb=preview.total_size_mb,
+        auto_selected_count=preview.auto_selected_count,
+        manual_selected_count=preview.manual_selected_count,
     )
 
 

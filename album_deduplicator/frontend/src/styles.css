@@ -1,20 +1,22 @@
 :root {
   color-scheme: light;
   font-family: "Rubik", "Segoe UI", sans-serif;
-  --bg: #f4efe5;
-  --bg-strong: #efe4d1;
-  --panel: rgba(255, 251, 244, 0.88);
-  --panel-strong: #fff9f0;
-  --ink: #1c241f;
-  --muted: #5a675f;
+  --bg: #f6f1e7;
+  --bg-strong: #ede2cf;
+  --panel: rgba(255, 251, 245, 0.9);
+  --panel-strong: #fffaf2;
+  --ink: #18211b;
+  --muted: #59655d;
   --accent: #0f766e;
-  --accent-soft: #b9ebe5;
-  --warning: #f59e0b;
+  --accent-soft: rgba(15, 118, 110, 0.12);
+  --warning: #af7a00;
+  --warning-soft: rgba(245, 158, 11, 0.14);
   --danger: #b42318;
-  --safe: #0b8f5c;
-  --review: #9a6700;
-  --line: rgba(28, 36, 31, 0.12);
-  --shadow: 0 24px 60px rgba(78, 56, 21, 0.12);
+  --danger-soft: rgba(180, 35, 24, 0.12);
+  --safe: #0c8c5a;
+  --safe-soft: rgba(12, 140, 90, 0.12);
+  --line: rgba(24, 33, 27, 0.1);
+  --shadow: 0 24px 60px rgba(82, 57, 15, 0.12);
 }
 
 * {
@@ -25,9 +27,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top right, rgba(15, 118, 110, 0.18), transparent 32%),
-    radial-gradient(circle at left bottom, rgba(196, 145, 67, 0.16), transparent 26%),
-    linear-gradient(135deg, #f8f4ee 0%, var(--bg) 52%, #ece0cf 100%);
+    radial-gradient(circle at top right, rgba(15, 118, 110, 0.18), transparent 28%),
+    radial-gradient(circle at left bottom, rgba(177, 115, 24, 0.16), transparent 26%),
+    linear-gradient(140deg, #faf5ee 0%, var(--bg) 52%, #ece1d0 100%);
   color: var(--ink);
 }
 
@@ -44,17 +46,29 @@ select {
 
 .shell {
   display: grid;
-  grid-template-columns: minmax(320px, 440px) 1fr;
+  grid-template-columns: minmax(320px, 430px) 1fr;
   gap: 24px;
   padding: 24px;
 }
 
-.hero {
+.hero,
+.workspace {
   display: grid;
-  gap: 18px;
+  gap: 20px;
+}
+
+.hero {
   align-self: start;
   position: sticky;
   top: 0;
+}
+
+.hero__eyebrow,
+.sectionEyebrow {
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .hero h1,
@@ -62,35 +76,35 @@ select {
 .workspace h3,
 .workspace h4 {
   margin: 0;
-  line-height: 1.1;
+  line-height: 1.08;
 }
 
 .hero h1 {
-  font-size: clamp(2.2rem, 4vw, 4.4rem);
+  font-size: clamp(2.4rem, 4vw, 4.4rem);
   max-width: 10ch;
 }
 
-.hero__lead {
+.hero__lead,
+.workspace__top p,
+.detailSummary,
+.modal__body,
+.recommendedReason span,
+.successPanel p,
+.actionBar p {
   margin: 0;
-  max-width: 46ch;
   color: var(--muted);
-  font-size: 1.02rem;
 }
 
-.hero__eyebrow,
-.sectionEyebrow {
-  font-size: 0.76rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
+.panel,
+.clusterCard {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
 }
 
 .panel {
-  border: 1px solid var(--line);
-  background: var(--panel);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
-  border-radius: 28px;
   padding: 20px;
 }
 
@@ -113,10 +127,10 @@ select {
 .field input,
 .field select {
   width: 100%;
+  padding: 14px 16px;
   border-radius: 18px;
   border: 1px solid rgba(17, 24, 39, 0.08);
   background: rgba(255, 255, 255, 0.72);
-  padding: 14px 16px;
   color: var(--ink);
   outline: none;
 }
@@ -132,18 +146,31 @@ select {
   box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
 }
 
-.actionRow {
+.actionRow,
+.workspace__controls,
+.tabBar,
+.clusterCard__labels,
+.clusterMiniScores,
+.albumPanel__actions,
+.detailPanel__badges,
+.reasonPills,
+.stagePills,
+.previewStats,
+.modal__actions,
+.shortcutRow,
+.shortcutList,
+.albumHighlights {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 8px;
 }
 
 .primaryButton,
 .ghostButton,
 .dangerButton,
 .tabButton,
-.albumChoice {
+.albumChoice,
+.dangerGhostButton {
   border: 0;
   border-radius: 999px;
   cursor: pointer;
@@ -161,23 +188,38 @@ select {
   box-shadow: 0 14px 26px rgba(15, 118, 110, 0.18);
 }
 
+.ghostButton,
+.dangerGhostButton,
+.tabButton,
+.albumChoice {
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.ghostButton--small {
+  padding: 10px 14px;
+}
+
 .dangerButton {
   background: linear-gradient(135deg, #bf3e2e, var(--danger));
   box-shadow: 0 14px 26px rgba(180, 35, 24, 0.2);
 }
 
-.ghostButton {
-  padding: 13px 18px;
-  background: rgba(255, 255, 255, 0.6);
-  color: var(--ink);
-  border: 1px solid var(--line);
+.dangerGhostButton {
+  color: var(--danger);
+  border-color: rgba(180, 35, 24, 0.2);
+  background: rgba(180, 35, 24, 0.06);
 }
 
 .primaryButton:hover,
 .ghostButton:hover,
 .dangerButton:hover,
 .tabButton:hover,
-.albumChoice:hover {
+.albumChoice:hover,
+.dangerGhostButton:hover,
+.clusterCard:hover {
   transform: translateY(-1px);
 }
 
@@ -189,17 +231,24 @@ select {
   transform: none;
 }
 
-.advancedGrid {
+.advancedGrid,
+.statusPanel,
+.warningStack,
+.clusterColumn,
+.albumsDetail,
+.pairTable,
+.deleteList,
+.trackComparison,
+.actionBar,
+.successPanel {
   display: grid;
-  gap: 12px;
-  margin-top: 16px;
+  gap: 14px;
 }
 
 .toggle {
   display: flex;
   gap: 10px;
   align-items: center;
-  color: var(--ink);
 }
 
 .toggle input {
@@ -207,39 +256,45 @@ select {
   block-size: 18px;
 }
 
+.mlBadge,
+.recommendedReason,
+.successText,
+.warningText,
+.errorText {
+  border-radius: 18px;
+  padding: 12px 14px;
+}
+
 .mlBadge {
   display: grid;
   gap: 4px;
-  margin-top: 12px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(15, 118, 110, 0.08);
-  color: var(--ink);
-}
-
-.statusPanel {
-  display: grid;
-  gap: 12px;
+  margin-top: 10px;
+  background: var(--accent-soft);
 }
 
 .statusPanel__header,
-.statusMeta,
-.pairRow,
+.detailPanel__header,
 .clusterCard__header,
 .deleteRow,
-.detailPanel__header {
+.albumPanel__header,
+.actionBar__summary {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+}
+
+.statusHuman {
+  margin: 6px 0 0;
+  color: var(--muted);
 }
 
 .progressTrack {
   width: 100%;
   height: 12px;
-  background: rgba(17, 24, 39, 0.08);
-  border-radius: 999px;
   overflow: hidden;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.08);
 }
 
 .progressBar {
@@ -248,188 +303,245 @@ select {
   background: linear-gradient(90deg, #15a183, var(--accent));
 }
 
-.statusMeta {
-  color: var(--muted);
-  font-size: 0.9rem;
-  flex-wrap: wrap;
-}
-
-.warningStack {
-  display: grid;
-  gap: 8px;
-}
-
-.warningText,
-.errorText {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 14px;
-}
-
-.warningText {
-  background: rgba(245, 158, 11, 0.12);
-  color: #845900;
-}
-
-.errorText {
-  background: rgba(180, 35, 24, 0.1);
-  color: var(--danger);
-}
-
-.workspace {
-  display: grid;
-  gap: 20px;
-}
-
-.workspace__top {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 18px;
-  align-items: end;
-}
-
-.workspace__top p {
-  margin: 8px 0 0;
-  color: var(--muted);
-  max-width: 56ch;
-}
-
-.tabBar {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.tabButton {
-  padding: 12px 16px;
-  background: transparent;
-  color: var(--muted);
-  border: 1px solid var(--line);
-}
-
-.tabButton--active {
-  background: var(--panel-strong);
-  color: var(--ink);
-  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.18);
-}
-
-.contentGrid {
-  display: grid;
-  grid-template-columns: minmax(380px, 1.1fr) minmax(340px, 0.9fr);
-  gap: 20px;
-  align-items: start;
-}
-
-.clusterColumn {
-  display: grid;
-  gap: 14px;
-}
-
-.clusterCard {
-  display: grid;
-  gap: 16px;
-  padding: 20px;
-  border-radius: 26px;
-  background: rgba(255, 253, 248, 0.92);
-  border: 1px solid transparent;
-  box-shadow: var(--shadow);
-  cursor: pointer;
-}
-
-.clusterCard--active {
-  border-color: rgba(15, 118, 110, 0.3);
-}
-
-.clusterCard h3,
-.deletePanel h3 {
-  margin: 8px 0 0;
-}
-
-.clusterReasons {
-  margin: 0;
-  color: var(--muted);
-}
-
-.clusterScores {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: var(--muted);
-}
-
-.bucketBadge {
+.stagePill,
+.bucketBadge,
+.resolutionBadge,
+.keeperBadge,
+.deletedBadge,
+.miniHighlight,
+.highlightPill,
+.reasonPill {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   padding: 7px 12px;
   border-radius: 999px;
   font-size: 0.82rem;
   font-weight: 700;
 }
 
-.bucketBadge--safe {
-  background: rgba(11, 143, 92, 0.12);
+.bucketBadge--safe,
+.resolutionBadge--auto,
+.metricCard--winner,
+.keeperBadge,
+.highlightPill--positive,
+.reasonPill--positive {
+  background: var(--safe-soft);
   color: var(--safe);
 }
 
-.bucketBadge--review {
-  background: rgba(245, 158, 11, 0.14);
-  color: var(--review);
+.bucketBadge--review,
+.resolutionBadge--skipped,
+.miniHighlight--warning,
+.highlightPill--warning,
+.reasonPill--warning {
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
-.albumChoiceList {
+.resolutionBadge--user_selected,
+.miniHighlight--neutral,
+.highlightPill--neutral,
+.reasonPill--neutral,
+.stagePill {
+  background: rgba(17, 24, 39, 0.06);
+  color: var(--muted);
+}
+
+.resolutionBadge--deleted,
+.deletedBadge,
+.highlightPill--negative,
+.reasonPill--negative {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.warningText {
+  margin: 0;
+  background: var(--warning-soft);
+  color: #845900;
+}
+
+.successText {
+  margin: 0;
+  background: rgba(12, 140, 90, 0.12);
+  color: var(--safe);
+}
+
+.errorText {
+  margin: 0;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.workspace__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 18px;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.95fr) minmax(380px, 1.05fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.clusterCard {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  background: rgba(255, 252, 248, 0.92);
+  cursor: pointer;
+}
+
+.clusterCard--active {
+  border-color: rgba(15, 118, 110, 0.32);
+}
+
+.clusterSummary,
+.keeperLine,
+.subtleText,
+.albumPath,
+.technicalSummary {
+  margin: 0;
+  color: var(--muted);
+}
+
+.keeperLine {
+  display: flex;
+  gap: 8px;
+}
+
+.choiceStrip {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .albumChoice {
-  padding: 12px 14px;
   min-width: 140px;
   display: grid;
   gap: 4px;
   justify-items: start;
-  background: rgba(255, 255, 255, 0.76);
-  border: 1px solid var(--line);
-  color: var(--ink);
 }
 
 .albumChoice--selected {
-  background: linear-gradient(135deg, rgba(15, 118, 110, 0.16), rgba(15, 118, 110, 0.06));
-  border-color: rgba(15, 118, 110, 0.3);
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.16), rgba(15, 118, 110, 0.04));
+  border-color: rgba(15, 118, 110, 0.28);
 }
 
 .detailPanel {
   position: sticky;
   top: 24px;
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
-.reasonPills {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.reasonPill {
-  padding: 8px 10px;
-  border-radius: 999px;
-  background: rgba(17, 24, 39, 0.06);
-  color: var(--muted);
-  font-size: 0.88rem;
-}
-
-.pairTable,
-.albumsDetail,
-.trackList {
+.recommendedReason {
   display: grid;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--line);
+}
+
+.albumsDetail--comparison {
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+
+.albumPanel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(17, 24, 39, 0.07);
+}
+
+.albumPanel--keeper {
+  border-color: rgba(12, 140, 90, 0.22);
+}
+
+.albumPanel--focused {
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.28);
+}
+
+.albumPanel--deleted {
+  opacity: 0.62;
+}
+
+.albumPanel__titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.metricCard {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(17, 24, 39, 0.06);
+}
+
+.metricCard span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.metricCard--warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.trackComparison__table {
+  display: grid;
+  gap: 8px;
+}
+
+.trackComparison__row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr auto repeat(2, minmax(90px, 1fr));
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.trackComparison__head {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.trackPresence {
+  font-weight: 700;
+}
+
+.technicalPanel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(17, 24, 39, 0.04);
+}
+
+.technicalPanel summary {
+  cursor: pointer;
+  font-weight: 700;
 }
 
 .pairRow {
   padding: 12px 14px;
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.72);
 }
 
@@ -439,80 +551,97 @@ select {
   justify-items: center;
 }
 
-.pairRow span,
-.albumMeta {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.albumPanel {
-  padding: 16px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(17, 24, 39, 0.06);
-}
-
-.albumPanel header {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.albumMeta {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.trackRow {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr auto;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(17, 24, 39, 0.06);
-}
-
-.trackRow:last-child {
-  border-bottom: 0;
-}
-
-.deletePanel {
-  display: grid;
-  gap: 18px;
-}
-
-.deletePanel__body {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 16px;
-  align-items: start;
+.actionBar__summary {
+  align-items: center;
 }
 
 .deleteCount {
-  width: 104px;
+  width: 110px;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
   border-radius: 28px;
   background: linear-gradient(135deg, rgba(191, 62, 46, 0.14), rgba(180, 35, 24, 0.08));
-  font-size: 2.6rem;
-  font-weight: 700;
   color: var(--danger);
+  text-align: center;
 }
 
-.deleteList {
+.deleteCount strong {
+  font-size: 2.6rem;
+  line-height: 1;
+}
+
+.previewStats {
+  flex: 1;
+}
+
+.previewStat {
   display: grid;
-  gap: 10px;
+  gap: 4px;
+  min-width: 120px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.previewStat span,
+.deleteRow small {
+  color: var(--muted);
 }
 
 .deleteRow {
   padding: 12px 14px;
-  border-radius: 16px;
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.72);
 }
 
-.deleteRow small {
-  color: var(--muted);
+.successPanel {
+  background: linear-gradient(135deg, rgba(12, 140, 90, 0.12), rgba(12, 140, 90, 0.04));
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(24, 33, 27, 0.28);
+  z-index: 30;
+}
+
+.modal {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 28px;
+  background: rgba(255, 250, 243, 0.98);
+  box-shadow: var(--shadow);
+}
+
+.modal--shortcuts {
+  width: min(560px, 100%);
+}
+
+.shortcutList {
+  display: grid;
+  gap: 10px;
+}
+
+.shortcutRow {
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(17, 24, 39, 0.05);
+}
+
+kbd {
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid var(--line);
+  font-family: inherit;
 }
 
 .emptyState {
@@ -524,8 +653,9 @@ select {
   color: var(--muted);
 }
 
-@media (max-width: 1180px) {
-  .shell {
+@media (max-width: 1240px) {
+  .shell,
+  .contentGrid {
     grid-template-columns: 1fr;
   }
 
@@ -534,28 +664,37 @@ select {
     position: static;
   }
 
-  .contentGrid {
-    grid-template-columns: 1fr;
+  .trackComparison__row {
+    grid-template-columns: 1.2fr 1fr auto repeat(2, minmax(80px, 1fr));
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .shell {
     padding: 14px;
   }
 
   .panel,
-  .clusterCard {
+  .clusterCard,
+  .modal {
     border-radius: 22px;
     padding: 16px;
   }
 
-  .deletePanel__body {
+  .workspace__top,
+  .statusPanel__header,
+  .detailPanel__header,
+  .actionBar__summary,
+  .albumPanel__header {
+    flex-direction: column;
+  }
+
+  .metricGrid,
+  .albumsDetail--comparison {
     grid-template-columns: 1fr;
   }
 
-  .trackRow {
+  .trackComparison__row {
     grid-template-columns: 1fr;
   }
 }
-

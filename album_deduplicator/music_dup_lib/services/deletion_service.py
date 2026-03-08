@@ -24,8 +24,14 @@ class DeletionService:
         clusters: Dict[str, AlbumCluster],
         albums: Dict[str, AlbumSummary],
         decisions: Dict[str, Optional[str]],
+        resolution_states: Optional[Dict[str, str]] = None,
+        excluded_folder_ids: Optional[set[str]] = None,
     ) -> DeletePreview:
         items: Dict[str, DeletePreviewItem] = {}
+        total_size_mb = 0.0
+        auto_selected_count = 0
+        manual_selected_count = 0
+        excluded = excluded_folder_ids or set()
         for cluster_id, keeper_id in decisions.items():
             if not keeper_id:
                 continue
@@ -33,11 +39,12 @@ class DeletionService:
             if cluster is None or keeper_id not in cluster.folder_ids:
                 continue
             keeper_album = albums[keeper_id]
+            selection_source = (resolution_states or {}).get(cluster_id, cluster.resolution_state)
             for folder_id in cluster.folder_ids:
-                if folder_id == keeper_id:
+                if folder_id == keeper_id or folder_id in excluded:
                     continue
                 album = albums[folder_id]
-                items[folder_id] = DeletePreviewItem(
+                preview_item = DeletePreviewItem(
                     folder_id=folder_id,
                     folder_path=album.path,
                     folder_name=album.name,
@@ -45,8 +52,43 @@ class DeletionService:
                     keeper_folder_name=keeper_album.name,
                     keeper_folder_path=keeper_album.path,
                     cluster_id=cluster_id,
+                    estimated_size_mb=album.total_size_mb,
+                    selection_source=selection_source,
                 )
-        return DeletePreview(items=list(items.values()))
+                items[folder_id] = preview_item
+                total_size_mb += album.total_size_mb
+                if selection_source == "auto":
+                    auto_selected_count += 1
+                else:
+                    manual_selected_count += 1
+        return DeletePreview(
+            items=list(items.values()),
+            total_size_mb=round(total_size_mb, 2),
+            auto_selected_count=auto_selected_count,
+            manual_selected_count=manual_selected_count,
+        )
+
+    def build_preview_item(
+        self,
+        cluster: AlbumCluster,
+        albums: Dict[str, AlbumSummary],
+        folder_id: str,
+        keeper_id: str,
+        selection_source: str = "user_selected",
+    ) -> DeletePreviewItem:
+        album = albums[folder_id]
+        keeper_album = albums[keeper_id]
+        return DeletePreviewItem(
+            folder_id=folder_id,
+            folder_path=album.path,
+            folder_name=album.name,
+            keeper_folder_id=keeper_id,
+            keeper_folder_name=keeper_album.name,
+            keeper_folder_path=keeper_album.path,
+            cluster_id=cluster.cluster_id,
+            estimated_size_mb=album.total_size_mb,
+            selection_source=selection_source,
+        )
 
     def execute(
         self,
@@ -81,6 +123,7 @@ class DeletionService:
                         folder_path=item.folder_path,
                         success=True,
                         message="הועבר לסל המחזור.",
+                        size_mb=item.estimated_size_mb,
                     )
                 )
             except Exception as exc:
@@ -92,12 +135,13 @@ class DeletionService:
                         folder_path=item.folder_path,
                         success=False,
                         message=str(exc),
+                        size_mb=item.estimated_size_mb,
                     )
                 )
 
         return DeleteExecution(
             moved_count=moved_count,
             failed_count=failed_count,
+            total_size_mb=round(sum(result.size_mb for result in results if result.success), 2),
             results=results,
         )
-

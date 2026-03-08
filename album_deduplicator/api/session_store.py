@@ -5,7 +5,7 @@ import queue
 import threading
 import uuid
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 
 from music_dup_lib.services import (
     AnalysisOptions,
@@ -28,10 +28,13 @@ class SessionState:
     progress: dict = field(
         default_factory=lambda: {
             "step": "queued",
+            "stage": "queued",
             "message": "ממתין",
+            "human_message": "ממתין לתחילת הניתוח.",
             "current": 0,
             "total": 1,
             "percent": 0.0,
+            "warnings": [],
         }
     )
     snapshot: AnalysisSnapshot = field(default_factory=AnalysisSnapshot)
@@ -40,6 +43,8 @@ class SessionState:
     error: Optional[str] = None
     events: "queue.Queue[dict]" = field(default_factory=queue.Queue)
     lock: threading.Lock = field(default_factory=threading.Lock)
+    resolution_states: Dict[str, str] = field(default_factory=dict)
+    deleted_folder_ids: Set[str] = field(default_factory=set)
 
 
 class SessionStore:
@@ -74,22 +79,32 @@ class SessionStore:
                     cluster_id: cluster.recommended_keeper_id if cluster.confidence_bucket == "safe" else None
                     for cluster_id, cluster in snapshot.clusters.items()
                 }
+                resolution_states = {
+                    cluster_id: "auto" if cluster.confidence_bucket == "safe" and cluster.recommended_keeper_id else "skipped"
+                    for cluster_id, cluster in snapshot.clusters.items()
+                }
+                self._apply_resolution_states(snapshot, resolution_states, set())
                 preview = self._deletion_service.build_preview(
                     clusters=snapshot.clusters,
                     albums=snapshot.albums,
                     decisions=decisions,
+                    resolution_states=resolution_states,
                 )
                 with session.lock:
                     session.snapshot = snapshot
                     session.decisions = decisions
+                    session.resolution_states = resolution_states
                     session.preview = preview
                     session.status = "completed"
                     session.progress = {
                         "step": "completed",
+                        "stage": "complete",
                         "message": "הניתוח הושלם",
+                        "human_message": "הניתוח הסתיים. אפשר להתחיל לעבור על הקבוצות הבטוחות והקבוצות שדורשות סקירה.",
                         "current": 1,
                         "total": 1,
                         "percent": 100.0,
+                        "warnings": snapshot.warnings.warnings,
                     }
                 self._push_event(session, "completed", {"status": "completed"})
             except Exception as exc:
@@ -105,11 +120,16 @@ class SessionStore:
     def apply_decisions(self, session_id: str, decisions: Dict[str, Optional[str]]) -> DeletePreview:
         session = self._require_session(session_id)
         with session.lock:
-            session.decisions.update(decisions)
+            for cluster_id, keeper_id in decisions.items():
+                session.decisions[cluster_id] = keeper_id
+                session.resolution_states[cluster_id] = "user_selected" if keeper_id else "skipped"
+            self._apply_resolution_states(session.snapshot, session.resolution_states, session.deleted_folder_ids)
             session.preview = self._deletion_service.build_preview(
                 clusters=session.snapshot.clusters,
                 albums=session.snapshot.albums,
                 decisions=session.decisions,
+                resolution_states=session.resolution_states,
+                excluded_folder_ids=session.deleted_folder_ids,
             )
             return session.preview
 
@@ -120,15 +140,72 @@ class SessionStore:
     def execute_delete(self, session_id: str, folder_ids: list[str]) -> DeleteExecution:
         session = self._require_session(session_id)
         execution = self._deletion_service.execute(session.preview, folder_ids)
-        removed_ids = set(folder_ids)
+        removed_ids = {result.folder_id for result in execution.results if result.success}
         with session.lock:
+            session.deleted_folder_ids.update(removed_ids)
             session.preview.items = [item for item in session.preview.items if item.folder_id not in removed_ids]
+            session.preview.total_size_mb = round(
+                sum(item.estimated_size_mb for item in session.preview.items),
+                2,
+            )
+            session.preview.auto_selected_count = sum(
+                1 for item in session.preview.items if item.selection_source == "auto"
+            )
+            session.preview.manual_selected_count = sum(
+                1 for item in session.preview.items if item.selection_source != "auto"
+            )
+            self._apply_resolution_states(session.snapshot, session.resolution_states, session.deleted_folder_ids)
         self._push_event(
             session,
             "delete_execution",
             {
                 "moved_count": execution.moved_count,
                 "failed_count": execution.failed_count,
+                "total_size_mb": execution.total_size_mb,
+            },
+        )
+        return execution
+
+    def execute_single_delete(self, session_id: str, cluster_id: str, folder_id: str) -> DeleteExecution:
+        session = self._require_session(session_id)
+        with session.lock:
+            cluster = session.snapshot.clusters.get(cluster_id)
+            if cluster is None:
+                raise KeyError(f"Unknown cluster id: {cluster_id}")
+            keeper_id = session.decisions.get(cluster_id) or cluster.recommended_keeper_id
+            if keeper_id is None:
+                raise ValueError("לא ניתן למחוק בודד בלי keeper פעיל לקבוצה.")
+            if folder_id == keeper_id:
+                raise ValueError("לא ניתן למחוק את העותק שנבחר לשמירה.")
+            if folder_id not in cluster.folder_ids:
+                raise ValueError("התיקייה שנבחרה אינה חלק מהקבוצה.")
+            preview_item = self._deletion_service.build_preview_item(
+                cluster=cluster,
+                albums=session.snapshot.albums,
+                folder_id=folder_id,
+                keeper_id=keeper_id,
+                selection_source="user_selected",
+            )
+
+        execution = self._deletion_service.execute(DeletePreview(items=[preview_item]), [folder_id])
+        removed_ids = {result.folder_id for result in execution.results if result.success}
+        with session.lock:
+            session.deleted_folder_ids.update(removed_ids)
+            session.preview = self._deletion_service.build_preview(
+                clusters=session.snapshot.clusters,
+                albums=session.snapshot.albums,
+                decisions=session.decisions,
+                resolution_states=session.resolution_states,
+                excluded_folder_ids=session.deleted_folder_ids,
+            )
+            self._apply_resolution_states(session.snapshot, session.resolution_states, session.deleted_folder_ids)
+        self._push_event(
+            session,
+            "delete_execution",
+            {
+                "moved_count": execution.moved_count,
+                "failed_count": execution.failed_count,
+                "total_size_mb": execution.total_size_mb,
             },
         )
         return execution
@@ -138,10 +215,13 @@ class SessionStore:
         percent = round((event.current / total) * 100, 2)
         progress = {
             "step": event.step,
+            "stage": event.stage,
             "message": event.message,
+            "human_message": event.human_message,
             "current": event.current,
             "total": total,
             "percent": percent,
+            "warnings": list(session.snapshot.warnings.warnings),
         }
         with session.lock:
             session.progress = progress
@@ -155,3 +235,18 @@ class SessionStore:
         if session is None:
             raise KeyError(f"Unknown session id: {session_id}")
         return session
+
+    def _apply_resolution_states(
+        self,
+        snapshot: AnalysisSnapshot,
+        resolution_states: Dict[str, str],
+        deleted_folder_ids: Set[str],
+    ) -> None:
+        for cluster_id, cluster in snapshot.clusters.items():
+            if cluster.deletable_folder_ids and all(
+                folder_id in deleted_folder_ids for folder_id in cluster.deletable_folder_ids
+            ):
+                cluster.resolution_state = "deleted"
+                resolution_states[cluster_id] = "deleted"
+            else:
+                cluster.resolution_state = resolution_states.get(cluster_id, cluster.resolution_state)
