@@ -73,6 +73,10 @@ export default function App() {
     if (d.status === 'completed' && d.summary && appView === 'scanning') setAppView('summary');
   }, [d.status, d.summary, appView]);
 
+  useEffect(() => {
+    setFocusedAlbumId(null);
+  }, [d.selectedClusterId, d.selectedTab]);
+
   const handleScanSubmit = async (event) => {
     event.preventDefault();
     d.setError("");
@@ -211,6 +215,7 @@ export default function App() {
               setSelectedTab={d.setSelectedTab}
             />
             <DiffWorkspace
+              key={`${d.selectedTab}-${d.selectedClusterId ?? "empty"}`}
               cluster={selectedCluster}
               currentKeeperId={currentKeeperId}
               hasUserDecision={hasSelectedClusterDecision}

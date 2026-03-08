@@ -216,7 +216,7 @@ async function createMainWindow() {
     minHeight: 820,
     show: false,
     backgroundColor: "#f4f1ea",
-    title: "Album Deduplicator",
+    title: "Music Automatic",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

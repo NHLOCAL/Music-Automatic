@@ -1,6 +1,6 @@
 import React from "react";
 import { Badge } from "./UI";
-import { getClusterDisplayTitle, hasClusterDecision } from "../utils";
+import { getClusterDisplayTitle, getClusterListSubtitle, getClusterStatusMeta, hasClusterDecision } from "../utils";
 
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
   
@@ -34,21 +34,17 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
             const isActive = cluster.cluster_id === selectedClusterId;
             const hasDecision = hasClusterDecision(decisions, cluster.cluster_id);
             const albums = cluster.albums.filter((a) => !a.is_deleted);
-            const isHandled = cluster.resolution_state === "auto" || (hasDecision && decisions[cluster.cluster_id] !== null);
+            const statusMeta = getClusterStatusMeta(cluster, hasDecision && decisions[cluster.cluster_id] !== null);
 
             return (
               <div key={cluster.cluster_id} className={`cluster-item ${isActive ? "active" : ""}`} onClick={() => setSelectedClusterId(cluster.cluster_id)}>
                 <div className="cluster-item-header">
                   <div className="cluster-title">{getClusterDisplayTitle(cluster)}</div>
                 </div>
-                <div className="cluster-subtitle" title={cluster.human_summary}>{cluster.human_summary}</div>
+                <div className="cluster-subtitle" title={cluster.human_summary}>{getClusterListSubtitle(cluster)}</div>
                 <div className="cluster-meta">
                   <span className="text-secondary">{albums.length} עותקים</span>
-                  {isHandled ? (
-                    <Badge tone={isActive ? "neutral" : "success"}>טופל</Badge>
-                  ) : (
-                    <Badge tone={isActive ? "neutral" : "warning"}>ממתין</Badge>
-                  )}
+                  <Badge tone={isActive ? "neutral" : statusMeta.tone}>{statusMeta.label}</Badge>
                 </div>
               </div>
             );

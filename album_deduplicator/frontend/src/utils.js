@@ -69,6 +69,36 @@ export function getClusterDisplayTitle(cluster) {
   if (names.length === 2) return `${names[0]} מול ${names[1]}`;
   return `${names[0]} מול ${names[1]} ועוד ${names.length - 2}`;
 }
+
+export function getClusterListSubtitle(cluster) {
+  const albumCount = cluster?.albums?.filter((album) => !album.is_deleted).length ?? 0;
+  const bucket = cluster?.confidence_bucket;
+  if (bucket === "safe") {
+    return `${albumCount} עותקים כמעט זהים. אפשר לאשר במהירות.`;
+  }
+  if (bucket === "review") {
+    return `${albumCount} עותקים דומים. כדאי לבדוק את ההבדלים לפני מחיקה.`;
+  }
+  return `${albumCount} עותקים להשוואה.`;
+}
+
+export function getClusterStatusMeta(cluster, hasDecision) {
+  if (!cluster) {
+    return { label: "ממתין", tone: "neutral" };
+  }
+
+  if (cluster.confidence_bucket === "safe") {
+    return cluster.resolution_state === "auto" || hasDecision
+      ? { label: "בטוח למחיקה", tone: "success" }
+      : { label: "מוכן לאישור", tone: "warning" };
+  }
+
+  if (hasDecision) {
+    return { label: "נבדק ידנית", tone: "neutral" };
+  }
+
+  return { label: "ממתין לבדיקה", tone: "warning" };
+}
 export function getMetricWinners(albums) {
   const winners = {};
   METRICS.forEach((metric) => {
@@ -111,6 +141,32 @@ export function buildTrackComparisonRows(albums) {
     });
   });
   return Array.from(rows.values()).sort((a, b) => a.title.localeCompare(b.title, "he"));
+}
+
+function normalizeTrackValue(field, value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (field === "duration") return Math.round(Number(value));
+  if (field === "size_mb") return Number(value).toFixed(2);
+  if (field === "bitrate") return Math.round(Number(value));
+  return String(value).trim().toLocaleLowerCase("he");
+}
+
+export function getTrackFieldTone(row, albumIds, field) {
+  const values = albumIds
+    .map((albumId) => row.entries[albumId])
+    .filter(Boolean)
+    .map((entry) => normalizeTrackValue(field, entry[field]))
+    .filter((value) => value !== null);
+
+  if (values.length <= 1) return "same";
+  return new Set(values).size === 1 ? "same" : "different";
+}
+
+export function getTrackRowTone(row, albumIds) {
+  const comparableFields = ["title", "filename", "duration", "size_mb", "bitrate"];
+  return comparableFields.some((field) => getTrackFieldTone(row, albumIds, field) === "different")
+    ? "different"
+    : "same";
 }
 
 export function getPairNarratives(pairs, albums) {

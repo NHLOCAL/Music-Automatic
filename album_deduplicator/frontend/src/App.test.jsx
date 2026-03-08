@@ -238,12 +238,13 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("button", { name: "התחל סריקה" })).toBeInTheDocument();
+    expect(screen.getByText("Music Automatic")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "התחל סריקה חכמה" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("C:\\Music")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("D:\\Archive")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("הגדרות מתקדמות"));
-    expect(screen.getByText("אימות AI למקרים גבוליים (Gemini)")).toBeInTheDocument();
+    expect(screen.getByText("אימות AI למקרים גבוליים")).toBeInTheDocument();
   });
 
   it("uses the electron bridge to pick scan folders", async () => {
@@ -289,7 +290,7 @@ describe("App", () => {
     fireEvent.change(screen.getByPlaceholderText("D:\\Archive"), {
       target: { value: "D:\\Archive" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
 
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
     MockEventSource.instances[0].emit("completed", { status: "completed" });
@@ -304,7 +305,11 @@ describe("App", () => {
       expect(screen.getAllByText('נמצאו עותקים כמעט זהים. מומלץ לשמור את "Best".').length).toBeGreaterThan(0),
     );
     expect(screen.getAllByText("Best מול Archive Copy").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("שם קובץ: 01.mp3").length).toBeGreaterThan(0);
+    expect(screen.getByText("בטוח למחיקה")).toBeInTheDocument();
+    expect(screen.getAllByText("שם קובץ").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
+    expect(screen.getByText("זהה")).toBeInTheDocument();
+    expect(screen.getByText("שונה")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "מחק עכשיו (D)" }));
 
@@ -343,7 +348,7 @@ describe("App", () => {
     fireEvent.change(screen.getByPlaceholderText("D:\\Archive"), {
       target: { value: "D:\\Archive" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
 
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
     MockEventSource.instances[0].emit("completed", { status: "completed" });
@@ -417,7 +422,7 @@ describe("App", () => {
     fireEvent.change(screen.getByPlaceholderText("D:\\Archive"), {
       target: { value: "D:\\Archive" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
 
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
     MockEventSource.instances[0].emit("completed", { status: "completed" });

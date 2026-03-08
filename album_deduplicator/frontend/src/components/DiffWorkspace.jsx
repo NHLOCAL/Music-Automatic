@@ -1,6 +1,15 @@
 import React, { useMemo } from "react";
 import { Button, Badge } from "./UI";
-import { buildTrackComparisonRows, formatBitrate, formatDuration, formatSizeMb, getClusterDisplayTitle, getMetricWinners } from "../utils";
+import {
+  buildTrackComparisonRows,
+  formatBitrate,
+  formatDuration,
+  formatSizeMb,
+  getClusterDisplayTitle,
+  getMetricWinners,
+  getTrackFieldTone,
+  getTrackRowTone,
+} from "../utils";
 
 export function DiffWorkspace({
   cluster,
@@ -31,6 +40,7 @@ export function DiffWorkspace({
   const visibleAlbums = cluster.albums.filter((a) => !a.is_deleted);
   const metricWinners = useMemo(() => getMetricWinners(visibleAlbums), [visibleAlbums]);
   const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
+  const albumIds = visibleAlbums.map((album) => album.folder_id);
   const trackGridStyle = {
     gridTemplateColumns: `minmax(220px, 1.1fr) repeat(${Math.max(visibleAlbums.length, 1)}, minmax(220px, 1fr))`,
   };
@@ -40,10 +50,17 @@ export function DiffWorkspace({
     const isLoser = metricWinners[key] !== null && !isWinner;
     const val = formatFn(album[key]);
     
-    if (isWinner) return <span className="diff-value diff-positive">{val}</span>;
-    if (isLoser) return <span className="diff-value diff-negative">{val}</span>;
-    return <span className="diff-value">{val}</span>;
+    if (isWinner) return <span className="diff-value diff-positive">טוב יותר: {val}</span>;
+    if (isLoser) return <span className="diff-value diff-negative">נמוך יותר: {val}</span>;
+    return <span className="diff-value diff-neutral">זהה: {val}</span>;
   };
+
+  const renderTrackMeta = (label, value, tone) => (
+    <div className={`track-cell-meta-row track-cell-meta-row--${tone}`}>
+      <span className="track-cell-meta-label">{label}</span>
+      <span className="track-cell-meta-value">{value}</span>
+    </div>
+  );
 
   return (
     <div className="workspace-main">
@@ -52,6 +69,13 @@ export function DiffWorkspace({
           <div>
             <h2>{getClusterDisplayTitle(cluster)}</h2>
             <p>{cluster.human_summary}</p>
+            <div className="workspace-header-badges">
+              <Badge tone={cluster.confidence_bucket === "safe" ? "success" : "warning"}>
+                {cluster.confidence_bucket === "safe" ? "אפשר למחוק בביטחון גבוה" : "נדרשת בדיקה קצרה"}
+              </Badge>
+              <Badge tone="neutral">{visibleAlbums.length} עותקים להשוואה</Badge>
+              <Badge tone="neutral">{selectedDeleteFolderIds.length} יסומנו לסל המחזור</Badge>
+            </div>
           </div>
           <Button variant="secondary" onClick={onBackToSetup}>סריקה חדשה</Button>
         </div>
@@ -135,46 +159,64 @@ export function DiffWorkspace({
 
         <div className="tracklist-section">
           <div className="tracklist-header">
-            <span>רשימת שירים והבדלים</span>
-            <span className="tracklist-caption">כל עמודה מציגה את נתוני הפריט באותו מיקום בכל עותק</span>
+            <div>
+              <span>רשימת שירים והבדלים</span>
+              <span className="tracklist-caption">כל עמודה מציגה את נתוני הפריט באותו מיקום בכל עותק.</span>
+            </div>
+            <div className="comparison-legend">
+              <span className="comparison-legend-item is-same">זהה</span>
+              <span className="comparison-legend-item is-different">שונה</span>
+              <span className="comparison-legend-item is-missing">חסר</span>
+            </div>
           </div>
-          <div className="track-compare-table" style={trackGridStyle}>
-            <div className="track-grid-header-cell">מיקום / שיר</div>
-            {visibleAlbums.map((album) => (
-              <div key={album.folder_id} className="track-grid-header-cell">
-                <div className="track-grid-album-name">{album.name}</div>
-                <div className="track-grid-album-path" title={album.path}>{album.path}</div>
-              </div>
-            ))}
-
-            {trackRows.map((row) => (
-              <React.Fragment key={row.key}>
-                <div className="track-grid-label">
-                  <div className="track-grid-title">{row.title}</div>
-                  <div className="track-grid-meta">{row.artist}</div>
-                  <div className="track-grid-meta">{formatDuration(row.duration)}</div>
+          <div className="tracklist-table-shell">
+            <div className="track-compare-table" style={trackGridStyle}>
+              <div className="track-grid-header-cell">מיקום / שיר</div>
+              {visibleAlbums.map((album) => (
+                <div key={album.folder_id} className="track-grid-header-cell">
+                  <div className="track-grid-album-name">{album.name}</div>
+                  <div className="track-grid-album-path" title={album.path}>{album.path}</div>
                 </div>
-                {visibleAlbums.map((album) => {
-                  const entry = row.entries[album.folder_id];
+              ))}
 
-                  return (
-                    <div key={album.folder_id} className={`track-grid-cell ${entry ? "" : "is-missing"}`}>
-                      {entry ? (
-                        <>
-                          <div className="track-cell-title">{entry.title}</div>
-                          <div className="track-cell-meta">שם קובץ: {entry.filename}</div>
-                          <div className="track-cell-meta">אורך: {formatDuration(entry.duration)}</div>
-                          <div className="track-cell-meta">גודל: {formatSizeMb(entry.size_mb)}</div>
-                          <div className="track-cell-meta">קצב נתונים: {formatBitrate(entry.bitrate)}</div>
-                        </>
-                      ) : (
-                        <span className="status-missing">חסר בעותק זה</span>
-                      )}
+              {trackRows.map((row) => {
+                const rowTone = getTrackRowTone(row, albumIds);
+
+                return (
+                  <React.Fragment key={row.key}>
+                    <div className={`track-grid-label track-grid-label--${rowTone}`}>
+                      <div className="track-grid-label-topline">
+                        <div className="track-grid-title">{row.title}</div>
+                        <span className={`track-grid-state track-grid-state--${rowTone}`}>
+                          {rowTone === "same" ? "כל הפרטים זהים" : "יש הבדלים בין העותקים"}
+                        </span>
+                      </div>
+                      <div className="track-grid-meta">{row.artist}</div>
+                      <div className="track-grid-meta">{formatDuration(row.duration)}</div>
                     </div>
-                  );
-                })}
-              </React.Fragment>
-            ))}
+                    {visibleAlbums.map((album) => {
+                      const entry = row.entries[album.folder_id];
+
+                      return (
+                        <div key={album.folder_id} className={`track-grid-cell ${entry ? "" : "is-missing"}`}>
+                          {entry ? (
+                            <>
+                              <div className="track-cell-title">{entry.title}</div>
+                              {renderTrackMeta("שם קובץ", entry.filename, getTrackFieldTone(row, albumIds, "filename"))}
+                              {renderTrackMeta("אורך", formatDuration(entry.duration), getTrackFieldTone(row, albumIds, "duration"))}
+                              {renderTrackMeta("גודל", formatSizeMb(entry.size_mb), getTrackFieldTone(row, albumIds, "size_mb"))}
+                              {renderTrackMeta("קצב נתונים", formatBitrate(entry.bitrate), getTrackFieldTone(row, albumIds, "bitrate"))}
+                            </>
+                          ) : (
+                            <span className="status-missing">חסר בעותק זה</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

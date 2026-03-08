@@ -33,7 +33,7 @@
   },
   "build": {
     "appId": "com.musicautomatic.albumdeduplicator",
-    "productName": "Album Deduplicator",
+    "productName": "Music Automatic",
     "files": [
       "dist/**/*",
       "electron/**/*",
