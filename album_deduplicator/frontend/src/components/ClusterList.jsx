@@ -1,5 +1,5 @@
 import React from "react";
-import { Badge } from "./UI";
+import { Badge, Icon } from "./UI";
 import {
   formatScore,
   getClusterDisplayTitle,
@@ -8,6 +8,7 @@ import {
   getRepresentativeClusterPair,
   hasClusterDecision,
 } from "../utils";
+
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
   const filteredClusters = clusters
     .filter((cluster) => {
@@ -22,25 +23,28 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
       return left.index - right.index;
     })
     .map(({ cluster }) => cluster);
+
   return (
     <div className="cluster-sidebar">
       <div className="sidebar-tabs">
         <div className="tab-group">
           <div className={`tab-item ${selectedTab === 'safe' ? 'active' : ''}`} onClick={() => setSelectedTab('safe')}>
-            בטוחים
+            <Icon name="shield" size={16} /> בטוחים
           </div>
           <div className={`tab-item ${selectedTab === 'review' ? 'active' : ''}`} onClick={() => setSelectedTab('review')}>
-            לסקירה
+            <Icon name="alert" size={16} /> לסקירה
           </div>
           <div className={`tab-item ${selectedTab === 'all' ? 'active' : ''}`} onClick={() => setSelectedTab('all')}>
-            הכל
+            <Icon name="folder" size={16} /> הכל
           </div>
         </div>
       </div>
+      
       <div className="cluster-scroll">
         {filteredClusters.length === 0 ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-            אין פריטים להצגה
+          <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-tertiary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+            <Icon name="check-circle" size={32} />
+            <span>אין פריטים להצגה</span>
           </div>
         ) : (
           filteredClusters.map((cluster) => {
@@ -48,22 +52,33 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
             const hasDecision = hasClusterDecision(decisions, cluster.cluster_id);
             const statusMeta = getClusterStatusMeta(cluster, hasDecision && decisions[cluster.cluster_id] !== null);
             const representativePair = getRepresentativeClusterPair(cluster, cluster.recommended_keeper_id);
+            
             const scoreLine = representativePair
               ? representativePair.is_identical_by_hash
                 ? "התאמה מלאה"
                 : `התאמה: ${formatScore(representativePair.final_score)}`
               : "דורש בדיקה";
+
+            const bucketIcon = cluster.confidence_bucket === "safe" ? "shield" : "alert";
+
             return (
               <div
                 key={cluster.cluster_id}
                 className={`cluster-card ${isActive ? "active" : ""} ${statusMeta.label === "נבדק ומוכן" ? "status-ready" : ""}`}
                 onClick={() => setSelectedClusterId(cluster.cluster_id)}
               >
-                <div className="cluster-name" title={getClusterDisplayTitle(cluster)}>
-                  {getClusterDisplayTitle(cluster)}
+                <div className="cluster-header">
+                  <div className="cluster-name" title={getClusterDisplayTitle(cluster)}>
+                    {getClusterDisplayTitle(cluster)}
+                  </div>
+                  {!isActive && <Icon name={statusMeta.label === "נבדק ומוכן" ? "check" : bucketIcon} size={14} className={`tone-${statusMeta.tone}`} />}
                 </div>
+                
                 <div className="cluster-info">
-                  <span className="cluster-scoreline">{scoreLine}</span>
+                  <span className="cluster-scoreline">
+                    <Icon name="music" size={12} />
+                    {scoreLine}
+                  </span>
                   {!isActive && <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>}
                 </div>
               </div>

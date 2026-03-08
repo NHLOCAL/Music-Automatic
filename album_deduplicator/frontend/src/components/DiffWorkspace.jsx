@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Button, Badge } from "./UI";
+import { Button, Badge, Icon, VisualMetric } from "./UI";
 import { ScoreTransparencyPanel } from "./ScoreTransparencyPanel";
 import {
   buildTrackComparisonRows,
@@ -8,6 +8,7 @@ import {
   formatSizeMb,
   getMetricWinners,
 } from "../utils";
+
 export function DiffWorkspace({
   cluster,
   currentKeeperId,
@@ -17,31 +18,41 @@ export function DiffWorkspace({
   if (!cluster) {
     return (
       <div className="centered-view">
+        <Icon name="music" size={48} className="tone-neutral" style={{ opacity: 0.2, marginBottom: '16px' }} />
         <h3 style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>בחר קבוצה מהרשימה להתחיל</h3>
       </div>
     );
   }
+
   const visibleAlbums = cluster.albums.filter((a) => !a.is_deleted);
   const metricWinners = useMemo(() => getMetricWinners(visibleAlbums), [visibleAlbums]);
   const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
   const activeKeeperOrFirst = currentKeeperId || visibleAlbums[0]?.folder_id;
-  const renderMetric = (album, key, formatFn) => {
-    const isWinner = metricWinners[key] === album.folder_id;
-    return (
-      <span className={`stat-val ${isWinner ? "val-good" : ""}`}>
-        {formatFn(album[key])}
-      </span>
-    );
-  };
+
+  const maxValues = useMemo(() => {
+    const maxes = { quality_score: 100, avg_bitrate: 0, total_size_mb: 0, file_count: 0 };
+    visibleAlbums.forEach(album => {
+      maxes.avg_bitrate = Math.max(maxes.avg_bitrate, album.avg_bitrate || 0);
+      maxes.total_size_mb = Math.max(maxes.total_size_mb, album.total_size_mb || 0);
+      maxes.file_count = Math.max(maxes.file_count, album.file_count || 0);
+    });
+    return maxes;
+  }, [visibleAlbums]);
+
   const renderTrackCell = (row, albumId, referenceEntry) => {
     const entry = row.entries[albumId];
-    if (!entry) return <td className="missing-track">חסר</td>;
+    if (!entry) return <td className="missing-track"><Icon name="alert" size={14} /> חסר</td>;
+    
     const bitrateDiff = referenceEntry && entry.bitrate !== referenceEntry.bitrate;
     const durationDiff = referenceEntry && entry.duration !== referenceEntry.duration;
+
     return (
       <td>
-        <div className="td-main">{entry.filename}</div>
-        <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
+        <div className="td-main">
+          <Icon name="music" size={14} className="tone-neutral" />
+          {entry.filename}
+        </div>
+        <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
           <span className={bitrateDiff ? "diff-highlight" : "diff-dimmed"}>
             {formatBitrate(entry.bitrate)}
           </span>
@@ -52,25 +63,29 @@ export function DiffWorkspace({
       </td>
     );
   };
+
   return (
     <div className="diff-area">
       <div className="diff-header">
         <div className="diff-title">
           <h2>
             {cluster.human_summary}
-            <Badge tone={cluster.confidence_bucket === "safe" ? "success" : "warning"}>
+            <Badge tone={cluster.confidence_bucket === "safe" ? "success" : "warning"} icon={cluster.confidence_bucket === "safe" ? "shield" : "alert"}>
               {cluster.confidence_bucket === "safe" ? "בטוח למחיקה" : "דורש סקירה"}
             </Badge>
           </h2>
           <p>בחר עותק אחד לשמירה. שאר העותקים יסומנו להעברה לסל המחזור.</p>
         </div>
       </div>
+
       <div className="diff-content">
         <ScoreTransparencyPanel cluster={cluster} currentKeeperId={currentKeeperId} />
+
         <div className="comparison-grid">
           {visibleAlbums.map((album) => {
             const isKeeper = currentKeeperId === album.folder_id;
             const isTrash = currentKeeperId && !isKeeper;
+
             return (
               <div key={album.folder_id} className={`album-column ${isKeeper ? 'is-keeper' : ''} ${isTrash ? 'is-deleted' : ''}`}>
                 <div className="column-action-bar">
@@ -78,41 +93,55 @@ export function DiffWorkspace({
                     variant={isKeeper ? "success" : isTrash ? "danger" : "primary"}
                     onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}
                   >
-                    {isKeeper ? "✓ נבחר לשמירה" : isTrash ? "✗ מיועד למחיקה" : "שמור עותק זה"}
+                    <Icon name={isKeeper ? "check-circle" : isTrash ? "trash" : "shield"} />
+                    {isKeeper ? "נבחר לשמירה" : isTrash ? "מיועד למחיקה" : "שמור עותק זה"}
                   </Button>
-                  <Button variant="secondary" onClick={() => openExplorer(album.path)}>
-                    תיקייה
+                  <Button variant="secondary" onClick={() => openExplorer(album.path)} title="פתח בתיקייה">
+                    <Icon name="folder" />
                   </Button>
                 </div>
+
                 <div className="column-header-info">
                   <div className="column-title">
                     <span>{album.name}</span>
-                    {!currentKeeperId && cluster.recommended_keeper_id === album.folder_id && <Badge tone="neutral">מומלץ</Badge>}
+                    {!currentKeeperId && cluster.recommended_keeper_id === album.folder_id && (
+                      <Badge tone="neutral" icon="star">מומלץ</Badge>
+                    )}
                   </div>
                   <div className="column-path" title={album.path}>{album.path}</div>
                 </div>
+
                 <div className="column-stats">
-                  <div className="stat-row">
-                    <span className="stat-key">דירוג איכות</span>
-                    {renderMetric(album, 'quality_score', v => v ? v.toFixed(1) : 'N/A')}
-                  </div>
-                  <div className="stat-row">
-                    <span className="stat-key">ביטרייט ממוצע</span>
-                    {renderMetric(album, 'avg_bitrate', v => `${Math.round(v)} kbps`)}
-                  </div>
-                  <div className="stat-row">
-                    <span className="stat-key">נפח תיקייה</span>
-                    {renderMetric(album, 'total_size_mb', formatSizeMb)}
-                  </div>
-                  <div className="stat-row">
-                    <span className="stat-key">מספר קבצים</span>
-                    <span className="stat-val">{album.file_count}</span>
-                  </div>
+                  <VisualMetric 
+                    label="דירוג איכות" 
+                    value={album.quality_score ? album.quality_score.toFixed(1) : 'N/A'} 
+                    percent={album.quality_score || 0}
+                    tone={metricWinners.quality_score === album.folder_id ? "success" : "primary"}
+                  />
+                  <VisualMetric 
+                    label="ביטרייט ממוצע" 
+                    value={`${Math.round(album.avg_bitrate || 0)} kbps`} 
+                    percent={maxValues.avg_bitrate ? ((album.avg_bitrate || 0) / maxValues.avg_bitrate) * 100 : 0}
+                    tone={metricWinners.avg_bitrate === album.folder_id ? "success" : "primary"}
+                  />
+                  <VisualMetric 
+                    label="נפח תיקייה" 
+                    value={formatSizeMb(album.total_size_mb)} 
+                    percent={maxValues.total_size_mb ? ((album.total_size_mb || 0) / maxValues.total_size_mb) * 100 : 0}
+                    tone="neutral"
+                  />
+                  <VisualMetric 
+                    label="מספר קבצים" 
+                    value={album.file_count} 
+                    percent={maxValues.file_count ? (album.file_count / maxValues.file_count) * 100 : 0}
+                    tone="neutral"
+                  />
                 </div>
               </div>
             );
           })}
         </div>
+
         <div className="track-table-container">
           <div className="track-table-scroll">
             <table className="tracks-table">
@@ -128,7 +157,10 @@ export function DiffWorkspace({
                   return (
                     <tr key={row.key}>
                       <td className="track-meta-cell">
-                        <div className="td-main">{row.title}</div>
+                        <div className="td-main">
+                          <Icon name="music" size={14} className="tone-neutral" />
+                          {row.title}
+                        </div>
                       </td>
                       {visibleAlbums.map(album => (
                         <React.Fragment key={`${row.key}-${album.folder_id}`}>
