@@ -1,17 +1,29 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDeduplicator } from "./hooks/useDeduplicator";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import * as api from "./api";
+import { getRuntimeInfo, getRuntimeSnapshot, openDesktopPath, pickPreferredRoot, pickScanFolders } from "./desktop";
+import { formatSizeMb } from "./utils";
 import { ScanPanel } from "./components/ScanPanel";
 import { ClusterList } from "./components/ClusterList";
 import { DiffWorkspace } from "./components/DiffWorkspace";
 import { DeletePreview } from "./components/DeletePreview";
 import { ConfirmModal } from "./components/UI";
+
 const TABS = [
   { id: "safe", label: "בטוח למחיקה" },
   { id: "review", label: "דורש סקירה" },
   { id: "all", label: "כל התוצאות" },
 ];
+
+function mergeFolderLines(currentValue, nextPaths) {
+  const items = [
+    ...currentValue.split("\n").map((item) => item.trim()).filter(Boolean),
+    ...nextPaths.map((item) => item.trim()).filter(Boolean),
+  ];
+  return Array.from(new Set(items));
+}
+
 export default function App() {
   const [form, setForm] = useState({ folders: "", preferred_root: "", force_rescan: false, clear_cache: false, bitrate_mode: "128", gemini_enabled: false });
   const [loading, setLoading] = useState(false);
@@ -19,10 +31,26 @@ export default function App() {
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [singleDeleteTarget, setSingleDeleteTarget] = useState(null);
   const [focusedAlbumId, setFocusedAlbumId] = useState(null);
+  const [runtimeInfo, setRuntimeInfo] = useState(getRuntimeSnapshot());
   
   const d = useDeduplicator();
   const selectedCluster = d.clusters.find(c => c.cluster_id === d.selectedClusterId) || null;
   const currentKeeperId = selectedCluster ? (d.decisions[selectedCluster.cluster_id] ?? (selectedCluster.resolution_state === "auto" ? selectedCluster.recommended_keeper_id : null)) : null;
+
+  useEffect(() => {
+    let active = true;
+    getRuntimeInfo()
+      .then((info) => {
+        if (active) {
+          setRuntimeInfo(info);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleScanSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -43,6 +71,22 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  const handlePickFolders = async () => {
+    const selectedPaths = await pickScanFolders();
+    if (!selectedPaths.length) return;
+    setForm((current) => ({
+      ...current,
+      folders: mergeFolderLines(current.folders, selectedPaths).join("\n"),
+    }));
+  };
+
+  const handlePickPreferredRoot = async () => {
+    const selectedPath = await pickPreferredRoot();
+    if (!selectedPath) return;
+    setForm((current) => ({ ...current, preferred_root: selectedPath }));
+  };
+
   const executeDelete = async () => {
     if (!d.sessionId || d.preview.total_count === 0) return;
     setExecutingDelete(true);
@@ -69,7 +113,14 @@ export default function App() {
     }
   };
   const openExplorer = async (path) => {
-    try { await api.openInExplorer(path); } catch (err) { d.setError(err.message); }
+    try {
+      const openedViaDesktop = await openDesktopPath(path);
+      if (!openedViaDesktop) {
+        await api.openInExplorer(path);
+      }
+    } catch (err) {
+      d.setError(err.message);
+    }
   };
   useKeyboardShortcuts({
     status: d.status, clusters: d.clusters, selectedCluster, selectedClusterId: d.selectedClusterId,
@@ -79,7 +130,18 @@ export default function App() {
   });
   return (
     <div className="app-layout" dir="rtl">
-      <ScanPanel form={form} setForm={setForm} onSubmit={handleScanSubmit} loading={loading} progress={d.progress} summary={d.summary} error={d.error} />
+      <ScanPanel
+        form={form}
+        setForm={setForm}
+        onSubmit={handleScanSubmit}
+        loading={loading}
+        progress={d.progress}
+        summary={d.summary}
+        error={d.error}
+        runtimeInfo={runtimeInfo}
+        onPickFolders={handlePickFolders}
+        onPickPreferredRoot={handlePickPreferredRoot}
+      />
       
       <main className="main-workspace">
         <div className="tabs-header">
@@ -88,6 +150,19 @@ export default function App() {
               {t.label}
             </button>
           ))}
+        </div>
+        <div className="workspace-topbar">
+          <div className="runtime-status">
+            <span className={`runtime-pill ${runtimeInfo.isElectron ? "runtime-pill-desktop" : "runtime-pill-browser"}`}>
+              {runtimeInfo.isElectron ? "Electron Desktop" : "Browser Preview"}
+            </span>
+            <span className="runtime-caption">{runtimeInfo.backendBaseUrl}</span>
+          </div>
+          {d.successSummary && (
+            <div className="workspace-success">
+              {`הועברו ${d.successSummary.moved_count} תיקיות לסל המחזור, כ-${formatSizeMb(d.successSummary.total_size_mb)}.`}
+            </div>
+          )}
         </div>
         <div className="workspace-grid">
           <div className="list-pane">

@@ -1,6 +1,6 @@
 # Album Deduplicator Architecture
 
-מסמך זה מתאר את מבנה המערכת העדכני של `album_deduplicator` לאחר המעבר ל-`React + FastAPI`, ואת גבולות האחריות בין שכבות הקוד.
+מסמך זה מתאר את מבנה המערכת העדכני של `album_deduplicator` לאחר המעבר ל-`Electron + React + FastAPI`, ואת גבולות האחריות בין שכבות הקוד.
 
 ## מטרות המערכת
 
@@ -15,7 +15,7 @@
 
 ## תמונת על
 
-המערכת בנויה מ-5 שכבות עיקריות:
+המערכת בנויה מ-6 שכבות עיקריות:
 
 1. `Core`:
    מנועי הסריקה, חילוץ המטא-דאטה, ההשוואה והאיכות.
@@ -23,10 +23,12 @@
    שכבת orchestration ו-business rules מעל ה-core.
 3. `API`:
    `FastAPI` עם sessions, DTOs ו-`SSE`.
-4. `Frontend`:
-   ממשק `React` שמתקשר רק מול ה-API.
-5. `Entrypoints`:
-   `CLI`, שרת API, ו-`Streamlit` ישן שנשאר כ-legacy.
+4. `Desktop Shell`:
+   `Electron` שמנהל את חלון האפליקציה, מרים backend מקומי, וחושף יכולות מערכת דרך `preload`.
+5. `Frontend`:
+   ממשק `React` שרץ ב-renderer של Electron ומתקשר מול ה-API.
+6. `Entrypoints`:
+   `Electron Desktop`, `CLI`, שרת API, ו-`Streamlit` ישן שנשאר כ-legacy.
 
 ## מבנה תיקיות
 
@@ -116,12 +118,28 @@
   - שמירת progress, snapshot, decisions ו-preview.
   - background execution לכל session.
 
+### `frontend/electron`
+
+מעטפת ה-desktop:
+
+- `main.cjs`
+  - יוצר `BrowserWindow`
+  - מרים `FastAPI` כתהליך מקומי
+  - ממתין ל-`GET /api/health`
+  - מנהל lifecycle של backend בעת פתיחה/סגירה
+- `preload.cjs`
+  - חושף bridge מאובטח ל-renderer
+  - בחירת תיקיות native
+  - פתיחת נתיבים ב-Explorer
+  - הזרקת runtime metadata כמו `backendBaseUrl`
+
 ### `frontend`
 
 הממשק החדש:
 
 - `src/App.jsx`
   - flow ראשי.
+  - מזהה אם היישום רץ בתוך `Electron`
   - יצירת session.
   - האזנה ל-`SSE`.
   - הצגת tabs:
@@ -132,6 +150,8 @@
   - delete confirmation.
 - `src/styles.css`
   - שפה חזותית מלאה של ה-UI.
+- `src/desktop.js`
+  - abstraction ליכולות desktop ול-runtime metadata.
 - `src/App.test.jsx`
   - smoke test לממשק הראשי.
 
@@ -142,11 +162,23 @@
   - משתמש ב-`AnalysisOrchestrator`.
 - `api_server.py`
   - entrypoint פשוט לשרת API.
+- `frontend/electron/main.cjs`
+  - entrypoint הראשי של אפליקציית ה-desktop.
 - `app.py`
   - `Streamlit` ישן.
   - נשאר זמני כ-legacy, לא ה-flow הראשי.
 
 ## זרימת נתונים מלאה
+
+### 0. Desktop bootstrap
+
+במצב desktop:
+
+1. `Electron main` מוצא port פנוי.
+2. מריץ backend מקומי (`FastAPI`) על `127.0.0.1`.
+3. בודק readiness דרך `GET /api/health`.
+4. טוען את חלון האפליקציה.
+5. `preload` מזריק ל-renderer את `backendBaseUrl` ואת יכולות המערכת.
 
 ### 1. יצירת session
 
@@ -410,14 +442,21 @@ final_score = base_score
 
 ## הרצה מקומית
 
-### Backend
+### Backend בלבד
 
 ```bash
 cd album_deduplicator
 uvicorn api.app:app --reload
 ```
 
-### Frontend
+### Desktop
+
+```bash
+cd album_deduplicator/frontend
+npm run dev:electron
+```
+
+### Frontend בלבד
 
 ```bash
 cd album_deduplicator/frontend
@@ -453,12 +492,20 @@ npm test
 npm run build
 ```
 
+### Desktop
+
+```bash
+cd frontend
+npm run dist:desktop
+```
+
 ## מגבלות ידועות
 
 - אין persistence ל-session store מעבר לחיי השרת.
 - אין תמיכה ב-v1 בזיהוי אלבומים עם מספר שירים שונה.
 - `Streamlit` עדיין קיים ועלול להמשיך לבלבל עד להסרה מלאה.
 - אין כרגע auth או multi-user isolation, כי המוצר מיועד local single-user.
+- חבילת `Electron` עדיין מניחה קיום `Python` מקומי כאשר backend ארוז כ-source resources; אריזת backend ל-executable היא הרחבה טבעית לשלב הבא.
 
 ## כיווני הרחבה טבעיים
 
@@ -468,4 +515,3 @@ npm run build
 - diff חזותי חכם בין tracklists
 - הסרה מלאה של `Streamlit`
 - הרחבת בדיקות e2e מול fixture directories אמיתיים
-

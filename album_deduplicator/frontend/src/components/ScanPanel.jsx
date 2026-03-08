@@ -1,27 +1,69 @@
 import React, { useState } from "react";
 import { Button } from "./UI";
-export function ScanPanel({ form, setForm, onSubmit, loading, progress, summary, error }) {
+
+export function ScanPanel({
+  form,
+  setForm,
+  onSubmit,
+  loading,
+  progress,
+  summary,
+  error,
+  runtimeInfo,
+  onPickFolders,
+  onPickPreferredRoot,
+}) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
   return (
     <aside className="scan-panel">
       <div className="hero-section">
         <span className="eyebrow">Album Deduplicator</span>
         <h1>סדר באוסף המוזיקה בראש שקט</h1>
         <p>מזהה כפילויות, משווה איכויות ומשאיר אצלך שליטה מלאה על מה שנמחק.</p>
+        <div className="hero-runtime">
+          <span className={`runtime-pill ${runtimeInfo?.isElectron ? "runtime-pill-desktop" : "runtime-pill-browser"}`}>
+            {runtimeInfo?.isElectron ? "Electron + React" : "React + API"}
+          </span>
+          <span className="hero-runtime-text">
+            {runtimeInfo?.isElectron
+              ? `ה-backend המקומי מחובר דרך ${runtimeInfo.backendBaseUrl}`
+              : "אפשר להקליד נתיבים ידנית או להפעיל את מעטפת Electron לחוויית Desktop מלאה."}
+          </span>
+        </div>
       </div>
       <form className="scan-form card" onSubmit={onSubmit}>
         <div className="input-group">
-          <label>תיקיות לסריקה</label>
+          <div className="input-label-row">
+            <label htmlFor="scan-folders">תיקיות לסריקה</label>
+            {runtimeInfo?.isElectron && (
+              <Button type="button" variant="secondary" className="picker-btn" onClick={onPickFolders}>
+                בחר תיקיות
+              </Button>
+            )}
+          </div>
           <textarea
+            id="scan-folders"
+            aria-label="תיקיות לסריקה"
             rows={4}
             placeholder="C:\Music&#10;D:\Archive"
             value={form.folders}
             onChange={(e) => setForm({ ...form, folders: e.target.value })}
           />
+          <p className="field-hint">כל שורה היא root נפרד לסריקה.</p>
         </div>
         <div className="input-group">
-          <label>תיקייה מועדפת לשמירה (אופציונלי)</label>
+          <div className="input-label-row">
+            <label htmlFor="preferred-root">תיקייה מועדפת לשמירה (אופציונלי)</label>
+            {runtimeInfo?.isElectron && (
+              <Button type="button" variant="ghost" className="picker-btn" onClick={onPickPreferredRoot}>
+                בחר תיקייה
+              </Button>
+            )}
+          </div>
           <input
+            id="preferred-root"
+            aria-label="תיקייה מועדפת לשמירה"
             type="text"
             placeholder="לדוגמה: C:\Music"
             value={form.preferred_root}

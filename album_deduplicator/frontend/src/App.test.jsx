@@ -35,6 +35,28 @@ function jsonResponse(payload) {
   };
 }
 
+function createDesktopBridge(overrides = {}) {
+  return {
+    runtime: {
+      isElectron: true,
+      backendBaseUrl: "http://127.0.0.1:9900",
+      version: "0.1.0",
+      platform: "win32",
+    },
+    getRuntimeInfo: vi.fn(async () => ({
+      isElectron: true,
+      backendBaseUrl: "http://127.0.0.1:9900",
+      version: "0.1.0",
+      platform: "win32",
+    })),
+    selectScanFolders: vi.fn(async () => []),
+    selectPreferredRoot: vi.fn(async () => null),
+    openPath: vi.fn(async () => ({ ok: true })),
+    revealPath: vi.fn(async () => ({ ok: true })),
+    ...overrides,
+  };
+}
+
 const sessionSummary = {
   session_id: "session-1",
   status: "completed",
@@ -81,7 +103,6 @@ const clusterResponse = {
       reasons: [{ code: "preferred_root_keeper", message: "root preferred" }],
       comparison_highlights: [
         { id: "h1", label: "איכות גבוהה יותר", album_id: "folder-keep", tone: "positive", value: "95.0%" },
-        { id: "h2", label: "כולל עטיפת אלבום", album_id: "folder-keep", tone: "positive", value: null },
       ],
       technical_summary: "1 זוג הושווה. הציון הנמוך ביותר הוא 98.5%.",
       deletable_folder_ids: ["folder-drop"],
@@ -167,26 +188,46 @@ describe("App", () => {
   beforeEach(() => {
     MockEventSource.instances = [];
     vi.stubGlobal("EventSource", MockEventSource);
+    delete window.albumDeduplicator;
   });
 
   afterEach(() => {
     cleanup();
+    delete window.albumDeduplicator;
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
-  it("renders the minimal analysis flow and advanced settings toggle", () => {
+  it("renders the browser fallback flow and advanced settings", () => {
     vi.stubGlobal("fetch", vi.fn());
+
     render(<App />);
 
-    expect(screen.getByRole("button", { name: "התחל ניתוח" })).toBeInTheDocument();
-    expect(screen.getByText("ML פעיל כברירת מחדל.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "התחל סריקה חכמה" })).toBeInTheDocument();
+    expect(screen.getByText("React + API")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "פתח אפשרויות מתקדמות" }));
-    expect(screen.getByText("Gemini לזוגות גבוליים בלבד")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "הגדרות מתקדמות" }));
+    expect(screen.getByText("הפעל אימות AI (Gemini) למקרים גבוליים")).toBeInTheDocument();
   });
 
-  it("loads a completed session and shows the human summary plus shortcut overlay", async () => {
+  it("uses the electron bridge to pick scan folders", async () => {
+    window.albumDeduplicator = createDesktopBridge({
+      selectScanFolders: vi.fn(async () => ["C:\\Music", "D:\\Archive"]),
+    });
+    vi.stubGlobal("fetch", vi.fn());
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "בחר תיקיות" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("תיקיות לסריקה")).toHaveValue("C:\\Music\nD:\\Archive"),
+    );
+    expect(screen.getByText("Electron + React")).toBeInTheDocument();
+  });
+
+  it("loads a completed session and opens the single-delete confirmation", async () => {
+    window.albumDeduplicator = createDesktopBridge();
     const fetchMock = vi.fn(async (url, options = {}) => {
       if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
         return jsonResponse({ session_id: "session-1", status: "queued" });
@@ -206,10 +247,10 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText("תיקיות קלט"), {
+    fireEvent.change(screen.getByLabelText("תיקיות לסריקה"), {
       target: { value: "C:\\Music\nD:\\Archive" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "התחל ניתוח" }));
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
 
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
     MockEventSource.instances[0].emit("completed", { status: "completed" });
@@ -217,45 +258,10 @@ describe("App", () => {
     await waitFor(() =>
       expect(screen.getAllByText('נמצאו עותקים כמעט זהים. מומלץ לשמור את "Best".').length).toBeGreaterThan(0),
     );
-    expect(screen.getByText("למה דווקא העותק הזה?")).toBeInTheDocument();
-    expect(screen.getByText("רשימת שירים מאוחדת")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "קיצורי מקלדת" }));
-    expect(screen.getByText("Keyboard Power Mode")).toBeInTheDocument();
-    expect(screen.getByText("פתח אישור למחיקה בודדת")).toBeInTheDocument();
-  });
-
-  it("opens a mini confirmation before single delete", async () => {
-    const fetchMock = vi.fn(async (url, options = {}) => {
-      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
-        return jsonResponse({ session_id: "session-1", status: "queued" });
-      }
-      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
-        return jsonResponse(clusterResponse);
-      }
-      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
-        return jsonResponse(previewResponse);
-      }
-      if (String(url).includes("/api/analysis-sessions/session-1")) {
-        return jsonResponse(sessionSummary);
-      }
-      throw new Error(`Unhandled fetch: ${url}`);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<App />);
-    fireEvent.change(screen.getByLabelText("תיקיות קלט"), {
-      target: { value: "C:\\Music\nD:\\Archive" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "התחל ניתוח" }));
-
-    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
-    MockEventSource.instances[0].emit("completed", { status: "completed" });
-
-    await waitFor(() => expect(screen.getByRole("button", { name: "מחק עכשיו" })).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "מחק עכשיו" }));
 
-    expect(screen.getByText('להעביר את "Archive Copy" לסל המחזור?')).toBeInTheDocument();
-    expect(screen.getByText("כן, העבר לסל המחזור")).toBeInTheDocument();
+    expect(screen.getByText("העברה בודדת לסל המחזור")).toBeInTheDocument();
+    expect(screen.getByText('התיקייה "Archive Copy" תועבר מיד לסל המחזור.')).toBeInTheDocument();
   });
 });

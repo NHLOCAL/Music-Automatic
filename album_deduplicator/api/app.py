@@ -63,6 +63,10 @@ def create_app() -> FastAPI:
         def serve_frontend() -> FileResponse:
             return FileResponse(frontend_dist / "index.html")
 
+    @app.get("/api/health")
+    def healthcheck() -> dict:
+        return {"status": "ok", "app": app.title, "version": app.version}
+
     @app.post("/api/analysis-sessions", response_model=AnalysisSessionCreatedResponse)
     def create_analysis_session(payload: AnalysisSessionCreateRequest) -> AnalysisSessionCreatedResponse:
         folders = [Path(folder).resolve() for folder in payload.folders]
