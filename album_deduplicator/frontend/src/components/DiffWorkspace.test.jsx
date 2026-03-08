@@ -8,14 +8,6 @@ const cluster = {
   confidence_bucket: "review",
   recommended_keeper_id: "folder-1",
   human_summary: "יש דמיון גבוה בין העותקים, אבל נדרשת בדיקה ידנית לפני מחיקה.",
-  technical_summary: "2 pairs הושוו. הציון הנמוך ביותר הוא 89.5/100.",
-  reason_codes: ["review_threshold"],
-  reasons: [
-    { code: "preferred_root_keeper", message: "העותק הראשון נמצא בתיקייה המועדפת." },
-  ],
-  comparison_highlights: [
-    { id: "h1", label: "איכות גבוהה יותר", album_id: "folder-1", tone: "positive", value: "320 kbps" },
-  ],
   albums: [
     {
       folder_id: "folder-1",
@@ -25,6 +17,7 @@ const cluster = {
       avg_bitrate: 320,
       file_count: 2,
       has_album_art: true,
+      in_preferred_root: true,
       total_size_mb: 120,
       is_deleted: false,
       tracks: [
@@ -40,6 +33,7 @@ const cluster = {
       avg_bitrate: 256,
       file_count: 2,
       has_album_art: false,
+      in_preferred_root: false,
       total_size_mb: 110,
       is_deleted: false,
       tracks: [
@@ -55,6 +49,7 @@ const cluster = {
       avg_bitrate: 192,
       file_count: 2,
       has_album_art: false,
+      in_preferred_root: false,
       total_size_mb: 95,
       is_deleted: false,
       tracks: [
@@ -75,9 +70,7 @@ const cluster = {
       final_score: 92.6,
       gemini_verdict: "similar",
       gemini_reason: "הרשימות כמעט זהות עם הבדל קטן באיכות.",
-      gemini_error: null,
       is_identical_by_hash: false,
-      similarity_scores: {},
       reason_codes: ["review_threshold"],
     },
     {
@@ -91,9 +84,7 @@ const cluster = {
       final_score: 89.7,
       gemini_verdict: null,
       gemini_reason: null,
-      gemini_error: null,
       is_identical_by_hash: false,
-      similarity_scores: {},
       reason_codes: ["review_threshold"],
     },
   ],
@@ -104,86 +95,75 @@ describe("DiffWorkspace", () => {
     cleanup();
   });
 
-  it("renders numbered copies, numbered summary text, and a scrollable track comparison table", () => {
+  it("renders the compact comparison workspace with numbered copies and a scrollable track table", () => {
     const { container } = render(
       <DiffWorkspace
         cluster={cluster}
         currentKeeperId="folder-1"
-        hasUserDecision
-        selectedDeleteFolderIds={["folder-2", "folder-3"]}
         handleDecision={vi.fn()}
-        toggleDeleteSelection={vi.fn()}
         openExplorer={vi.fn()}
-        setSingleDeleteTarget={vi.fn()}
-        onBackToSetup={vi.fn()}
       />,
     );
 
     expect(screen.getAllByText("עותק 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("עותק 2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("עותק 3").length).toBeGreaterThan(0);
-    expect(screen.getByText(/ההמלצה הראשונית היא לשמור את עותק 1/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "איך המערכת הגיעה להחלטה" })).toBeInTheDocument();
-    expect(screen.getAllByText("המודל המתמטי").length).toBeGreaterThan(0);
-    expect(screen.getByText("ציון ה-AI המקומי")).toBeInTheDocument();
-    expect(screen.getByText("הציון הסופי")).toBeInTheDocument();
-    expect(screen.getAllByText("89.7/100").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("92.0/100").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("91.0/100").length).toBeGreaterThan(0);
-    expect(screen.getByText("השוואת קבצים מפורטת")).toBeInTheDocument();
+    expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
+    expect(screen.getByText("עותקי האלבום זה לצד זה")).toBeInTheDocument();
+    expect(screen.getByText("רשימת השוואה מפורטת")).toBeInTheDocument();
+    const scoreSummary = container.querySelector(".ai-panel-summary");
+    if (!scoreSummary) throw new Error("Expected score summary to exist");
+    fireEvent.click(scoreSummary);
+    expect(screen.getByText("ציון סופי")).toBeInTheDocument();
+    expect(screen.getByText("השוואה מתמטית")).toBeInTheDocument();
+    expect(screen.getByText("למידת מכונה")).toBeInTheDocument();
+    expect(screen.getByText("Score בסיס")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "נבחר לשמירה" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "מיועד למחיקה" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "פתח בתיקייה" })).toHaveLength(3);
     expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
     expect(screen.getAllByText("02.mp3").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "עותק שמור" })).toBeDisabled();
-    expect(screen.getAllByRole("button", { name: "מחק תיקייה זו כעת" })).toHaveLength(2);
+    expect(container.querySelector(".comparison-grid-scroll")).not.toBeNull();
     expect(container.querySelector(".track-table-scroll")).not.toBeNull();
     expect(container.querySelector("table.tracks-table")).not.toBeNull();
-    expect(container.querySelectorAll(".box-secondary-action")).toHaveLength(3);
   });
 
-  it("reveals the advanced score breakdown for power users", () => {
-    render(
+  it("shows system insight text and toggles the details panel open", () => {
+    const { container } = render(
       <DiffWorkspace
         cluster={cluster}
         currentKeeperId="folder-1"
-        hasUserDecision
-        selectedDeleteFolderIds={["folder-2", "folder-3"]}
         handleDecision={vi.fn()}
-        toggleDeleteSelection={vi.fn()}
         openExplorer={vi.fn()}
-        setSingleDeleteTarget={vi.fn()}
-        onBackToSetup={vi.fn()}
       />,
     );
 
-    expect(screen.queryByText("פירוט מלא לכל pair")).not.toBeInTheDocument();
+    expect(screen.getByText("פירוט score, הסבר אנושי, ושכבת השקיפות האלגוריתמית.")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "הצג פרטים מתקדמים" }));
+    const details = container.querySelector(".ai-panel-details");
+    const summary = container.querySelector(".ai-panel-summary");
 
-    expect(screen.getByText("פירוט מלא לכל pair")).toBeInTheDocument();
-    expect(screen.getByText("תקציר טכני")).toBeInTheDocument();
-    expect(screen.getByText("2 pairs הושוו. הציון הנמוך ביותר הוא 89.5/100.")).toBeInTheDocument();
-    expect(screen.getAllByText("90.0/100").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Reason codes של הקבוצה:/)).toBeInTheDocument();
+    expect(details?.hasAttribute("open")).toBe(false);
+    if (!summary) throw new Error("Expected score transparency summary to exist");
+
+    fireEvent.click(summary);
+
+    expect(details?.hasAttribute("open")).toBe(true);
+    expect(screen.getAllByText("89.7/100").length).toBeGreaterThan(0);
   });
 
-  it("blocks single-delete actions when no keeper is active", () => {
+  it("keeps all copy actions selectable when no keeper has been chosen yet", () => {
     render(
       <DiffWorkspace
         cluster={cluster}
         currentKeeperId={null}
-        hasUserDecision
-        selectedDeleteFolderIds={[]}
         handleDecision={vi.fn()}
-        toggleDeleteSelection={vi.fn()}
         openExplorer={vi.fn()}
-        setSingleDeleteTarget={vi.fn()}
-        onBackToSetup={vi.fn()}
       />,
     );
 
-    const blockedButtons = screen.getAllByRole("button", { name: "בחר קודם עותק לשמירה" });
-    expect(blockedButtons).toHaveLength(3);
-    blockedButtons.forEach((button) => expect(button).toBeDisabled());
-    expect(screen.queryAllByRole("button", { name: "מחק תיקייה זו כעת" })).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: "שמור עותק זה" })).toHaveLength(3);
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.queryAllByRole("button", { name: "מיועד למחיקה" })).toHaveLength(0);
   });
 });

@@ -3,6 +3,7 @@
   --color-primary-hover: #003eaa;
   --color-primary-active: #002878;
   --color-primary-subtle: #e0f0ff;
+  --color-primary-soft: #f2f7ff;
   --color-success: #1a7f37;
   --color-success-bg: #dafbe1;
   --color-success-text: #1a7f37;
@@ -13,11 +14,11 @@
   --color-danger-hover: #a40e26;
   --color-danger-bg: #ffebe9;
   --color-danger-text: #cf222e;
-  --bg-app: #f3f3f3;
+  --bg-app: #eef1f5;
   --bg-surface: #ffffff;
-  --bg-sidebar: #f9f9fb;
+  --bg-sidebar: #f7f9fc;
   --bg-input: #ffffff;
-  --bg-selected: #e0e0e6;
+  --bg-selected: #e6ebf2;
   --border-subtle: #e1e1e1;
   --border-default: #d0d0d0;
   --border-focus: #0060df;
@@ -52,7 +53,9 @@ body,
 }
 body {
   font-family: var(--font-ui);
-  background-color: var(--bg-app);
+  background:
+    radial-gradient(circle at top right, rgba(0, 96, 223, 0.08), transparent 28%),
+    linear-gradient(180deg, #f7f9fc 0%, var(--bg-app) 100%);
   color: var(--text-main);
   font-size: 13px;
   line-height: 1.5;
@@ -118,9 +121,9 @@ button {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 28px;
+  height: 30px;
   padding: 0 12px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   font-weight: 500;
   font-size: 0.85rem;
   transition: all 0.1s ease;
@@ -143,10 +146,11 @@ button {
   background-color: var(--color-primary-active);
 }
 .btn-secondary {
-  background-color: var(--bg-surface);
+  background-color: rgba(255, 255, 255, 0.82);
   color: var(--text-main);
   border: 1px solid var(--border-default);
   box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
 }
 .btn-secondary:hover:not(:disabled) {
   background-color: var(--bg-sidebar);
@@ -186,12 +190,26 @@ button {
   font-size: 0.75rem;
 }
 .btn-icon {
-  width: 28px;
+  width: 30px;
   padding: 0;
 }
+.icon {
+  flex-shrink: 0;
+}
+.icon.tone-primary,
+.icon.tone-success,
+.icon.tone-warning,
+.icon.tone-neutral {
+  background: transparent;
+}
+.icon.tone-primary { color: var(--color-primary); }
+.icon.tone-success { color: var(--color-success); }
+.icon.tone-warning { color: var(--color-warning); }
+.icon.tone-neutral { color: var(--text-tertiary); }
 .badge {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   font-size: 0.75rem;

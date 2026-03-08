@@ -57,7 +57,7 @@ describe("ClusterList", () => {
     const { container } = render(
       <ClusterList
         clusters={clusters}
-        selectedClusterId="cluster-ready"
+        selectedClusterId="cluster-pending"
         setSelectedClusterId={vi.fn()}
         decisions={{ "cluster-ready": "folder-c" }}
         selectedTab="review"
@@ -70,7 +70,8 @@ describe("ClusterList", () => {
     expect(cards).toHaveLength(2);
     expect(cards[0].textContent).toContain("Ready Copy");
     expect(cards[0].textContent).toContain("נבדק ומוכן");
-    expect(cards[0].textContent).toContain("סופי 95.6");
+    expect(cards[0].textContent).toContain("התאמה: 95.6");
+    expect(cards[0].textContent).toContain("2 עותקים");
     expect(cards[1].textContent).toContain("Pending Copy");
   });
 });

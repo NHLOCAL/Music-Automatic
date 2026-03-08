@@ -362,7 +362,7 @@ describe("App", () => {
     });
   });
 
-  it("loads a completed session and opens the single-delete confirmation", async () => {
+  it("loads a completed session and renders the compact review workspace", async () => {
     window.albumDeduplicator = createDesktopBridge();
     const fetchMock = vi.fn(async (url, options = {}) => {
       if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
@@ -402,19 +402,15 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
 
     await waitFor(() =>
-      expect(screen.getByText(/מומלץ לשמור את עותק 1/i)).toBeInTheDocument(),
+      expect(screen.getByText("עותקי האלבום זה לצד זה")).toBeInTheDocument(),
     );
     expect(screen.getAllByText("Best vs Archive Copy").length).toBeGreaterThan(0);
     expect(screen.getAllByText("בטוח למחיקה").length).toBeGreaterThan(0);
-    expect(screen.getByText("השוואת קבצים מפורטת")).toBeInTheDocument();
+    expect(screen.getByText("רשימת השוואה מפורטת")).toBeInTheDocument();
     expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
-    expect(screen.getByText("שוני בנתונים")).toBeInTheDocument();
-    expect(screen.getByText("קובץ חסר")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "מחק תיקייה זו כעת" }));
-
-    expect(screen.getByText("העברה בודדת לסל המחזור")).toBeInTheDocument();
-    expect(screen.getByText('התיקייה "Archive Copy" תועבר מיד לסל המחזור בלי להמתין לאישור המרוכז.')).toBeInTheDocument();
+    expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "נבחר לשמירה" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "מיועד למחיקה" })).toBeInTheDocument();
   });
 
   it("opens the standalone finalize screen and shows partial execution status after delete", async () => {
@@ -546,7 +542,7 @@ describe("App", () => {
     );
   });
 
-  it("allows marking a review copy for deletion using the recommended keeper", async () => {
+  it("allows changing the keeper in a review cluster and persists the decision", async () => {
     window.albumDeduplicator = createDesktopBridge();
     const fetchMock = vi.fn(async (url, options = {}) => {
       if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
@@ -617,8 +613,7 @@ describe("App", () => {
     fireEvent.click(screen.getByText("לסקירה"));
 
     await waitFor(() => expect(screen.getAllByText("Best vs Archive Copy").length).toBeGreaterThan(0));
-    const deleteButtons = screen.getAllByRole("button", { name: "סמן למחיקה" });
-    fireEvent.click(deleteButtons.find((button) => !button.disabled));
+    fireEvent.click(screen.getByRole("button", { name: "מיועד למחיקה" }));
 
     await waitFor(() => {
       const decisionRequest = fetchMock.mock.calls.find(([url]) =>
@@ -629,8 +624,8 @@ describe("App", () => {
         decisions: [
           {
             cluster_id: "cluster-1",
-            keeper_id: "folder-keep",
-            delete_folder_ids: ["folder-drop"],
+            keeper_id: "folder-drop",
+            delete_folder_ids: ["folder-keep"],
           },
         ],
       });
@@ -696,7 +691,7 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getAllByText("Best vs Archive Copy").length).toBeGreaterThan(0));
 
-    expect(screen.getAllByRole("button", { name: "בחר קודם עותק לשמירה" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "שמור עותק זה" }).length).toBeGreaterThan(0);
 
     fireEvent.keyDown(window, { key: "d" });
 

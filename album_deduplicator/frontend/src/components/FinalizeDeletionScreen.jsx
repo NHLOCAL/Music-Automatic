@@ -1,5 +1,5 @@
 import React from "react";
-import { Badge, Button } from "./UI";
+import { Badge, Button, Icon } from "./UI";
 import { formatSizeMb, getClusterDisplayTitle } from "../utils";
 
 function KeeperPanel({ keeper, openExplorer }) {
@@ -27,6 +27,7 @@ function KeeperPanel({ keeper, openExplorer }) {
         <span>{formatSizeMb(keeper.total_size_mb)}</span>
       </div>
       <Button variant="secondary" size="sm" onClick={() => openExplorer(keeper.path)}>
+        <Icon name="folder" size={14} />
         פתח keeper
       </Button>
     </div>
@@ -63,11 +64,13 @@ function ItemRow({ item, keeper, variant = "pending", openExplorer }) {
       <div className="finalize-item-actions">
         {!isHistory ? (
           <Button variant="secondary" size="sm" onClick={() => openExplorer(item.path)}>
+            <Icon name="folder" size={14} />
             פתח תיקייה
           </Button>
         ) : null}
         {keeper ? (
           <Button variant="ghost" size="sm" onClick={() => openExplorer(keeper.path)}>
+            <Icon name="shield" size={14} />
             פתח keeper
           </Button>
         ) : null}
@@ -150,8 +153,14 @@ export function FinalizeDeletionScreen({
           </p>
         </div>
         <div className="finalize-header-actions">
-          <Button variant="secondary" size="lg" onClick={onBackToReview}>חזור לסקירה</Button>
-          <Button variant="secondary" size="lg" onClick={onBackToSetup}>סריקה חדשה</Button>
+          <Button variant="secondary" size="lg" onClick={onBackToReview}>
+            <Icon name="compare" size={16} />
+            חזור לסקירה
+          </Button>
+          <Button variant="secondary" size="lg" onClick={onBackToSetup}>
+            <Icon name="arrow-left" size={16} />
+            סריקה חדשה
+          </Button>
         </div>
       </div>
 
@@ -179,6 +188,7 @@ export function FinalizeDeletionScreen({
               disabled={!hasPending || isExecuting}
               style={{ width: "100%" }}
             >
+              <Icon name="trash" size={16} />
               {isExecuting
                 ? "מעביר לסל המחזור..."
                 : hasPending

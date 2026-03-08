@@ -26,6 +26,16 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
 
   return (
     <div className="cluster-sidebar">
+      <div className="cluster-sidebar-top">
+        <div className="cluster-sidebar-title">
+          <div>
+            <span className="sidebar-kicker">מרכז סקירה</span>
+            <h3>קבוצות אלבומים</h3>
+          </div>
+          <Badge tone="neutral" icon="layers">{filteredClusters.length}</Badge>
+        </div>
+        <p>בחר קבוצה אחת, השווה בין העותקים, והחלט איזה עותק נשאר.</p>
+      </div>
       <div className="sidebar-tabs">
         <div className="tab-group">
           <div className={`tab-item ${selectedTab === 'safe' ? 'active' : ''}`} onClick={() => setSelectedTab('safe')}>
@@ -80,6 +90,16 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
                     {scoreLine}
                   </span>
                   {!isActive && <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>}
+                </div>
+                <div className="cluster-meta">
+                  <span>
+                    <Icon name="layers" size={12} />
+                    {cluster.albums.filter((album) => !album.is_deleted).length} עותקים
+                  </span>
+                  <span>
+                    <Icon name="folder" size={12} />
+                    {cluster.confidence_bucket === "safe" ? "מוכן לפעולה" : "דורש החלטה"}
+                  </span>
                 </div>
               </div>
             );

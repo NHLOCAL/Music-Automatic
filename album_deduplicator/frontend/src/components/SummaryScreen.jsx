@@ -1,5 +1,5 @@
 import React from "react";
-import { Button } from "./UI";
+import { Badge, Button, Icon } from "./UI";
 
 export function SummaryScreen({ summary, onStartReview, onBackToSetup }) {
   if (!summary?.counts) return null;
@@ -9,32 +9,46 @@ export function SummaryScreen({ summary, onStartReview, onBackToSetup }) {
     <div className="centered-view">
       <div className="summary-container">
         <div className="success-icon">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
+          <Icon name="check-circle" size={40} />
         </div>
         
-        <h1 style={{ fontSize: '2rem', marginBottom: '16px' }}>הסריקה הושלמה!</h1>
-        <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)' }}>
+        <Badge tone="success" icon="shield">מוכן למעבר על התוצאות</Badge>
+        <h1 className="summary-title">הסריקה הושלמה!</h1>
+        <p className="summary-description">
            המודל המתמטי ומנוע ה-AI סיימו לנתח את הקבצים. במסך הבא תוכל לראות גם את פירוק הציונים בצורה מלאה יותר.
         </p>
 
         <div className="summary-stats-grid">
           <div className="stat-card highlight">
+            <div className="stat-card-head">
+              <Icon name="shield" size={16} />
+              בטוח למחיקה
+            </div>
             <div className="stat-value">{safe_clusters}</div>
             <div className="stat-label">עותקים בטוחים למחיקה</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value" style={{ color: 'var(--color-warning-text)' }}>{review_clusters}</div>
+            <div className="stat-card-head warning">
+              <Icon name="alert" size={16} />
+              דורש בדיקה
+            </div>
+            <div className="stat-value stat-value-warning">{review_clusters}</div>
             <div className="stat-label">דורשים סקירה</div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <Button variant="secondary" size="lg" style={{ flex: 1 }} onClick={onBackToSetup}>
+        <div className="summary-note">
+          <Icon name="info" size={16} />
+          שום קובץ לא יועבר עדיין. במסך הסקירה תוכל לאשר כל החלטה ידנית.
+        </div>
+
+        <div className="summary-actions">
+          <Button variant="secondary" size="lg" className="summary-action-button" onClick={onBackToSetup}>
+            <Icon name="arrow-left" size={16} />
             סריקה חדשה
           </Button>
-          <Button variant="primary" size="lg" style={{ flex: 2 }} onClick={onStartReview}>
+          <Button variant="primary" size="lg" className="summary-action-button is-primary" onClick={onStartReview}>
+            <Icon name="compare" size={16} />
             התחל לעבור על התוצאות
           </Button>
         </div>

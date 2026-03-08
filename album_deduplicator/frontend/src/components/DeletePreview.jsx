@@ -1,5 +1,5 @@
 import React from "react";
-import { Button } from "./UI";
+import { Button, Icon } from "./UI";
 import { formatSizeMb } from "../utils";
 
 export function DeletePreview({ workflowSummary, onOpenFinalize, isExecuting }) {
@@ -10,15 +10,18 @@ export function DeletePreview({ workflowSummary, onOpenFinalize, isExecuting }) 
   return (
     <div className="fab-container">
       <div className="fab-info">
-        <div className="fab-badge">{workflowSummary.pendingCount}</div>
+        <div className="fab-badge">
+          <Icon name="trash" size={14} />
+          {workflowSummary.pendingCount}
+        </div>
         <div>
-          <div style={{ fontWeight: 600, fontSize: "1rem" }}>שלב ההעברה הסופי מוכן</div>
-          <div style={{ fontSize: "0.85rem", opacity: 0.9 }}>
+          <div className="fab-title">שלב ההעברה הסופי מוכן</div>
+          <div className="fab-copy">
             {workflowSummary.pendingCount > 0
               ? `ממתינות ${workflowSummary.pendingCount} תיקיות להעברה • ${formatSizeMb(workflowSummary.pendingSizeMb)}`
               : "אין כרגע פריטים חדשים שממתינים להעברה"}
           </div>
-          <div style={{ fontSize: "0.8rem", opacity: 0.72, marginTop: "2px" }}>
+          <div className="fab-subcopy">
             {workflowSummary.deletedCount > 0
               ? `${workflowSummary.deletedCount} כבר הועברו`
               : "עדיין לא בוצעה העברה מתוך הזרימה המרוכזת"}
@@ -28,6 +31,7 @@ export function DeletePreview({ workflowSummary, onOpenFinalize, isExecuting }) 
       </div>
       
       <Button variant="danger" size="lg" onClick={onOpenFinalize} disabled={isExecuting}>
+        <Icon name="trash" size={16} />
         פתח את שלב ההעברה
       </Button>
     </div>
