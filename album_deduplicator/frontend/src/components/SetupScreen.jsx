@@ -92,19 +92,25 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
             <div className="form-section">
               <div className="form-section-header">
                 <label style={{ margin: 0 }}>ספריות לסריקה</label>
-                {runtimeInfo?.isElectron ? (
-                  <Button type="button" variant="ghost" size="sm" style={{ height: '28px', fontSize: '0.8rem' }} onClick={onPickFolders}>
-                    + בחר תיקיות
-                  </Button>
-                ) : (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {runtimeInfo?.isElectron && (
+                    <Button type="button" variant="ghost" size="sm" style={{ height: '28px', fontSize: '0.8rem' }} onClick={onPickFolders}>
+                      + בחר כמה תיקיות
+                    </Button>
+                  )}
                   <Button type="button" variant="ghost" size="sm" style={{ height: '28px', fontSize: '0.8rem' }} onClick={addFolder}>
                     + הוסף שורה
                   </Button>
-                )}
+                </div>
               </div>
               <div className="form-helper">
-                כל שורה היא root נפרד לסריקה. אפשר להשוות בין כמה ספריות במקביל.
+                כל שורה היא root נפרד לסריקה. באפליקציית ה-Desktop אפשר לבחור כמה תיקיות יחד באותו דו-שיח ולהוסיף את כולן בבת אחת.
               </div>
+              {runtimeInfo?.isElectron && (
+                <div className="form-helper">
+                  אם דו-שיח Windows מציג עבור תיקיות מסוימות הודעה כמו "שם התיקיה אינו חוקי", אפשר להוסיף שורה ולהדביק את הנתיב ידנית.
+                </div>
+              )}
               <div className="path-list">
                 {form.folders.map((folder, idx) => (
                   <div key={folder.id} className="path-input-group">

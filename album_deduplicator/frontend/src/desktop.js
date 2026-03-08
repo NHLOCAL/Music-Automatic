@@ -25,12 +25,12 @@ export async function getRuntimeInfo() {
   return fallbackRuntime;
 }
 
-export async function pickScanFolders() {
+export async function pickScanFolders(options = {}) {
   const bridge = getBridge();
   if (!bridge?.selectScanFolders) {
     return [];
   }
-  return bridge.selectScanFolders();
+  return bridge.selectScanFolders(options);
 }
 
 export async function pickPreferredRoot() {

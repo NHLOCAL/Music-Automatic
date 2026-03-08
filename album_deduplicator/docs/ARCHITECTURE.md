@@ -126,7 +126,7 @@
   - מנהל lifecycle של backend בעת פתיחה/סגירה
 - `preload.cjs`
   - חושף bridge מאובטח ל-renderer
-  - בחירת תיקיות native
+  - בחירת תיקיות native, כולל multi-select ל-roots של הסריקה
   - פתיחת נתיבים ב-Explorer
   - הזרקת runtime metadata כמו `backendBaseUrl`
 
@@ -140,6 +140,7 @@
   - יצירת session.
   - האזנה ל-`SSE`.
   - ניהול roots בשדות נפרדים עם add/remove ברור.
+  - fallback ידני להזנת roots גם ב-Desktop כאשר chooser native של Windows נכשל עבור תיקיות מסוימות.
   - הצגת tabs:
     - `בטוח למחיקה`
     - `דורש סקירה`
@@ -422,6 +423,7 @@ final_score = base_score
 ### מסך התחלה
 
 - הזנת roots בשדות נפרדים
+- בחירה מרובת תיקיות באותו דו-שיח native עבור roots
 - root מועדף
 - כפתורי הוספה/הסרה לשדות roots
 - בחירת תיקיות native ב-Electron

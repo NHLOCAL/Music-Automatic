@@ -15,7 +15,7 @@ const runtime = Object.freeze({
 contextBridge.exposeInMainWorld("albumDeduplicator", {
   runtime,
   getRuntimeInfo: () => ipcRenderer.invoke("desktop:get-runtime"),
-  selectScanFolders: () => ipcRenderer.invoke("desktop:pick-scan-folders"),
+  selectScanFolders: (options) => ipcRenderer.invoke("desktop:pick-scan-folders", options),
   selectPreferredRoot: () => ipcRenderer.invoke("desktop:pick-preferred-root"),
   openPath: (targetPath) => ipcRenderer.invoke("desktop:open-path", targetPath),
   revealPath: (targetPath) => ipcRenderer.invoke("desktop:reveal-path", targetPath),

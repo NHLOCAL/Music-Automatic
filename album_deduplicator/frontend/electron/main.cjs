@@ -181,16 +181,22 @@ function setupIpcHandlers() {
     platform: process.platform,
   }));
 
-  ipcMain.handle("desktop:pick-scan-folders", async () => {
-    const result = await dialog.showOpenDialog({
+  ipcMain.handle("desktop:pick-scan-folders", async (_event, options = {}) => {
+    const defaultPath = typeof options.defaultPath === "string" && options.defaultPath.trim()
+      ? options.defaultPath.trim()
+      : undefined;
+
+    const result = await dialog.showOpenDialog(mainWindow, {
       title: "בחר תיקיות לסריקה",
+      buttonLabel: "הוסף תיקיות",
+      defaultPath,
       properties: ["openDirectory", "multiSelections"],
     });
     return result.canceled ? [] : result.filePaths;
   });
 
   ipcMain.handle("desktop:pick-preferred-root", async () => {
-    const result = await dialog.showOpenDialog({
+    const result = await dialog.showOpenDialog(mainWindow, {
       title: "בחר תיקייה מועדפת לשמירה",
       properties: ["openDirectory"],
     });

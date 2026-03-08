@@ -255,12 +255,34 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "+ בחר תיקיות" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ בחר כמה תיקיות" }));
 
     await waitFor(() =>
       expect(screen.getByPlaceholderText("C:\\Music")).toHaveValue("C:\\Music"),
     );
     expect(screen.getByPlaceholderText("D:\\Archive")).toHaveValue("D:\\Archive");
+  });
+
+  it("merges multiple picked scan folders without duplicating existing paths", async () => {
+    window.albumDeduplicator = createDesktopBridge({
+      selectScanFolders: vi.fn(async () => ["C:\\Music", "D:\\Archive", "E:\\Collection"]),
+    });
+    vi.stubGlobal("fetch", vi.fn());
+
+    render(<App />);
+
+    fireEvent.change(screen.getByPlaceholderText("C:\\Music"), {
+      target: { value: "C:\\Music" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "+ בחר כמה תיקיות" }));
+
+    await waitFor(() => {
+      const pathInputs = screen.getAllByRole("textbox");
+      expect(pathInputs[0]).toHaveValue("C:\\Music");
+      expect(pathInputs[1]).toHaveValue("D:\\Archive");
+      expect(pathInputs[2]).toHaveValue("E:\\Collection");
+    });
   });
 
   it("loads a completed session and opens the single-delete confirmation", async () => {

@@ -154,7 +154,8 @@ export default function App() {
   };
 
   const handlePickFolders = async () => {
-    const paths = await pickScanFolders();
+    const [defaultPath] = normalizeFolderPaths(form.folders);
+    const paths = await pickScanFolders({ defaultPath });
     if (paths.length) setForm(prev => ({...prev, folders: mergeFolderInputs(prev.folders, paths)}));
   };
 
