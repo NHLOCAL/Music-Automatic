@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Callable, Dict, FrozenSet, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Optional
 
 from .. import config
 from ..core.quality_analyzer import QualityAnalyzer
@@ -13,6 +13,11 @@ from .dto import AnalysisWarnings, PairAnalysis, stable_id
 logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[str, str, int, int], None]
+
+if TYPE_CHECKING:
+    from ..external.gemini_analyzer import GeminiAnalyzer as GeminiAnalyzerType
+else:
+    GeminiAnalyzerType = Any
 
 try:
     from ..external.gemini_analyzer import GeminiAnalyzer, API_KEY as GEMINI_API_KEY
@@ -194,7 +199,7 @@ class ScoringService:
         cached_result: Optional[FolderComparisonResult],
         folder1_info: FolderInfo,
         folder2_info: FolderInfo,
-        gemini_analyzer: Optional[GeminiAnalyzer],
+        gemini_analyzer: Optional[GeminiAnalyzerType],
         base_score: float,
     ) -> tuple[Optional[str], Optional[float], Optional[str], Optional[str]]:
         if cached_result:
@@ -225,4 +230,3 @@ class ScoringService:
         result.gemini_reason = reason
         result.gemini_error = None
         return verdict, gemini_score, reason, None
-
