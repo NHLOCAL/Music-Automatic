@@ -19,6 +19,8 @@ ML_MODEL_FILE = DATA_DIR / ML_MODEL_FILENAME
 SIMILARITY_MODEL_FALLBACK_FILE = REPO_ROOT / "similarity_model" / "models" / ML_MODEL_FILENAME
 ML_PREDICTION_BATCH_SIZE = 256
 ML_MAX_THREADS = max(1, min(4, max(1, (os.cpu_count() or 1) // 2)))
+SCAN_MAX_WORKERS = None
+SCAN_MAX_PENDING_TASKS_MULTIPLIER = 2
 ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
 LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
 IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini',
@@ -74,7 +76,7 @@ REVIEW_MIN_SIMILARITY = 60.0
 SAFE_DELETE_MIN_SIMILARITY = 90.0
 DEFAULT_LOG_LEVEL = "INFO"
 LOG_FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
-MAX_WORKERS = None # os.cpu_count() will be used by default if None
+MAX_WORKERS = None # Legacy override. Folder scanning now prefers SCAN_MAX_WORKERS.
 LRU_CACHE_SIZE = 10000
 JIBRISH_FIX_LANGUAGE = "heb"
 # --- הגדרות Gemini ---

@@ -29,6 +29,12 @@
   - `LightGBM` מוגבל למספר threads מתון כדי למנוע spike אגרסיבי של CPU
   - זוגות שלא עוברים את סף ה-`review` לא נשמרים עוד כ-`PairAnalysis`, כדי למנוע growth מיותר של RAM
   - cache תוצאות ה-ML/Gemini נשמר בפורמט רזה ללא `similarity_scores` מלאים, כי הם לא נדרשים לשימוש חוזר
+- שלב הסריקה עבר אופטימיזציה מקיפה לעומסים גדולים:
+  - הסורק מזהה מראש רק `leaf folders` שיכולים להיות אלבומים, במקום לסרוק כל תיקייה פעמיים
+  - העיבוד זורם עם `bounded worker queue`, כך שלא נצבר backlog גדול של `Future`-ים בזיכרון
+  - cache התיקיות נכתב מחדש מתוך snapshot קיים בלי `load+merge` נוסף, ובפורמט JSON קומפקטי יותר
+  - חילוץ metadata משתמש בפתיחה מפורטת אחת לכל קובץ כאשר צריך `albumartist/lyrics`, במקום כמה פתיחות חוזרות
+  - אובייקטי `FileInfo` / `FolderInfo` / `FolderComparisonResult` עברו ל-`slots` כדי לצמצם overhead בזיכרון
 - hashing ברירת המחדל הוא `partial hash`; אפשר להפעיל `full hash scan` ידנית מתוך ההגדרות המתקדמות.
 - מחיקה אוטומטית מוצעת רק כאשר:
   - מספר קבצי המוזיקה זהה

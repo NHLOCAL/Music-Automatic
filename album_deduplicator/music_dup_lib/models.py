@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Set
 
-@dataclass
+@dataclass(slots=True)
 class FileInfo:
 
     filename: str
@@ -22,7 +22,7 @@ class FileInfo:
     has_lyrics: bool = False
     is_lossless: bool = False
 
-@dataclass
+@dataclass(slots=True)
 class FolderInfo:
 
     path: Path
@@ -48,7 +48,7 @@ class FolderInfo:
     quality_score: Optional[float] = None
     quality_breakdown: Dict[str, float] = field(default_factory=dict)
 
-@dataclass
+@dataclass(slots=True)
 class FolderComparisonResult:
     folder1_path: Path
     folder2_path: Path

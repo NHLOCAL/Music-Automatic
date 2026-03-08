@@ -37,17 +37,22 @@ class DataStore:
         else:
             logger.info("Music data cache file not found. Starting with an empty cache.")
             return {}
-    def save_data(self, data_to_update: Dict[str, Any]):
+    def save_data(self, data_to_update: Dict[str, Any], merge: bool = True):
         logger.info(f"Attempting to save/update music data cache to: {self.music_cache_file}")
-        existing_music_data = self.load_data()
-        logger.info(f"Loaded {len(existing_music_data)} existing music data entries. Merging with {len(data_to_update)} new/updated entries.")
-        existing_music_data.update(data_to_update)
-        logger.info(f"Total music data entries after merge: {len(existing_music_data)}")
+        if merge:
+            existing_music_data = self.load_data()
+            logger.info(f"Loaded {len(existing_music_data)} existing music data entries. Merging with {len(data_to_update)} new/updated entries.")
+            existing_music_data.update(data_to_update)
+            data_to_write = existing_music_data
+        else:
+            data_to_write = data_to_update
+            logger.info(f"Writing {len(data_to_write)} music data entries without reloading existing cache.")
+        logger.info(f"Total music data entries after merge: {len(data_to_write)}")
         try:
             self.music_cache_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.music_cache_file, 'w', encoding='utf-8') as f:
-                json.dump(existing_music_data, f, ensure_ascii=False, indent=4)
-            logger.info(f"Music data cache successfully updated and saved with {len(existing_music_data)} total entries.")
+                json.dump(data_to_write, f, ensure_ascii=False, separators=(',', ':'))
+            logger.info(f"Music data cache successfully updated and saved with {len(data_to_write)} total entries.")
         except TypeError as e:
              logger.error(f"Error serializing updated music data to JSON: {e}. Data might contain non-serializable types.", exc_info=True)
         except OSError as e:

@@ -39,13 +39,15 @@
 - `file_processor.py`
   - עיבוד קובץ מוזיקה בודד.
   - חילוץ מטא-דאטה.
+  - פתיחה מפורטת אחת בלבד לכל קובץ כאשר נדרש `albumartist` או זיהוי `lyrics`, במקום כמה פתיחות חוזרות.
   - חישוב `partial hash` כברירת מחדל.
   - חישוב `full hash` אופציונלי כאשר המשתמש מפעיל אותו בהגדרות המתקדמות.
-  - איתור hash של עטיפת אלבום.
+  - איתור hash של עטיפת אלבום תוך reuse של רשימת קבצי התיקייה שכבר נאספה בסריקה.
 - `folder_scanner.py`
   - סריקה רקורסיבית של roots.
-  - זיהוי תיקיות אלבום תקפות.
-  - טעינה ושמירה של cache.
+  - זיהוי `leaf folders` תקפים בלבד, כדי לא לעבד intermediate directories לשווא.
+  - עיבוד זורם עם `bounded futures`, כדי למנוע backlog גדול של משימות וזיכרון מיותר.
+  - reuse של cache קיים וכתיבה קומפקטית שלו בסוף הסריקה.
 - `comparison_engine.py`
   - השוואת זוג תיקיות.
   - חישוב `weighted_score` האלגוריתמי.
@@ -54,6 +56,10 @@
   - חישוב `quality_score` לכל אלבום.
 - `data_store.py`
   - cache של תיקיות ושל תוצאות השוואה.
+
+### footprint בזיכרון
+
+- מודלי `FileInfo`, `FolderInfo`, ו-`FolderComparisonResult` מוגדרים כעת עם `slots`, כדי להקטין overhead פר-אובייקט במהלך סריקות גדולות.
 
 ### `music_dup_lib/external`
 

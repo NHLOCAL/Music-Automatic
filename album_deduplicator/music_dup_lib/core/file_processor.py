@@ -2,7 +2,7 @@ import hashlib
 import random
 import logging
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any
+from typing import Iterable, Optional, Tuple, Dict, Any
 
 
 class _DummyPillowError(Exception):
@@ -136,41 +136,12 @@ class FileProcessor:
                     if hasattr(audio.info, 'length') and audio.info.length:
                         metadata['duration'] = float(audio.info.length) # Store as float seconds
 
-                # Attempt to get Album Artist if EasyID3 didn't provide it (common case)
-                if 'albumartist' not in metadata or not metadata['albumartist']:
-                     try:
-                         detailed_audio_obj = MutagenFile(filepath) # Renamed to avoid conflict
-                         if detailed_audio_obj: # Check if detailed_audio_obj is not None
-                             if 'TPE2' in detailed_audio_obj: # type: ignore
-                                 metadata['albumartist'] = str(detailed_audio_obj['TPE2'][0]) # type: ignore
-                             elif 'albumartist' in detailed_audio_obj: # type: ignore
-                                 metadata['albumartist'] = str(detailed_audio_obj['albumartist'][0]) # type: ignore
-                             elif 'ALBUMARTIST' in detailed_audio_obj: # type: ignore
-                                 metadata['albumartist'] = str(detailed_audio_obj['ALBUMARTIST'][0]) # type: ignore
-                     except Exception as detail_e:
-                         logger.debug(f"Could not get detailed album artist for {filepath}: {detail_e}")
-
-
                 current_tags = {}
                 for k, v_list in audio.items():
                     current_tags[k] = str(v_list[0]) if v_list and v_list[0] is not None else None
                 metadata['all_tags'] = current_tags
 
-
-                try:
-                    detailed_audio_for_lyrics = MutagenFile(filepath) # Renamed
-                    if detailed_audio_for_lyrics: # Check if not None
-
-                        if any(tag_key.startswith('USLT') for tag_key in detailed_audio_for_lyrics): # type: ignore
-                             metadata['all_tags']['lyrics'] = "[Present]"
-                        elif 'COMM::eng' in detailed_audio_for_lyrics and 'lyrics' in str(detailed_audio_for_lyrics['COMM::eng'][0]).lower(): # type: ignore
-                             metadata['all_tags']['lyrics'] = "[Present]"
-                        elif 'lyrics' in detailed_audio_for_lyrics: # type: ignore
-                             metadata['all_tags']['lyrics'] = "[Present]"
-                        elif 'LYRICS' in detailed_audio_for_lyrics: # type: ignore
-                             metadata['all_tags']['lyrics'] = "[Present]"
-                except Exception as lyrics_e:
-                    logger.debug(f"Could not perform detailed lyrics check for {filepath}: {lyrics_e}")
+                self._augment_metadata_from_detailed_tags(filepath, metadata)
 
 
             else:
@@ -202,6 +173,75 @@ class FileProcessor:
 
 
         return metadata
+
+    def _augment_metadata_from_detailed_tags(self, filepath: Path, metadata: Dict[str, Any]) -> None:
+        needs_albumartist = not metadata.get('albumartist')
+        needs_lyrics_check = 'lyrics' not in metadata.get('all_tags', {})
+        if not needs_albumartist and not needs_lyrics_check:
+            return
+
+        try:
+            detailed_audio = MutagenFile(filepath)
+            if not detailed_audio:
+                return
+
+            if needs_albumartist:
+                albumartist = self._extract_first_matching_tag_value(
+                    detailed_audio,
+                    ('TPE2', 'albumartist', 'ALBUMARTIST', 'aART'),
+                )
+                if albumartist:
+                    metadata['albumartist'] = albumartist
+
+            if needs_lyrics_check and self._detailed_audio_has_lyrics(detailed_audio):
+                metadata.setdefault('all_tags', {})['lyrics'] = "[Present]"
+        except Exception as detail_e:
+            logger.debug(f"Could not augment detailed metadata for {filepath}: {detail_e}")
+
+    def _extract_first_matching_tag_value(self, audio: Any, keys: Iterable[str]) -> Optional[str]:
+        for key in keys:
+            try:
+                if key not in audio: # type: ignore[operator]
+                    continue
+                value = audio[key] # type: ignore[index]
+            except Exception:
+                continue
+
+            normalized = self._normalize_tag_value(value)
+            if normalized:
+                return normalized
+        return None
+
+    def _normalize_tag_value(self, value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                normalized = self._normalize_tag_value(item)
+                if normalized:
+                    return normalized
+            return None
+        text_value = None
+        if hasattr(value, 'text') and value.text:
+            text_value = value.text[0]
+        elif hasattr(value, 'value') and value.value:
+            text_value = value.value
+        else:
+            text_value = value
+        if text_value is None:
+            return None
+        normalized = str(text_value).strip()
+        return normalized or None
+
+    def _detailed_audio_has_lyrics(self, audio: Any) -> bool:
+        try:
+            if any(str(tag_key).startswith('USLT') for tag_key in audio): # type: ignore[operator]
+                return True
+            if 'COMM::eng' in audio and 'lyrics' in str(audio['COMM::eng'][0]).lower(): # type: ignore[index,operator]
+                return True
+            return 'lyrics' in audio or 'LYRICS' in audio  # type: ignore[operator]
+        except Exception:
+            return False
 
 
     def _calculate_hash(self, filepath: Path) -> Optional[str]:
@@ -293,7 +333,12 @@ class FileProcessor:
             return None
 
 
-    def get_folder_album_art_hash(self, folder_path: Path) -> Optional[str]:
+    def get_folder_album_art_hash(
+        self,
+        folder_path: Path,
+        music_files: Optional[Iterable[Path]] = None,
+        album_art_files: Optional[Iterable[Path]] = None,
+    ) -> Optional[str]:
 
         if folder_path in self._album_art_hash_cache:
             return self._album_art_hash_cache[folder_path]
@@ -301,8 +346,10 @@ class FileProcessor:
         art_hash = None
 
         if PIL_AVAILABLE: # Check if Pillow is available
-            for filename in config.ALBUM_ART_FILES:
-                art_file = folder_path / filename
+            candidate_art_files = list(album_art_files) if album_art_files is not None else [
+                folder_path / filename for filename in config.ALBUM_ART_FILES
+            ]
+            for art_file in candidate_art_files:
                 if art_file.is_file():
                     art_hash = self._hash_image_file(art_file)
                     if art_hash:
@@ -312,12 +359,12 @@ class FileProcessor:
 
         if not art_hash:
             try:
-                music_files = sorted([
+                candidate_music_files = list(music_files) if music_files is not None else sorted([
                     f for f in folder_path.iterdir()
                     if f.is_file() and f.suffix.lower() in config.ALLOWED_EXTENSIONS
                 ])
 
-                for music_file in music_files[:5]:
+                for music_file in candidate_music_files[:5]:
                     art_hash = self._extract_embedded_art_hash(music_file)
                     if art_hash:
                         logger.debug(f"Found embedded album art in: {music_file.name}")
