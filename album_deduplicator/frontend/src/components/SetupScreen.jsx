@@ -113,14 +113,36 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
             {showAdvanced && (
               <div className="advanced-panel">
                 <label className="checkbox-card">
-                  <input type="checkbox" checked={form.force_rescan} onChange={(e) => setForm({...form, force_rescan: e.target.checked})} />
+                  <input
+                    type="checkbox"
+                    aria-label="סריקה מחדש מלאה"
+                    checked={form.force_rescan}
+                    onChange={(e) => setForm({...form, force_rescan: e.target.checked})}
+                  />
                   <div className="checkbox-content">
                     <h4>סריקה מחדש מלאה</h4>
                     <p>התעלם מנתונים שמורים ב-Cache וסרוק את הדיסק מחדש.</p>
                   </div>
                 </label>
                 <label className="checkbox-card">
-                  <input type="checkbox" checked={form.gemini_enabled} onChange={(e) => setForm({...form, gemini_enabled: e.target.checked})} />
+                  <input
+                    type="checkbox"
+                    aria-label="סריקת Hash מלאה"
+                    checked={form.full_hash_scan}
+                    onChange={(e) => setForm({...form, full_hash_scan: e.target.checked})}
+                  />
+                  <div className="checkbox-content">
+                    <h4>סריקת Hash מלאה</h4>
+                    <p>חשב hash מלא לכל קובץ להשוואה מדויקת יותר. איטי יותר ולכן כבוי כברירת מחדל.</p>
+                  </div>
+                </label>
+                <label className="checkbox-card">
+                  <input
+                    type="checkbox"
+                    aria-label="אימות AI (Gemini)"
+                    checked={form.gemini_enabled}
+                    onChange={(e) => setForm({...form, gemini_enabled: e.target.checked})}
+                  />
                   <div className="checkbox-content">
                     <h4>אימות AI (Gemini)</h4>
                     <p>השתמש בבינה מלאכותית להכרעה במקרים גבוליים.</p>

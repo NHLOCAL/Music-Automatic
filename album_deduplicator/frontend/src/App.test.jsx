@@ -195,6 +195,26 @@ const previewResponse = {
   manual_selected_count: 0,
 };
 
+const deletedClusterResponse = {
+  clusters: [
+    {
+      ...clusterResponse.clusters[0],
+      resolution_state: "deleted",
+      selected_delete_folder_ids: [],
+      albums: [
+        {
+          ...clusterResponse.clusters[0].albums[0],
+          is_deleted: false,
+        },
+        {
+          ...clusterResponse.clusters[0].albums[1],
+          is_deleted: true,
+        },
+      ],
+    },
+  ],
+};
+
 const reviewClusterResponse = {
   clusters: [
     {
@@ -249,6 +269,59 @@ describe("App", () => {
 
     fireEvent.click(screen.getByText("הגדרות מתקדמות"));
     expect(screen.getByText("אימות AI (Gemini)")).toBeInTheDocument();
+    expect(screen.getByLabelText("סריקת Hash מלאה")).not.toBeChecked();
+  });
+
+  it("submits full hash scan only when the advanced toggle is enabled", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse(emptyClusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(emptyPreviewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse({
+          ...sessionSummary,
+          counts: {
+            ...sessionSummary.counts,
+            safe_clusters: 0,
+            review_clusters: 0,
+          },
+        });
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    const folderInputs = getScanFolderInputs();
+    fireEvent.change(folderInputs[0], {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.change(folderInputs[1], {
+      target: { value: "D:\\Archive" },
+    });
+
+    fireEvent.click(screen.getByText("הגדרות מתקדמות"));
+    fireEvent.click(screen.getByLabelText("סריקת Hash מלאה"));
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
+
+    await waitFor(() => {
+      const createRequest = fetchMock.mock.calls.find(([url, options]) =>
+        String(url).endsWith("/api/analysis-sessions") && options?.method === "POST",
+      );
+      expect(createRequest).toBeTruthy();
+      expect(JSON.parse(createRequest[1].body)).toMatchObject({
+        folders: ["C:\\Music", "D:\\Archive"],
+        full_hash_scan: true,
+      });
+    });
   });
 
   it("uses the electron bridge to pick scan folders", async () => {
@@ -342,6 +415,80 @@ describe("App", () => {
 
     expect(screen.getByText("העברה בודדת לסל המחזור")).toBeInTheDocument();
     expect(screen.getByText('התיקייה "Archive Copy" תועבר מיד לסל המחזור בלי להמתין לאישור המרוכז.')).toBeInTheDocument();
+  });
+
+  it("opens the standalone finalize screen and shows partial execution status after delete", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    let deleteExecuted = false;
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-executions")) {
+        deleteExecuted = true;
+        return jsonResponse({
+          moved_count: 1,
+          failed_count: 0,
+          total_size_mb: 45,
+          results: [
+            {
+              folder_id: "folder-drop",
+              folder_path: "D:/Archive/Best",
+              success: true,
+              message: "הועבר לסל המחזור.",
+              size_mb: 45,
+            },
+          ],
+        });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse(deleteExecuted ? deletedClusterResponse : clusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(deleteExecuted ? emptyPreviewResponse : previewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse(sessionSummary);
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    const folderInputs = getScanFolderInputs();
+    fireEvent.change(folderInputs[0], {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.change(folderInputs[1], {
+      target: { value: "D:\\Archive" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "הסריקה הושלמה!" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
+
+    await waitFor(() => expect(screen.getByText("פתח את שלב ההעברה")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "פתח את שלב ההעברה" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "העברה סופית לסל המחזור" })).toBeInTheDocument(),
+    );
+    expect(screen.getAllByText("ממתינות להעברה").length).toBeGreaterThan(0);
+    expect(screen.getByText("עותק נשמר")).toBeInTheDocument();
+    expect(screen.getByText("נבחר אוטומטית")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "העבר 1 תיקיות לסל המחזור" }));
+
+    await waitFor(() => expect(screen.getAllByText("כבר הועברו").length).toBeGreaterThan(0));
+    expect(screen.getByText("הועבר בהצלחה לסל המחזור")).toBeInTheDocument();
+    expect(screen.getByText("אין כרגע תיקיות שממתינות להעברה. אפשר לחזור לסקירה או להתחיל סריקה חדשה.")).toBeInTheDocument();
   });
 
   it("waits for summary data before switching from scanning to summary", async () => {

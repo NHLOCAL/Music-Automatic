@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 export function useKeyboardShortcuts({
+  appView,
   status, clusters, selectedCluster, selectedClusterId, setSelectedClusterId,
   currentKeeperId, focusedAlbumId, setFocusedAlbumId, handleDecision,
-  preview, setBulkConfirmOpen, singleDeleteTarget, setSingleDeleteTarget, executeSingleDelete, openExplorer,
+  preview, openFinalize, singleDeleteTarget, setSingleDeleteTarget, executeSingleDelete, openExplorer,
   toggleDeleteSelection,
 }) {
   useEffect(() => {
@@ -10,11 +11,10 @@ export function useKeyboardShortcuts({
       const targetTag = event.target?.tagName;
       if (["INPUT", "TEXTAREA", "SELECT"].includes(targetTag)) return;
       if (event.key === "Escape") {
-        setBulkConfirmOpen(false);
         setSingleDeleteTarget(null);
         return;
       }
-      if (status !== "completed" || !selectedCluster) return;
+      if (appView !== "review" || status !== "completed" || !selectedCluster) return;
       const clusterIndex = clusters.findIndex(c => c.cluster_id === selectedCluster.cluster_id);
       if (event.key === "ArrowDown" && clusterIndex < clusters.length - 1) {
         event.preventDefault();
@@ -47,7 +47,7 @@ export function useKeyboardShortcuts({
       if (event.key === "Enter") {
         event.preventDefault();
         if (singleDeleteTarget) executeSingleDelete(singleDeleteTarget);
-        else if (preview.total_count > 0) setBulkConfirmOpen(true);
+        else if (preview.total_count > 0) openFinalize();
         return;
       }
       if (event.key.toLowerCase() === "o") {
@@ -76,5 +76,5 @@ export function useKeyboardShortcuts({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [clusters, currentKeeperId, focusedAlbumId, preview.total_count, selectedCluster, singleDeleteTarget, status, executeSingleDelete, handleDecision, openExplorer, setBulkConfirmOpen, setFocusedAlbumId, setSelectedClusterId, setSingleDeleteTarget, toggleDeleteSelection]);
+  }, [appView, clusters, currentKeeperId, focusedAlbumId, openFinalize, preview.total_count, selectedCluster, singleDeleteTarget, status, executeSingleDelete, handleDecision, openExplorer, setFocusedAlbumId, setSelectedClusterId, setSingleDeleteTarget, toggleDeleteSelection]);
 }   

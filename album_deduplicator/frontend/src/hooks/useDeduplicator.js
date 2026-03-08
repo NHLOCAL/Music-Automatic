@@ -9,6 +9,7 @@ export function useDeduplicator() {
   });
   const [summary, setSummary] = useState(null);
   const [clusters, setClusters] = useState([]);
+  const [allClusters, setAllClusters] = useState([]);
   const [decisions, setDecisions] = useState({});
   const [deleteSelections, setDeleteSelections] = useState({});
   const [preview, setPreview] = useState({ items: [], total_count: 0, total_size_mb: 0, auto_selected_count: 0, manual_selected_count: 0 });
@@ -18,19 +19,25 @@ export function useDeduplicator() {
   const [selectedTab, setSelectedTab] = useState("safe");
   const refreshData = useCallback(async (sid, tab) => {
     try {
-      const [sessionData, clustersData, previewData] = await Promise.all([
+      const clusterRequests = tab === "all"
+        ? [api.getClusters(sid, "all"), Promise.resolve(null)]
+        : [api.getClusters(sid, tab), api.getClusters(sid, "all")];
+      const [sessionData, clustersData, previewData, allClustersData] = await Promise.all([
         api.getAnalysisSession(sid),
-        api.getClusters(sid, tab),
-        api.getDeletePreview(sid)
+        clusterRequests[0],
+        api.getDeletePreview(sid),
+        clusterRequests[1],
       ]);
+      const fullClusters = tab === "all" ? clustersData.clusters : (allClustersData?.clusters ?? []);
       startTransition(() => {
         setSummary(sessionData);
         setProgress(sessionData.progress);
         setClusters(clustersData.clusters);
+        setAllClusters(fullClusters);
         setPreview(previewData);
         setDecisions((prev) => {
           const next = { ...prev };
-          clustersData.clusters.forEach(c => {
+          fullClusters.forEach(c => {
             if (!(c.cluster_id in next) && c.resolution_state === "auto" && c.recommended_keeper_id) {
               next[c.cluster_id] = c.recommended_keeper_id;
             }
@@ -39,7 +46,7 @@ export function useDeduplicator() {
         });
         setDeleteSelections((prev) => {
           const next = { ...prev };
-          clustersData.clusters.forEach((cluster) => {
+          fullClusters.forEach((cluster) => {
             next[cluster.cluster_id] = cluster.selected_delete_folder_ids ?? [];
           });
           return next;
@@ -115,7 +122,7 @@ export function useDeduplicator() {
     }
   };
   return {
-    sessionId, setSessionId, status, setStatus, progress, summary, clusters, setClusters,
+    sessionId, setSessionId, status, setStatus, progress, summary, clusters, setClusters, allClusters, setAllClusters,
     decisions, setDecisions, deleteSelections, setDeleteSelections, preview, setPreview, selectedClusterId, setSelectedClusterId,
     error, setError, successSummary, setSuccessSummary, selectedTab, setSelectedTab,
     refreshData, handleDecision

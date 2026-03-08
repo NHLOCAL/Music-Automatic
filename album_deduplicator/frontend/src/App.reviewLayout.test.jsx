@@ -185,7 +185,7 @@ describe("App review layout", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
 
-    await waitFor(() => expect(screen.getByText("העבר לסל המחזור")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("פתח את שלב ההעברה")).toBeInTheDocument());
 
     const workspaceLayout = container.querySelector(".workspace-layout");
     expect(workspaceLayout).not.toBeNull();

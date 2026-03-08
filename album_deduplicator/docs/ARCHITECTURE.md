@@ -39,7 +39,8 @@
 - `file_processor.py`
   - עיבוד קובץ מוזיקה בודד.
   - חילוץ מטא-דאטה.
-  - חישוב hash חלקי.
+  - חישוב `partial hash` כברירת מחדל.
+  - חישוב `full hash` אופציונלי כאשר המשתמש מפעיל אותו בהגדרות המתקדמות.
   - איתור hash של עטיפת אלבום.
 - `folder_scanner.py`
   - סריקה רקורסיבית של roots.
@@ -330,6 +331,7 @@ final_score = base_score
 - `preferred_root`
 - `force_rescan`
 - `clear_cache`
+- `full_hash_scan`
 - `bitrate_mode`
 - `gemini_enabled`
 
@@ -429,6 +431,7 @@ final_score = base_score
 - בחירת תיקיות native ב-Electron
 - כפתור ניתוח אחד
 - advanced drawer נסתר
+- `Full Hash Scan` כבוי כברירת מחדל, וניתן להפעיל אותו רק מתוך ה-advanced drawer כאשר נדרשת השוואה מדויקת יותר על חשבון זמן סריקה
 
 ### מסך review
 
@@ -449,11 +452,13 @@ final_score = base_score
 
 ### delete confirmation
 
-מציג preview מרוכז בלבד:
+הפך למסך finalize עצמאי:
 
-- כמה תיקיות יימחקו
-- מי נשמר
-- אישור אחד מפורש
+- כמה תיקיות ממתינות להעברה כרגע
+- מי נשמר בכל cluster
+- אילו תיקיות כבר הועברו בשלבים קודמים
+- האם cluster בוצע חלקית או דורש טיפול
+- כפתור ביצוע אחד מפורש לאחר preview מלא
 
 ## הרצה מקומית
 

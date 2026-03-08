@@ -177,3 +177,178 @@ export function getTrackRowTone(row, albumIds) {
     ? "different"
     : "same";
 }
+
+function getDeleteSelectionLabel(selectionSource) {
+  if (selectionSource === "auto") return "נבחר אוטומטית";
+  if (selectionSource === "user_selected") return "נבחר ידנית";
+  if (selectionSource === "deleted") return "כבר הועבר";
+  return "ממתין";
+}
+
+function getDeleteSelectionTone(selectionSource) {
+  if (selectionSource === "auto") return "warning";
+  if (selectionSource === "user_selected") return "neutral";
+  if (selectionSource === "deleted") return "success";
+  return "neutral";
+}
+
+function getFinalizeGroupStatus({ pendingCount, deletedCount, failedCount, keeper }) {
+  if (failedCount > 0) {
+    return { label: "דורש טיפול", tone: "danger" };
+  }
+  if (pendingCount > 0 && deletedCount > 0) {
+    return { label: "בוצע חלקית", tone: "warning" };
+  }
+  if (pendingCount > 0) {
+    return { label: "מוכן להעברה", tone: "warning" };
+  }
+  if (deletedCount > 0) {
+    return { label: "הועבר לסל המחזור", tone: "success" };
+  }
+  if (keeper) {
+    return { label: "נשמר בלבד", tone: "neutral" };
+  }
+  return { label: "ללא הכרעה", tone: "neutral" };
+}
+
+export function mergeDeleteAttemptResults(previousResults, executionResults = []) {
+  const next = { ...previousResults };
+  executionResults.forEach((result) => {
+    next[result.folder_id] = result;
+  });
+  return next;
+}
+
+export function buildDeletionWorkflowModel(clusters = [], preview = null, decisions = {}, deleteAttemptResults = {}) {
+  const safePreview = preview ?? { items: [], total_count: 0, total_size_mb: 0, auto_selected_count: 0, manual_selected_count: 0 };
+  const previewItems = Array.isArray(safePreview.items) ? safePreview.items : [];
+  const previewByCluster = new Map();
+  const previewByFolderId = new Map();
+
+  previewItems.forEach((item) => {
+    previewByFolderId.set(item.folder_id, item);
+    const group = previewByCluster.get(item.cluster_id) ?? [];
+    group.push(item);
+    previewByCluster.set(item.cluster_id, group);
+  });
+
+  const deleteAttemptMap = new Map(Object.entries(deleteAttemptResults));
+
+  const groups = clusters
+    .map((cluster, index) => {
+      const activeKeeperId = getActiveKeeperId(cluster, decisions);
+      const albums = Array.isArray(cluster.albums) ? cluster.albums : [];
+      const previewItemsForCluster = previewByCluster.get(cluster.cluster_id) ?? [];
+      const pendingFolderIds = new Set(previewItemsForCluster.map((item) => item.folder_id));
+
+      const keeper = activeKeeperId
+        ? albums.find((album) => album.folder_id === activeKeeperId) ?? null
+        : null;
+
+      const pending = previewItemsForCluster
+        .map((item) => {
+          const album = albums.find((candidate) => candidate.folder_id === item.folder_id);
+          if (!album) return null;
+          return {
+            ...album,
+            estimated_size_mb: item.estimated_size_mb ?? album.total_size_mb,
+            selection_source: item.selection_source,
+            status_label: getDeleteSelectionLabel(item.selection_source),
+            status_tone: getDeleteSelectionTone(item.selection_source),
+          };
+        })
+        .filter(Boolean);
+
+      const deleted = albums
+        .filter((album) => album.is_deleted)
+        .map((album) => ({
+          ...album,
+          status_label: "כבר הועבר",
+          status_tone: "success",
+        }));
+
+      const failed = albums
+        .filter((album) => !album.is_deleted && !pendingFolderIds.has(album.folder_id))
+        .map((album) => {
+          const attempt = deleteAttemptMap.get(album.folder_id);
+          if (!attempt || attempt.success) return null;
+          return {
+            ...album,
+            status_label: "העברה נכשלה",
+            status_tone: "danger",
+            failure_message: attempt.message,
+          };
+        })
+        .filter(Boolean);
+
+      const failedFolderIds = new Set(failed.map((album) => album.folder_id));
+      const additionalKeptCopies = albums.filter((album) => (
+        !album.is_deleted
+        && album.folder_id !== activeKeeperId
+        && !pendingFolderIds.has(album.folder_id)
+        && !failedFolderIds.has(album.folder_id)
+      ));
+
+      const status = getFinalizeGroupStatus({
+        pendingCount: pending.length,
+        deletedCount: deleted.length,
+        failedCount: failed.length,
+        keeper,
+      });
+
+      const deletedSizeMb = deleted.reduce((sum, album) => sum + (album.total_size_mb ?? 0), 0);
+      const pendingSizeMb = pending.reduce((sum, album) => sum + (album.estimated_size_mb ?? album.total_size_mb ?? 0), 0);
+
+      return {
+        cluster,
+        order: index,
+        activeKeeperId,
+        keeper,
+        pending,
+        deleted,
+        failed,
+        additionalKeptCopies,
+        pendingCount: pending.length,
+        deletedCount: deleted.length,
+        failedCount: failed.length,
+        pendingSizeMb,
+        deletedSizeMb,
+        totalAlbums: albums.length,
+        hasPendingActions: pending.length > 0,
+        status,
+      };
+    })
+    .filter((group) => group.totalAlbums > 0)
+    .sort((left, right) => {
+      if (left.hasPendingActions !== right.hasPendingActions) return left.hasPendingActions ? -1 : 1;
+      if (left.failedCount !== right.failedCount) return right.failedCount - left.failedCount;
+      if (left.deletedCount !== right.deletedCount) return right.deletedCount - left.deletedCount;
+      return left.order - right.order;
+    });
+
+  const deletedCount = groups.reduce((sum, group) => sum + group.deletedCount, 0);
+  const deletedSizeMb = groups.reduce((sum, group) => sum + group.deletedSizeMb, 0);
+  const keeperCount = groups.filter((group) => group.keeper).length;
+  const failedCount = groups.reduce((sum, group) => sum + group.failedCount, 0);
+  const additionalKeptCount = groups.reduce((sum, group) => sum + group.additionalKeptCopies.length, 0);
+  const unresolvedClusters = groups.filter((group) => !group.keeper).length;
+  const partiallyCompletedClusters = groups.filter((group) => group.pendingCount > 0 && group.deletedCount > 0).length;
+
+  return {
+    groups,
+    summary: {
+      pendingCount: safePreview.total_count ?? previewItems.length,
+      pendingSizeMb: safePreview.total_size_mb ?? 0,
+      autoSelectedCount: safePreview.auto_selected_count ?? 0,
+      manualSelectedCount: safePreview.manual_selected_count ?? 0,
+      deletedCount,
+      deletedSizeMb: Number(deletedSizeMb.toFixed(2)),
+      keeperCount,
+      failedCount,
+      additionalKeptCount,
+      unresolvedClusters,
+      partiallyCompletedClusters,
+    },
+    previewByFolderId,
+  };
+}

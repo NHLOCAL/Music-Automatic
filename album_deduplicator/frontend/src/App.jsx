@@ -9,8 +9,9 @@ import { SummaryScreen } from "./components/SummaryScreen";
 import { ClusterList } from "./components/ClusterList";
 import { DiffWorkspace } from "./components/DiffWorkspace";
 import { DeletePreview } from "./components/DeletePreview";
+import { FinalizeDeletionScreen } from "./components/FinalizeDeletionScreen";
 import { ConfirmModal } from "./components/UI";
-import { getActiveKeeperId, hasClusterDecision } from "./utils";
+import { buildDeletionWorkflowModel, getActiveKeeperId, hasClusterDecision, mergeDeleteAttemptResults } from "./utils";
 
 function normalizeFolderPaths(entries) {
   return entries.map((entry) => entry.path.trim()).filter(Boolean);
@@ -41,15 +42,16 @@ export default function App() {
     preferred_root: "",
     force_rescan: false,
     clear_cache: false,
+    full_hash_scan: false,
     bitrate_mode: "128",
     gemini_enabled: false,
   });
 
   const[executingDelete, setExecutingDelete] = useState(false);
-  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [singleDeleteTarget, setSingleDeleteTarget] = useState(null);
   const[focusedAlbumId, setFocusedAlbumId] = useState(null);
   const [runtimeInfo, setRuntimeInfo] = useState(getRuntimeSnapshot());
+  const [deleteAttemptResults, setDeleteAttemptResults] = useState({});
   
   const d = useDeduplicator();
   
@@ -61,6 +63,7 @@ export default function App() {
   const selectedDeleteFolderIds = selectedCluster
     ? (d.deleteSelections[selectedCluster.cluster_id] ?? selectedCluster.selected_delete_folder_ids ??[])
     :[];
+  const deletionWorkflow = buildDeletionWorkflowModel(d.allClusters, d.preview, d.decisions, deleteAttemptResults);
 
   useEffect(() => {
     let active = true;
@@ -90,7 +93,9 @@ export default function App() {
       d.setDecisions({});
       d.setDeleteSelections({});
       d.setPreview({ items:[], total_count: 0, total_size_mb: 0 });
+      d.setAllClusters([]);
       d.setSelectedClusterId(null);
+      setDeleteAttemptResults({});
       setAppView('scanning');
     } catch (err) {
       d.setError(err.message);
@@ -101,9 +106,9 @@ export default function App() {
     if (!d.sessionId || d.preview.total_count === 0) return;
     setExecutingDelete(true);
     try {
-      await api.executeDelete(d.sessionId, d.preview.items.map((item) => item.folder_id));
+      const execution = await api.executeDelete(d.sessionId, d.preview.items.map((item) => item.folder_id));
+      setDeleteAttemptResults((prev) => mergeDeleteAttemptResults(prev, execution.results));
       await d.refreshData(d.sessionId, d.selectedTab);
-      setBulkConfirmOpen(false);
     } catch (err) {
       d.setError(err.message);
     } finally {
@@ -115,7 +120,8 @@ export default function App() {
     if (!d.sessionId || !target) return;
     setSingleDeleteTarget(null);
     try {
-      await api.executeSingleDelete(d.sessionId, target.clusterId, target.folderId);
+      const execution = await api.executeSingleDelete(d.sessionId, target.clusterId, target.folderId);
+      setDeleteAttemptResults((prev) => mergeDeleteAttemptResults(prev, execution.results));
       await d.refreshData(d.sessionId, d.selectedTab);
     } catch (err) { 
       d.setError(err.message); 
@@ -137,10 +143,10 @@ export default function App() {
   };
 
   const goToSetup = () => {
-    setBulkConfirmOpen(false);
     setSingleDeleteTarget(null);
     d.setError("");
     d.setSuccessSummary(null);
+    setDeleteAttemptResults({});
     setAppView("setup");
   };
 
@@ -165,6 +171,7 @@ export default function App() {
   };
 
   useKeyboardShortcuts({
+    appView,
     status: d.status,
     clusters: d.clusters,
     selectedCluster,
@@ -175,7 +182,7 @@ export default function App() {
     setFocusedAlbumId,
     handleDecision: updateClusterDecision,
     preview: d.preview,
-    setBulkConfirmOpen,
+    openFinalize: () => setAppView("finalize"),
     singleDeleteTarget,
     setSingleDeleteTarget,
     executeSingleDelete,
@@ -229,28 +236,28 @@ export default function App() {
                 onBackToSetup={goToSetup}
               />
 
-              {d.preview.total_count > 0 && (
+              {(deletionWorkflow.summary.pendingCount > 0 || deletionWorkflow.summary.deletedCount > 0 || deletionWorkflow.summary.failedCount > 0) && (
                 <DeletePreview 
-                  preview={d.preview} 
-                  onConfirm={() => setBulkConfirmOpen(true)} 
+                  workflowSummary={deletionWorkflow.summary}
+                  onOpenFinalize={() => setAppView("finalize")}
                   isExecuting={executingDelete} 
                 />
               )}
             </div>
           </div>
         )}
-      </div>
 
-      {bulkConfirmOpen && (
-        <ConfirmModal
-          title="העברה לסל המחזור"
-          body={`פעולה זו תעביר ${d.preview.total_count} תיקיות לסל המחזור. הקבצים לא יימחקו לצמיתות בשלב זה.`}
-          confirmText="העבר לסל"
-          onConfirm={executeDelete}
-          onCancel={() => setBulkConfirmOpen(false)}
-          isDanger
-        />
-      )}
+        {appView === "finalize" && d.status === "completed" && (
+          <FinalizeDeletionScreen
+            workflow={deletionWorkflow}
+            onBackToReview={() => setAppView("review")}
+            onBackToSetup={goToSetup}
+            onExecute={executeDelete}
+            isExecuting={executingDelete}
+            openExplorer={openExplorer}
+          />
+        )}
+      </div>
 
       {singleDeleteTarget && (
         <ConfirmModal
