@@ -84,6 +84,8 @@
   - מסמן degraded mode כאשר ML או Gemini אינם זמינים.
   - מבצע batching של חישובי ML כדי לצמצם spike של CPU ו-RAM בפרויקטים גדולים.
   - מדלג על ML לזוגות שהם כבר `identical_by_hash`.
+  - שומר ב-memory רק pairs שיכולים להשפיע על clusters, ולא את כל הזוגות החלשים.
+  - משחרר `comparison_results` שכבר עובדו ושומר cache רזה ל-ML/Gemini בלבד.
 - `recommendation_service.py`
   - יוצר `AlbumSummary`.
   - בונה graph של קשרי דמיון.

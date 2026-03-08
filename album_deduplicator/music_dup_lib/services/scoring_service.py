@@ -13,6 +13,7 @@ from .dto import AnalysisWarnings, PairAnalysis, stable_id
 logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[str, str, int, int], None]
+CacheResultCallback = Callable[[FolderComparisonResult], None]
 
 if TYPE_CHECKING:
     from ..external.gemini_analyzer import GeminiAnalyzer as GeminiAnalyzerType
@@ -41,6 +42,7 @@ class ScoringService:
         all_folders: Dict[Path, FolderInfo],
         cached_results_map: Dict[FrozenSet[str], FolderComparisonResult],
         progress_callback: Optional[ProgressCallback] = None,
+        cache_result_callback: Optional[CacheResultCallback] = None,
     ) -> tuple[Dict[str, PairAnalysis], AnalysisWarnings]:
         warnings = AnalysisWarnings()
         self._calculate_quality_scores(comparison_results, all_folders, progress_callback)
@@ -79,7 +81,8 @@ class ScoringService:
                 cached_results_map=cached_results_map,
             )
 
-            for offset, result in enumerate(chunk, start=chunk_start + 1):
+            for chunk_index, result in enumerate(chunk):
+                offset = chunk_start + chunk_index + 1
                 if progress_callback:
                     progress_callback("scoring", "מחשב ציוני דמיון", offset, total_pairs)
 
@@ -136,33 +139,87 @@ class ScoringService:
                 elif final_score >= config.REVIEW_MIN_SIMILARITY:
                     reason_codes.append("review_threshold")
 
-                folder_ids_sorted = sorted(
-                    [
-                        stable_id("folder", str(result.folder1_path)),
-                        stable_id("folder", str(result.folder2_path)),
-                    ]
-                )
-                pair_id = stable_id("pair", "|".join(folder_ids_sorted))
-                pairs[pair_id] = PairAnalysis(
-                    pair_id=pair_id,
-                    folder1_id=stable_id("folder", str(result.folder1_path)),
-                    folder2_id=stable_id("folder", str(result.folder2_path)),
-                    folder1_path=result.folder1_path,
-                    folder2_path=result.folder2_path,
-                    algorithmic_score=round(algorithmic_score, 4),
-                    ml_score=round(ml_score, 4) if ml_score is not None else None,
-                    base_score=round(base_score, 4),
-                    gemini_score=round(gemini_score, 4) if gemini_score is not None else None,
-                    final_score=round(final_score, 4),
-                    gemini_verdict=gemini_verdict,
-                    gemini_reason=gemini_reason,
-                    gemini_error=gemini_error,
-                    is_identical_by_hash=result.is_identical_by_hash,
-                    similarity_scores=result.similarity_scores,
-                    reason_codes=reason_codes,
-                )
+                if self._should_cache_result(result, final_score):
+                    cache_entry = self._build_cache_entry(result)
+                    if cache_result_callback is not None:
+                        cache_result_callback(cache_entry)
+
+                if self._should_retain_pair(result, final_score):
+                    folder_ids_sorted = sorted(
+                        [
+                            stable_id("folder", str(result.folder1_path)),
+                            stable_id("folder", str(result.folder2_path)),
+                        ]
+                    )
+                    pair_id = stable_id("pair", "|".join(folder_ids_sorted))
+                    pairs[pair_id] = PairAnalysis(
+                        pair_id=pair_id,
+                        folder1_id=stable_id("folder", str(result.folder1_path)),
+                        folder2_id=stable_id("folder", str(result.folder2_path)),
+                        folder1_path=result.folder1_path,
+                        folder2_path=result.folder2_path,
+                        algorithmic_score=round(algorithmic_score, 4),
+                        ml_score=round(ml_score, 4) if ml_score is not None else None,
+                        base_score=round(base_score, 4),
+                        gemini_score=round(gemini_score, 4) if gemini_score is not None else None,
+                        final_score=round(final_score, 4),
+                        gemini_verdict=gemini_verdict,
+                        gemini_reason=gemini_reason,
+                        gemini_error=gemini_error,
+                        is_identical_by_hash=result.is_identical_by_hash,
+                        similarity_scores=self._compact_similarity_scores(result.similarity_scores),
+                        reason_codes=reason_codes,
+                    )
+
+                self._release_processed_result(result)
+                comparison_results[offset - 1] = None  # type: ignore[list-item]
 
         return pairs, warnings
+
+    def _should_retain_pair(self, result: FolderComparisonResult, final_score: float) -> bool:
+        return result.is_identical_by_hash or final_score >= config.REVIEW_MIN_SIMILARITY
+
+    def _should_cache_result(self, result: FolderComparisonResult, final_score: float) -> bool:
+        return result.is_identical_by_hash or final_score >= config.MIN_SCORE_FOR_CACHING
+
+    def _compact_similarity_scores(self, similarity_scores: Dict[str, Any]) -> Dict[str, Any]:
+        compact: Dict[str, Any] = {}
+        for key, value in similarity_scores.items():
+            if key == "additional_metadata_details":
+                if isinstance(value, dict):
+                    details = {
+                        meta_key: round(float(meta_value), 4)
+                        for meta_key, meta_value in value.items()
+                        if isinstance(meta_value, (float, int)) and meta_value > 0
+                    }
+                    if details:
+                        compact[key] = details
+                continue
+            if isinstance(value, (float, int)):
+                if value > 0:
+                    compact[key] = round(float(value), 4)
+                continue
+            if value:
+                compact[key] = value
+        return compact
+
+    def _build_cache_entry(self, result: FolderComparisonResult) -> FolderComparisonResult:
+        return FolderComparisonResult(
+            folder1_path=result.folder1_path,
+            folder2_path=result.folder2_path,
+            similarity_scores={},
+            weighted_score=result.weighted_score,
+            is_identical_by_hash=result.is_identical_by_hash,
+            gemini_verdict=result.gemini_verdict,
+            gemini_similarity_score=result.gemini_similarity_score,
+            gemini_reason=result.gemini_reason,
+            gemini_error=result.gemini_error,
+            ml_similarity_score=result.ml_similarity_score,
+            final_combined_score=result.final_combined_score,
+        )
+
+    def _release_processed_result(self, result: FolderComparisonResult) -> None:
+        result.similarity_scores = {}
 
     def _populate_ml_scores_for_chunk(
         self,

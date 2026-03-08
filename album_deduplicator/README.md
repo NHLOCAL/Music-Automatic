@@ -23,6 +23,8 @@
   - feature extraction מחושב פעם אחת לכל תיקייה וממוחזר בין זוגות
   - inference רץ ב-`batches` במקום `pair-by-pair`
   - `LightGBM` מוגבל למספר threads מתון כדי למנוע spike אגרסיבי של CPU
+  - זוגות שלא עוברים את סף ה-`review` לא נשמרים עוד כ-`PairAnalysis`, כדי למנוע growth מיותר של RAM
+  - cache תוצאות ה-ML/Gemini נשמר בפורמט רזה ללא `similarity_scores` מלאים, כי הם לא נדרשים לשימוש חוזר
 - hashing ברירת המחדל הוא `partial hash`; אפשר להפעיל `full hash scan` ידנית מתוך ההגדרות המתקדמות.
 - מחיקה אוטומטית מוצעת רק כאשר:
   - מספר קבצי המוזיקה זהה
