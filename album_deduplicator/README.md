@@ -19,6 +19,10 @@
 - `Gemini` הוא enhancement בלבד לזוגות גבוליים:
   - רץ רק כאשר `85 <= base_score < 97`
   - לא מקדם לבדו זוג ל-`safe delete`
+- שלב ה-ML עבר אופטימיזציה לעומסים גדולים:
+  - feature extraction מחושב פעם אחת לכל תיקייה וממוחזר בין זוגות
+  - inference רץ ב-`batches` במקום `pair-by-pair`
+  - `LightGBM` מוגבל למספר threads מתון כדי למנוע spike אגרסיבי של CPU
 - hashing ברירת המחדל הוא `partial hash`; אפשר להפעיל `full hash scan` ידנית מתוך ההגדרות המתקדמות.
 - מחיקה אוטומטית מוצעת רק כאשר:
   - מספר קבצי המוזיקה זהה

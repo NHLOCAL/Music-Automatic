@@ -56,7 +56,7 @@ def test_scoring_service_blends_algorithmic_ml_and_gemini(monkeypatch):
 
     service = ScoringService(use_gemini=True)
     monkeypatch.setattr(service.ml_model, "model_loaded", True)
-    monkeypatch.setattr(service.ml_model, "predict_similarity_for_pair", lambda *args, **kwargs: 90.0)
+    monkeypatch.setattr(service.ml_model, "predict_similarities_for_pairs", lambda *args, **kwargs: [90.0])
     monkeypatch.setattr(
         service,
         "_resolve_gemini",
@@ -107,7 +107,7 @@ def test_scoring_service_skips_gemini_outside_review_band(monkeypatch):
 
     service = ScoringService(use_gemini=True)
     monkeypatch.setattr(service.ml_model, "model_loaded", True)
-    monkeypatch.setattr(service.ml_model, "predict_similarity_for_pair", lambda *args, **kwargs: 99.0)
+    monkeypatch.setattr(service.ml_model, "predict_similarities_for_pairs", lambda *args, **kwargs: [99.0])
     monkeypatch.setattr(
         service,
         "_resolve_gemini",
@@ -124,3 +124,64 @@ def test_scoring_service_skips_gemini_outside_review_band(monkeypatch):
     assert pair.gemini_score is None
     assert pair.final_score == 99.0
 
+
+def test_scoring_service_skips_ml_for_identical_hash_pairs(monkeypatch):
+    folder1 = make_folder("C:/music/A")
+    folder2 = make_folder("D:/music/B")
+    comparison = FolderComparisonResult(
+        folder1_path=folder1.path,
+        folder2_path=folder2.path,
+        weighted_score=100.0,
+        is_identical_by_hash=True,
+    )
+
+    service = ScoringService(use_gemini=False)
+    monkeypatch.setattr(service.ml_model, "model_loaded", True)
+    monkeypatch.setattr(
+        service.ml_model,
+        "predict_similarities_for_pairs",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("ML batch should not run")),
+    )
+
+    pairs, _ = service.apply_scores(
+        comparison_results=[comparison],
+        all_folders={folder1.path: folder1, folder2.path: folder2},
+        cached_results_map={},
+    )
+
+    pair = next(iter(pairs.values()))
+    assert pair.ml_score is None
+    assert pair.base_score == 100.0
+    assert pair.final_score == 100.0
+    assert "identical_by_hash" in pair.reason_codes
+
+
+def test_scoring_service_batches_ml_predictions(monkeypatch):
+    folder1 = make_folder("C:/music/A")
+    folder2 = make_folder("D:/music/B")
+    folder3 = make_folder("E:/music/C")
+
+    first = FolderComparisonResult(folder1_path=folder1.path, folder2_path=folder2.path, weighted_score=80.0)
+    second = FolderComparisonResult(folder1_path=folder1.path, folder2_path=folder3.path, weighted_score=82.0)
+
+    service = ScoringService(use_gemini=False)
+    monkeypatch.setattr(service.ml_model, "model_loaded", True)
+
+    seen_batch_sizes = []
+
+    def fake_batch_predict(pair_inputs):
+        seen_batch_sizes.append(len(pair_inputs))
+        return [91.0, 84.0]
+
+    monkeypatch.setattr(service.ml_model, "predict_similarities_for_pairs", fake_batch_predict)
+    monkeypatch.setattr(service.ml_model, "prediction_batch_size", 32)
+
+    pairs, _ = service.apply_scores(
+        comparison_results=[first, second],
+        all_folders={folder1.path: folder1, folder2.path: folder2, folder3.path: folder3},
+        cached_results_map={},
+    )
+
+    assert seen_batch_sizes == [2]
+    pair_values = sorted(pairs.values(), key=lambda item: item.folder2_path)
+    assert [pair.ml_score for pair in pair_values] == [91.0, 84.0]

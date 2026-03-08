@@ -63,6 +63,8 @@
   - טוען מודל `LightGBM`.
   - מחפש קודם ב-`album_deduplicator/data`.
   - fallback אוטומטי ל-`similarity_model/models`.
+  - ממחזר folder-level features במקום לחשב אותם מחדש לכל זוג.
+  - מריץ inference ב-`numpy batches` ומגביל threads של `LightGBM` בזמן prediction.
 - `gemini_analyzer.py`
   - ניתוח זוגות גבוליים מול `Gemini`.
   - מקבל `base_score` כקלט תומך.
@@ -80,6 +82,8 @@
   - מחשב `algorithmic_score`, `ml_score`, `base_score`, `gemini_score`, `final_score`.
   - מפעיל `Gemini` רק בטווח הגבולי.
   - מסמן degraded mode כאשר ML או Gemini אינם זמינים.
+  - מבצע batching של חישובי ML כדי לצמצם spike של CPU ו-RAM בפרויקטים גדולים.
+  - מדלג על ML לזוגות שהם כבר `identical_by_hash`.
 - `recommendation_service.py`
   - יוצר `AlbumSummary`.
   - בונה graph של קשרי דמיון.

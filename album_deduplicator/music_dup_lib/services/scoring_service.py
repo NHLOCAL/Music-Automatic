@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 from .. import config
 from ..core.quality_analyzer import QualityAnalyzer
@@ -71,90 +71,138 @@ class ScoringService:
         total_pairs = len(comparison_results)
         pairs: Dict[str, PairAnalysis] = {}
 
-        for index, result in enumerate(comparison_results, start=1):
-            if progress_callback:
-                progress_callback("scoring", "מחשב ציוני דמיון", index, total_pairs)
+        for chunk_start in range(0, total_pairs, self.ml_model.prediction_batch_size):
+            chunk = comparison_results[chunk_start:chunk_start + self.ml_model.prediction_batch_size]
+            self._populate_ml_scores_for_chunk(
+                chunk_results=chunk,
+                all_folders=all_folders,
+                cached_results_map=cached_results_map,
+            )
+
+            for offset, result in enumerate(chunk, start=chunk_start + 1):
+                if progress_callback:
+                    progress_callback("scoring", "מחשב ציוני דמיון", offset, total_pairs)
+
+                cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
+                cached_result = cached_results_map.get(cache_key)
+                folder1_info = all_folders.get(result.folder1_path)
+                folder2_info = all_folders.get(result.folder2_path)
+                if not folder1_info or not folder2_info:
+                    continue
+
+                algorithmic_score = float(result.weighted_score)
+                ml_score = None if result.is_identical_by_hash else result.ml_similarity_score
+                base_score = algorithmic_score
+                reason_codes: List[str] = []
+
+                if ml_score is not None:
+                    base_score = (
+                        algorithmic_score * config.BASE_SCORE_ALGORITHMIC_WEIGHT
+                        + ml_score * config.BASE_SCORE_ML_WEIGHT
+                    )
+                    reason_codes.append("ml_blended")
+                else:
+                    reason_codes.append("algorithmic_only")
+
+                gemini_score = None
+                gemini_verdict = None
+                gemini_reason = None
+                gemini_error = None
+                if self._should_run_gemini(base_score, result.is_identical_by_hash):
+                    gemini_verdict, gemini_score, gemini_reason, gemini_error = self._resolve_gemini(
+                        result=result,
+                        cached_result=cached_result,
+                        folder1_info=folder1_info,
+                        folder2_info=folder2_info,
+                        gemini_analyzer=gemini_analyzer,
+                        base_score=base_score,
+                    )
+                    if gemini_score is not None:
+                        reason_codes.append("gemini_reviewed")
+                    elif gemini_error:
+                        reason_codes.append("gemini_unavailable")
+
+                final_score = base_score
+                if gemini_score is not None:
+                    final_score = (
+                        base_score * config.FINAL_SCORE_BASE_WEIGHT
+                        + gemini_score * config.FINAL_SCORE_GEMINI_WEIGHT
+                    )
+
+                if result.is_identical_by_hash:
+                    reason_codes.append("identical_by_hash")
+                elif final_score >= config.SAFE_DELETE_MIN_SIMILARITY:
+                    reason_codes.append("safe_threshold")
+                elif final_score >= config.REVIEW_MIN_SIMILARITY:
+                    reason_codes.append("review_threshold")
+
+                folder_ids_sorted = sorted(
+                    [
+                        stable_id("folder", str(result.folder1_path)),
+                        stable_id("folder", str(result.folder2_path)),
+                    ]
+                )
+                pair_id = stable_id("pair", "|".join(folder_ids_sorted))
+                pairs[pair_id] = PairAnalysis(
+                    pair_id=pair_id,
+                    folder1_id=stable_id("folder", str(result.folder1_path)),
+                    folder2_id=stable_id("folder", str(result.folder2_path)),
+                    folder1_path=result.folder1_path,
+                    folder2_path=result.folder2_path,
+                    algorithmic_score=round(algorithmic_score, 4),
+                    ml_score=round(ml_score, 4) if ml_score is not None else None,
+                    base_score=round(base_score, 4),
+                    gemini_score=round(gemini_score, 4) if gemini_score is not None else None,
+                    final_score=round(final_score, 4),
+                    gemini_verdict=gemini_verdict,
+                    gemini_reason=gemini_reason,
+                    gemini_error=gemini_error,
+                    is_identical_by_hash=result.is_identical_by_hash,
+                    similarity_scores=result.similarity_scores,
+                    reason_codes=reason_codes,
+                )
+
+        return pairs, warnings
+
+    def _populate_ml_scores_for_chunk(
+        self,
+        chunk_results: Sequence[FolderComparisonResult],
+        all_folders: Dict[Path, FolderInfo],
+        cached_results_map: Dict[FrozenSet[str], FolderComparisonResult],
+    ) -> None:
+        if not self.ml_model.model_loaded:
+            return
+
+        prediction_inputs: List[Tuple[FolderInfo, FolderInfo, FolderComparisonResult]] = []
+        prediction_targets: List[FolderComparisonResult] = []
+
+        for result in chunk_results:
+            if result.is_identical_by_hash:
+                result.ml_similarity_score = None
+                continue
 
             cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
             cached_result = cached_results_map.get(cache_key)
+            cached_ml_score = getattr(cached_result, "ml_similarity_score", None) if cached_result else None
+            if cached_ml_score is not None:
+                result.ml_similarity_score = float(cached_ml_score)
+                continue
+
             folder1_info = all_folders.get(result.folder1_path)
             folder2_info = all_folders.get(result.folder2_path)
             if not folder1_info or not folder2_info:
                 continue
 
-            algorithmic_score = float(result.weighted_score)
-            ml_score = self._resolve_ml_score(result, cached_result, folder1_info, folder2_info)
-            base_score = algorithmic_score
-            reason_codes: List[str] = []
+            prediction_inputs.append((folder1_info, folder2_info, result))
+            prediction_targets.append(result)
 
-            if ml_score is not None:
-                base_score = (
-                    algorithmic_score * config.BASE_SCORE_ALGORITHMIC_WEIGHT
-                    + ml_score * config.BASE_SCORE_ML_WEIGHT
-                )
-                reason_codes.append("ml_blended")
-            else:
-                reason_codes.append("algorithmic_only")
+        if not prediction_inputs:
+            return
 
-            gemini_score = None
-            gemini_verdict = None
-            gemini_reason = None
-            gemini_error = None
-            if self._should_run_gemini(base_score, result.is_identical_by_hash):
-                gemini_verdict, gemini_score, gemini_reason, gemini_error = self._resolve_gemini(
-                    result=result,
-                    cached_result=cached_result,
-                    folder1_info=folder1_info,
-                    folder2_info=folder2_info,
-                    gemini_analyzer=gemini_analyzer,
-                    base_score=base_score,
-                )
-                if gemini_score is not None:
-                    reason_codes.append("gemini_reviewed")
-                elif gemini_error:
-                    reason_codes.append("gemini_unavailable")
-
-            final_score = base_score
-            if gemini_score is not None:
-                final_score = (
-                    base_score * config.FINAL_SCORE_BASE_WEIGHT
-                    + gemini_score * config.FINAL_SCORE_GEMINI_WEIGHT
-                )
-
-            if result.is_identical_by_hash:
-                reason_codes.append("identical_by_hash")
-            elif final_score >= config.SAFE_DELETE_MIN_SIMILARITY:
-                reason_codes.append("safe_threshold")
-            elif final_score >= config.REVIEW_MIN_SIMILARITY:
-                reason_codes.append("review_threshold")
-
-            folder_ids_sorted = sorted(
-                [
-                    stable_id("folder", str(result.folder1_path)),
-                    stable_id("folder", str(result.folder2_path)),
-                ]
-            )
-            pair_id = stable_id("pair", "|".join(folder_ids_sorted))
-            pairs[pair_id] = PairAnalysis(
-                pair_id=pair_id,
-                folder1_id=stable_id("folder", str(result.folder1_path)),
-                folder2_id=stable_id("folder", str(result.folder2_path)),
-                folder1_path=result.folder1_path,
-                folder2_path=result.folder2_path,
-                algorithmic_score=round(algorithmic_score, 4),
-                ml_score=round(ml_score, 4) if ml_score is not None else None,
-                base_score=round(base_score, 4),
-                gemini_score=round(gemini_score, 4) if gemini_score is not None else None,
-                final_score=round(final_score, 4),
-                gemini_verdict=gemini_verdict,
-                gemini_reason=gemini_reason,
-                gemini_error=gemini_error,
-                is_identical_by_hash=result.is_identical_by_hash,
-                similarity_scores=result.similarity_scores,
-                reason_codes=reason_codes,
-            )
-
-        return pairs, warnings
+        predicted_scores = self.ml_model.predict_similarities_for_pairs(prediction_inputs)
+        for result, predicted_score in zip(prediction_targets, predicted_scores):
+            if predicted_score is not None:
+                result.ml_similarity_score = predicted_score
 
     def _calculate_quality_scores(
         self,
@@ -173,24 +221,6 @@ class ScoringService:
             if progress_callback:
                 progress_callback("quality", "מחשב איכות אלבומים", index, total)
             self.quality_analyzer.calculate_quality(all_folders[folder_path])
-
-    def _resolve_ml_score(
-        self,
-        result: FolderComparisonResult,
-        cached_result: Optional[FolderComparisonResult],
-        folder1_info: FolderInfo,
-        folder2_info: FolderInfo,
-    ) -> Optional[float]:
-        cached_ml_score = getattr(cached_result, "ml_similarity_score", None) if cached_result else None
-        if cached_ml_score is not None:
-            result.ml_similarity_score = cached_ml_score
-            return float(cached_ml_score)
-        if not self.ml_model.model_loaded:
-            return None
-        ml_score = self.ml_model.predict_similarity_for_pair(folder1_info, folder2_info, result)
-        if ml_score is not None:
-            result.ml_similarity_score = ml_score
-        return ml_score
 
     def _should_run_gemini(self, base_score: float, is_identical_by_hash: bool) -> bool:
         return (

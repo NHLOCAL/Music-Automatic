@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 MUSIC_DUP_LIB_ROOT = Path(__file__).resolve().parent
 ALBUM_DEDUP_PROJECT_ROOT = MUSIC_DUP_LIB_ROOT.parent
@@ -16,6 +17,8 @@ ARTIST_CSV_FILE = DATA_DIR / ARTIST_CSV_FILENAME
 ML_MODEL_FILENAME = "lgbm_regressor_model.joblib"
 ML_MODEL_FILE = DATA_DIR / ML_MODEL_FILENAME
 SIMILARITY_MODEL_FALLBACK_FILE = REPO_ROOT / "similarity_model" / "models" / ML_MODEL_FILENAME
+ML_PREDICTION_BATCH_SIZE = 256
+ML_MAX_THREADS = max(1, min(4, max(1, (os.cpu_count() or 1) // 2)))
 ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
 LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
 IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini',

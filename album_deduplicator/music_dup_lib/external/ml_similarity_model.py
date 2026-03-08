@@ -1,10 +1,9 @@
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Set
+from typing import Optional, List, Dict, Any, Set, Sequence, Tuple
 import re # Added for calculate_word_jaccard_index
 
 import joblib
-import pandas as pd
 import numpy as np
 
 from .. import config
@@ -57,6 +56,9 @@ class MLSimilarityModel:
         self.resolved_model_path: Optional[Path] = None
         self.model = None
         self.model_loaded = False
+        self.prediction_batch_size = config.ML_PREDICTION_BATCH_SIZE
+        self.max_prediction_threads = config.ML_MAX_THREADS
+        self._folder_feature_cache: Dict[Path, Dict[str, Any]] = {}
         self._load_model()
 
     def _load_model(self):
@@ -71,12 +73,39 @@ class MLSimilarityModel:
                 return
             self.resolved_model_path = existing_path
             self.model = joblib.load(existing_path)
+            self._configure_model_runtime()
             self.model_loaded = True
             logger.info(f"ML similarity model loaded successfully from: {existing_path}")
         except Exception as e:
             logger.error(f"Error loading ML similarity model from {self.model_path}: {e}", exc_info=True)
             self.model = None
             self.model_loaded = False
+
+    def _configure_model_runtime(self) -> None:
+        if self.model is None:
+            return
+        if self.max_prediction_threads <= 0:
+            return
+
+        configured = False
+        if hasattr(self.model, "set_params"):
+            try:
+                self.model.set_params(n_jobs=self.max_prediction_threads)
+                configured = True
+            except Exception:
+                logger.debug("Model does not accept n_jobs via set_params.", exc_info=True)
+        if not configured and hasattr(self.model, "n_jobs"):
+            try:
+                self.model.n_jobs = self.max_prediction_threads
+                configured = True
+            except Exception:
+                logger.debug("Model does not expose writable n_jobs.", exc_info=True)
+
+        if configured:
+            logger.info(
+                "Configured ML prediction runtime to use at most %s threads.",
+                self.max_prediction_threads,
+            )
 
     def _calculate_jaccard_index(self, set1: Set[Any], set2: Set[Any]) -> float:
         if not isinstance(set1, set) or not isinstance(set2, set):
@@ -87,14 +116,6 @@ class MLSimilarityModel:
         intersection_len = len(set1.intersection(set2))
         union_len = len(set1.union(set2))
         return intersection_len / union_len if union_len > 0 else 0.0
-
-    def _calculate_word_jaccard_index(self, str1: Optional[str], str2: Optional[str]) -> float:
-        if not str1 and not str2: return 1.0
-        if not str1 or not str2: return 0.0
-
-        words1 = set(re.findall(r'\w+', str1.lower()))
-        words2 = set(re.findall(r'\w+', str2.lower()))
-        return self._calculate_jaccard_index(words1, words2)
 
     def _ml_calculate_folder_stats(self, folder_info: FolderInfo) -> Dict[str, float]:
         # This is a copy of _calculate_folder_stats from create_ml_dataset.py
@@ -139,10 +160,41 @@ class MLSimilarityModel:
 
         return final_stats
 
-    def _prepare_features_for_prediction(self,
-                                        folder1_info: FolderInfo,
-                                        folder2_info: FolderInfo,
-                                        comparison_result: FolderComparisonResult) -> Optional[pd.DataFrame]:
+    def _extract_word_set(self, value: Optional[str]) -> Set[str]:
+        if not value:
+            return set()
+        return set(re.findall(r'\w+', value.lower()))
+
+    def _get_folder_feature_cache_entry(self, folder_info: FolderInfo) -> Dict[str, Any]:
+        cached = self._folder_feature_cache.get(folder_info.path)
+        if cached is not None:
+            return cached
+
+        other_files_details: List[Dict[str, Any]] = folder_info.other_files
+        entry = {
+            "stats": self._ml_calculate_folder_stats(folder_info),
+            "parent_name": folder_info.parent_folder_name or "",
+            "parent_words": self._extract_word_set(folder_info.parent_folder_name),
+            "other_files_details": other_files_details,
+            "other_files_names": {f['name'] for f in other_files_details},
+            "other_files_map": {f['name']: f for f in other_files_details},
+            "quality_fields": {
+                'quality_score': folder_info.quality_score,
+                'hebrew_metadata_ratio': folder_info.hebrew_metadata_ratio,
+                'metadata_completeness_ratio': folder_info.metadata_completeness_ratio,
+                'lossless_ratio': folder_info.lossless_ratio,
+                'lyrics_ratio': folder_info.lyrics_ratio,
+            },
+        }
+        self._folder_feature_cache[folder_info.path] = entry
+        return entry
+
+    def _build_feature_vector(
+        self,
+        folder1_info: FolderInfo,
+        folder2_info: FolderInfo,
+        comparison_result: FolderComparisonResult,
+    ) -> Optional[List[float]]:
         if not folder1_info or not folder2_info or not comparison_result:
             logger.warning("Missing data for ML feature preparation.")
             return None
@@ -150,6 +202,9 @@ class MLSimilarityModel:
         features: Dict[str, Any] = {}
 
         try:
+            folder1_cache = self._get_folder_feature_cache_entry(folder1_info)
+            folder2_cache = self._get_folder_feature_cache_entry(folder2_info)
+
             # Basic Bitrate
             f1_avg_bitrate = folder1_info.avg_bitrate if folder1_info.avg_bitrate is not None else 0.0
             f2_avg_bitrate = folder2_info.avg_bitrate if folder2_info.avg_bitrate is not None else 0.0
@@ -175,8 +230,8 @@ class MLSimilarityModel:
             features['diff_generic_title_score'] = abs(f1_gen_title_score - f2_gen_title_score)
 
             # Folder Stats
-            folder1_stats = self._ml_calculate_folder_stats(folder1_info)
-            folder2_stats = self._ml_calculate_folder_stats(folder2_info)
+            folder1_stats = folder1_cache["stats"]
+            folder2_stats = folder2_cache["stats"]
             for stat_key in ["avg_duration", "std_duration", "min_duration", "max_duration", "total_duration",
                              "std_bitrate", "min_bitrate", "max_bitrate",
                              "avg_other_file_size_bytes", "total_other_file_size_bytes"]:
@@ -193,21 +248,24 @@ class MLSimilarityModel:
                     else: features['ratio_total_other_file_size_bytes'] = min(s1_val,s2_val) / max(1.0, s1_val, s2_val)
             
             # Parent Folder Name
-            f1_parent_name = folder1_info.parent_folder_name
-            f2_parent_name = folder2_info.parent_folder_name
+            f1_parent_name = folder1_cache["parent_name"]
+            f2_parent_name = folder2_cache["parent_name"]
             features['f1_parent_folder_name_len'] = len(f1_parent_name) if f1_parent_name else 0
             features['f2_parent_folder_name_len'] = len(f2_parent_name) if f2_parent_name else 0
             features['diff_parent_folder_name_len'] = abs(features['f1_parent_folder_name_len'] - features['f2_parent_folder_name_len'])
             features['parent_folder_names_match'] = 1.0 if f1_parent_name and f1_parent_name == f2_parent_name else 0.0
-            features['jaccard_parent_folder_names'] = self._calculate_word_jaccard_index(f1_parent_name, f2_parent_name)
+            features['jaccard_parent_folder_names'] = self._calculate_jaccard_index(
+                folder1_cache["parent_words"],
+                folder2_cache["parent_words"],
+            )
 
             # Quality Related Fields
             quality_related_fields_map = {
-                'quality_score': (folder1_info.quality_score, folder2_info.quality_score),
-                'hebrew_metadata_ratio': (folder1_info.hebrew_metadata_ratio, folder2_info.hebrew_metadata_ratio),
-                'metadata_completeness_ratio': (folder1_info.metadata_completeness_ratio, folder2_info.metadata_completeness_ratio),
-                'lossless_ratio': (folder1_info.lossless_ratio, folder2_info.lossless_ratio),
-                'lyrics_ratio': (folder1_info.lyrics_ratio, folder2_info.lyrics_ratio),
+                field: (
+                    folder1_cache["quality_fields"].get(field),
+                    folder2_cache["quality_fields"].get(field),
+                )
+                for field in folder1_cache["quality_fields"].keys()
             }
             for field, (val1, val2) in quality_related_fields_map.items():
                 v1 = val1 if val1 is not None else 0.0
@@ -217,10 +275,10 @@ class MLSimilarityModel:
                 features[f'diff_{field}'] = abs(v1 - v2)
 
             # Other Files Details
-            f1_other_files_details: List[Dict[str, Any]] = folder1_info.other_files
-            f2_other_files_details: List[Dict[str, Any]] = folder2_info.other_files
-            f1_other_files_names = {f['name'] for f in f1_other_files_details}
-            f2_other_files_names = {f['name'] for f in f2_other_files_details}
+            f1_other_files_details: List[Dict[str, Any]] = folder1_cache["other_files_details"]
+            f2_other_files_details: List[Dict[str, Any]] = folder2_cache["other_files_details"]
+            f1_other_files_names = folder1_cache["other_files_names"]
+            f2_other_files_names = folder2_cache["other_files_names"]
             features['f1_num_other_files'] = len(f1_other_files_details)
             features['f2_num_other_files'] = len(f2_other_files_details)
             features['diff_num_other_files'] = abs(features['f1_num_other_files'] - features['f2_num_other_files'])
@@ -234,8 +292,8 @@ class MLSimilarityModel:
             other_files_hash_match_count = 0
             other_files_size_similarity_sum = 0.0
             if common_other_file_names:
-                f1_other_map = {f['name']: f for f in f1_other_files_details}
-                f2_other_map = {f['name']: f for f in f2_other_files_details}
+                f1_other_map = folder1_cache["other_files_map"]
+                f2_other_map = folder2_cache["other_files_map"]
                 for name in common_other_file_names:
                     of1 = f1_other_map[name]
                     of2 = f2_other_map[name]
@@ -283,62 +341,79 @@ class MLSimilarityModel:
                 # All features should now be in the `features` dict.
                 # Default to 0.0 if a feature was somehow missed, though ideally all are calculated.
                 val = features.get(feature_name, 0.0)
-                if val is None: # Ensure no None makes it to the DataFrame
+                if val is None: # Ensure no None reaches the model input matrix.
                     logger.warning(f"Feature '{feature_name}' had None value for pair "
                                    f"{folder1_info.path.name} and {folder2_info.path.name}. Defaulting to 0.0.")
                     val = 0.0
                 feature_values_ordered.append(val)
-            
-            df = pd.DataFrame([feature_values_ordered], columns=self.EXPECTED_FEATURE_NAMES_ORDERED)
-            return df
+            return [float(value) for value in feature_values_ordered]
 
         except Exception as e:
             logger.error(f"Error preparing features for ML prediction "
                          f"for pair {folder1_info.path.name} and {folder2_info.path.name}: {e}", exc_info=True)
             return None
 
+    def predict_similarities_for_pairs(
+        self,
+        pair_inputs: Sequence[Tuple[FolderInfo, FolderInfo, FolderComparisonResult]],
+    ) -> List[Optional[float]]:
+        if not pair_inputs:
+            return []
+        if not self.model_loaded or self.model is None:
+            logger.debug("ML model not loaded. Skipping ML batch prediction.")
+            return [None] * len(pair_inputs)
+
+        scores: List[Optional[float]] = [None] * len(pair_inputs)
+        feature_rows: List[List[float]] = []
+        feature_indexes: List[int] = []
+
+        for index, (folder1_info, folder2_info, comparison_result) in enumerate(pair_inputs):
+            feature_vector = self._build_feature_vector(folder1_info, folder2_info, comparison_result)
+            if feature_vector is None:
+                logger.warning(
+                    "Feature preparation failed for ML prediction for pair: %s and %s. Skipping.",
+                    folder1_info.path.name,
+                    folder2_info.path.name,
+                )
+                continue
+            feature_rows.append(feature_vector)
+            feature_indexes.append(index)
+
+        if not feature_rows:
+            return scores
+
+        features_matrix = np.asarray(feature_rows, dtype=np.float64)
+        if not np.isfinite(features_matrix).all():
+            logger.warning("Non-finite values found in ML features. Replacing them with 0.0 before prediction.")
+            features_matrix = np.nan_to_num(features_matrix, nan=0.0, posinf=0.0, neginf=0.0)
+
+        try:
+            for start in range(0, len(feature_indexes), self.prediction_batch_size):
+                stop = start + self.prediction_batch_size
+                batch_indexes = feature_indexes[start:stop]
+                batch_matrix = features_matrix[start:stop]
+                batch_predictions = np.asarray(self.model.predict(batch_matrix), dtype=np.float64)
+                batch_predictions = np.clip(batch_predictions, 0.0, 100.0)
+                for row_index, predicted_score in zip(batch_indexes, batch_predictions.tolist()):
+                    scores[row_index] = float(predicted_score)
+        except Exception as e:
+            logger.error("Error during ML batch prediction: %s", e, exc_info=True)
+
+        return scores
 
     def predict_similarity_for_pair(self,
                                    folder1_info: FolderInfo,
                                    folder2_info: FolderInfo,
                                    comparison_result: FolderComparisonResult) -> Optional[float]:
-        if not self.model_loaded or self.model is None:
-            logger.debug("ML model not loaded. Skipping ML prediction.")
-            return None
-
-        features_df = self._prepare_features_for_prediction(folder1_info, folder2_info, comparison_result)
-
-        if features_df is None:
-            logger.warning(f"Feature preparation failed for ML prediction for pair: "
-                           f"{folder1_info.path.name} and {folder2_info.path.name}. Skipping.")
-            return None
-
-
-        if features_df.isnull().values.any():
-            logger.warning(f"NaN values found in features for ML prediction (pair: "
-                           f"{folder1_info.path.name}, {folder2_info.path.name}). Model might behave unexpectedly or error. "
-                           f"NaNs: {features_df.columns[features_df.isnull().any()].tolist()}")
-            # Optionally, fill NaNs: features_df.fillna(0.0, inplace=True) if model robust to this
-
-
-        try:
-            prediction = self.model.predict(features_df)
-
-            ml_score = float(prediction[0]) # Prediction is usually a numpy array
-
-            # Clip the score to be between 0 and 100, as similarity scores usually are.
-            # The model's output range might vary based on its training target (e.g. 0-5, 0-100, etc.)
-            # Assuming the model was trained to output scores in 0-100 range.
-            # If it was, e.g. 0-5 (like in some dataset labels), it would need scaling: ml_score * 20
-            # For now, we just clip. If scaling is needed, it would be:
-            # ml_score = min(max(ml_score * SCALE_FACTOR, 0.0), 100.0)
-            ml_score = min(max(ml_score, 0.0), 100.0)
-
-
-            logger.debug(f"ML model predicted similarity for "
-                        f"{folder1_info.path.name} vs {folder2_info.path.name}: {ml_score:.4f}")
-            return ml_score
-        except Exception as e:
-            logger.error(f"Error during ML model prediction for "
-                         f"{folder1_info.path.name} vs {folder2_info.path.name}: {e}", exc_info=True)
-            return None
+        predictions = self.predict_similarities_for_pairs(
+            [(folder1_info, folder2_info, comparison_result)]
+        )
+        ml_score = predictions[0] if predictions else None
+        if ml_score is not None:
+            logger.debug(
+                "ML model predicted similarity for %s vs %s: %.4f",
+                folder1_info.path.name,
+                folder2_info.path.name,
+                ml_score,
+            )
+        return ml_score
