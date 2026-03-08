@@ -1,12 +1,21 @@
 import React from "react";
 import { Badge } from "./UI";
-import { getClusterDisplayTitle, getClusterStatusMeta, hasClusterDecision } from "../utils";
+import { getClusterDisplayTitle, getClusterSortPriority, getClusterStatusMeta, hasClusterDecision } from "../utils";
 
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
-  const filteredClusters = clusters.filter(c => {
-    if (selectedTab === 'all') return true;
-    return c.confidence_bucket === selectedTab;
-  });
+  const filteredClusters = clusters
+    .filter((cluster) => {
+      if (selectedTab === "all") return true;
+      return cluster.confidence_bucket === selectedTab;
+    })
+    .map((cluster, index) => ({ cluster, index }))
+    .sort((left, right) => {
+      const priorityDiff =
+        getClusterSortPriority(left.cluster, decisions) - getClusterSortPriority(right.cluster, decisions);
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.index - right.index;
+    })
+    .map(({ cluster }) => cluster);
 
   return (
     <div className="cluster-sidebar">
@@ -39,7 +48,7 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
             return (
               <div 
                 key={cluster.cluster_id} 
-                className={`cluster-card ${isActive ? "active" : ""}`} 
+                className={`cluster-card ${isActive ? "active" : ""} ${statusMeta.label === "נבדק ומוכן" ? "status-ready" : ""}`} 
                 onClick={() => setSelectedClusterId(cluster.cluster_id)}
               >
                 <div className="cluster-name" title={getClusterDisplayTitle(cluster)}>

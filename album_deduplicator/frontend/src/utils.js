@@ -80,6 +80,10 @@ export function getClusterListSubtitle(cluster) {
   return `${albumCount} עותקים להשוואה`;
 }
 
+export function getAlbumOrdinalLabel(index) {
+  return `עותק ${index + 1}`;
+}
+
 export function getClusterStatusMeta(cluster, hasDecision) {
   if (!cluster) {
     return { label: "ממתין לסקירה", tone: "neutral" };
@@ -93,6 +97,14 @@ export function getClusterStatusMeta(cluster, hasDecision) {
     return { label: "נבדק ומוכן", tone: "success" };
   }
   return { label: "ממתין לסקירה", tone: "neutral" };
+}
+
+export function getClusterSortPriority(cluster, decisions = {}) {
+  if (!cluster) return 99;
+  const hasDecision = hasClusterDecision(decisions, cluster.cluster_id) && decisions[cluster.cluster_id] !== null;
+  const statusMeta = getClusterStatusMeta(cluster, hasDecision);
+  if (statusMeta.label === "נבדק ומוכן") return 0;
+  return 1;
 }
 
 export function getMetricWinners(albums) {

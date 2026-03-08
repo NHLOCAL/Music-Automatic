@@ -5,6 +5,7 @@ import {
   formatBitrate,
   formatDuration,
   formatSizeMb,
+  getAlbumOrdinalLabel,
   getClusterDisplayTitle,
   getMetricWinners,
   getTrackFieldTone,
@@ -65,16 +66,17 @@ export function DiffWorkspace({
     );
   };
 
-  const renderTrackCell = (row, albumId) => {
+  const renderTrackCell = (row, albumId, rowIndex) => {
     const entry = row.entries[albumId];
-    if (!entry) return <div className="td-cell missing-track">חסר קובץ</div>;
+    const rowToneClass = rowIndex % 2 === 1 ? "row-alt" : "";
+    if (!entry) return <div className={`td-cell track-data-cell missing-track ${rowToneClass}`}>חסר קובץ</div>;
 
     const bitrateDiff = getTrackFieldTone(row, albumIds, "bitrate") === "different";
     const sizeDiff = getTrackFieldTone(row, albumIds, "size_mb") === "different";
     const durationDiff = getTrackFieldTone(row, albumIds, "duration") === "different";
 
     return (
-      <div className="td-cell">
+      <div className={`td-cell track-data-cell ${rowToneClass}`}>
         <div className="td-main" title={entry.filename}>{entry.filename}</div>
         <div style={{ display: 'flex', gap: '8px', marginTop: '4px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
           <span className={bitrateDiff ? "diff-highlight" : ""}>{formatBitrate(entry.bitrate)}</span>
@@ -106,14 +108,19 @@ export function DiffWorkspace({
         <div className="diff-content">
           {/* Top Cards Grid */}
           <div className="comparison-grid">
-            {visibleAlbums.map((album) => {
+            {visibleAlbums.map((album, albumIndex) => {
               const isKeeper = currentKeeperId === album.folder_id;
               const isMarked = selectedDeleteFolderIds.includes(album.folder_id);
               const isSuggestedKeeper = !hasUserDecision && cluster.recommended_keeper_id === album.folder_id;
+              const albumOrdinalLabel = getAlbumOrdinalLabel(albumIndex);
 
               return (
                 <div key={album.folder_id} className={`album-box ${isKeeper ? 'is-keeper' : ''} ${isMarked ? 'is-deleted' : ''}`}>
                   <div className="box-header">
+                    <div className="box-order-row">
+                      <div className="album-index-badge">{albumIndex + 1}</div>
+                      <div className="album-order-label">{albumOrdinalLabel}</div>
+                    </div>
                     <div className="box-title">
                        <span title={album.name}>{album.name}</span>
                        {isKeeper && <Badge tone="success">נשמר</Badge>}
@@ -171,19 +178,23 @@ export function DiffWorkspace({
                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     </Button>
                   </div>
-                  
-                  {!isKeeper && (
-                     <div style={{ padding: '0 20px 20px 20px' }}>
-                        <Button 
-                           variant="danger" 
-                           style={{ width: '100%', opacity: 0.8 }} 
-                           size="sm"
-                           onClick={() => setSingleDeleteTarget({ clusterId: cluster.cluster_id, folderId: album.folder_id, name: album.name })}
-                        >
-                           מחק תיקייה זו כעת
-                        </Button>
-                     </div>
-                  )}
+
+                  <div className="box-secondary-action">
+                    {isKeeper ? (
+                      <Button variant="secondary" style={{ width: "100%" }} size="sm" disabled>
+                        עותק שמור
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="danger" 
+                        style={{ width: '100%', opacity: 0.88 }} 
+                        size="sm"
+                        onClick={() => setSingleDeleteTarget({ clusterId: cluster.cluster_id, folderId: album.folder_id, name: album.name })}
+                      >
+                        מחק תיקייה זו כעת
+                      </Button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -198,30 +209,43 @@ export function DiffWorkspace({
                 <span><span className="dot missing"></span> קובץ חסר</span>
               </div>
             </div>
-            
-            <div className="tracks-grid" style={trackGridStyle}>
-              {/* Header Row */}
-              <div className="th-cell">שיר / אמן</div>
-              {visibleAlbums.map(album => (
-                <div key={album.folder_id} className="th-cell" style={{ direction: 'ltr', textAlign: 'right' }}>
-                  {album.name}
-                </div>
-              ))}
 
-              {/* Data Rows */}
-              {trackRows.map(row => (
-                <div className="tr-group" key={row.key}>
-                   <div className="td-cell">
-                      <div className="td-main">{row.title}</div>
-                      <div className="td-sub">{row.artist}</div>
-                   </div>
-                   {visibleAlbums.map(album => (
-                      <React.Fragment key={album.folder_id}>
-                         {renderTrackCell(row, album.folder_id)}
+            <div className="track-grid-scroll">
+              <div className="tracks-grid" style={trackGridStyle}>
+                <div className="th-cell">שיר / אמן</div>
+                {visibleAlbums.map((album, albumIndex) => (
+                  <div key={album.folder_id} className="th-cell track-column-header">
+                    <span className="track-column-index">{albumIndex + 1}</span>
+                    <div className="track-column-copy">
+                      <span className="track-column-label">{getAlbumOrdinalLabel(albumIndex)}</span>
+                      <span className="track-column-name" title={album.name}>{album.name}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {trackRows.length > 0 ? (
+                  trackRows.flatMap((row, rowIndex) => [
+                    (
+                      <div key={`${row.key}-meta`} className={`td-cell track-meta-cell ${rowIndex % 2 === 1 ? "row-alt" : ""}`}>
+                        <div className="td-main">{row.title}</div>
+                        <div className="td-sub">{row.artist}</div>
+                      </div>
+                    ),
+                    ...visibleAlbums.map((album) => (
+                      <React.Fragment key={`${row.key}-${album.folder_id}`}>
+                        {renderTrackCell(row, album.folder_id, rowIndex)}
                       </React.Fragment>
-                   ))}
-                </div>
-              ))}
+                    )),
+                  ])
+                ) : (
+                  <>
+                    <div className="track-empty-state">לא נמצאו קבצי שמע להצגה בקבוצה זו.</div>
+                    {visibleAlbums.map((album) => (
+                      <div key={`empty-${album.folder_id}`} className="track-empty-filler"></div>
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
