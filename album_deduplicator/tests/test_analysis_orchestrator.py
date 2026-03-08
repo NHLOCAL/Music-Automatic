@@ -29,6 +29,15 @@ def test_analysis_orchestrator_counts_all_compared_pairs(monkeypatch):
         similarity_scores={"title": 0.4},
     )
 
+    def fake_ml_model_init(self):
+        self.model_loaded = False
+        self.prediction_batch_size = 256
+
+    monkeypatch.setattr(
+        "music_dup_lib.services.scoring_service.MLSimilarityModel.__init__",
+        fake_ml_model_init,
+    )
+
     monkeypatch.setattr(
         "music_dup_lib.services.analysis_orchestrator.FolderScanner.scan_folders",
         lambda self, folders: {folder_a.path: folder_a, folder_b.path: folder_b},

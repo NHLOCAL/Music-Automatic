@@ -112,6 +112,20 @@ def test_recommendation_marks_review_for_borderline_scores():
     assert "cluster_review" in cluster.reason_codes
 
 
+def test_recommendation_excludes_exact_review_threshold_from_clusters():
+    folder1 = make_folder("C:/music/A", 90.0)
+    folder2 = make_folder("D:/music/B", 88.0)
+    folders = {folder1.path: folder1, folder2.path: folder2}
+
+    service = RecommendationService()
+    albums = service.build_album_summaries(folders)
+    pair = make_pair(folder1.path, folder2.path, 60.0)
+
+    clusters = service.build_clusters(folders, {pair.pair_id: pair}, albums)
+
+    assert clusters == {}
+
+
 def test_recommendation_builds_human_highlights_for_quality_and_art():
     keeper = make_folder("C:/music/Best", 95.0, bitrate=320.0, has_art=True)
     duplicate = make_folder("D:/music/Worse", 82.0, bitrate=192.0, has_art=False)

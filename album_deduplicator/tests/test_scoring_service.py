@@ -100,6 +100,43 @@ def test_scoring_service_falls_back_to_algorithmic_when_ml_missing():
     assert "algorithmic_only" in pair.reason_codes
 
 
+def test_scoring_service_excludes_exact_review_threshold():
+    folder1 = make_folder("C:/music/A")
+    folder2 = make_folder("D:/music/B")
+    comparison = FolderComparisonResult(folder1_path=folder1.path, folder2_path=folder2.path, weighted_score=60.0)
+
+    service = ScoringService(use_gemini=False)
+    service.ml_model.model_loaded = False
+
+    pairs, _ = service.apply_scores(
+        comparison_results=[comparison],
+        all_folders={folder1.path: folder1, folder2.path: folder2},
+        cached_results_map={},
+    )
+
+    assert pairs == {}
+
+
+def test_scoring_service_keeps_exact_safe_threshold_in_review():
+    folder1 = make_folder("C:/music/A")
+    folder2 = make_folder("D:/music/B")
+    comparison = FolderComparisonResult(folder1_path=folder1.path, folder2_path=folder2.path, weighted_score=90.0)
+
+    service = ScoringService(use_gemini=False)
+    service.ml_model.model_loaded = False
+
+    pairs, _ = service.apply_scores(
+        comparison_results=[comparison],
+        all_folders={folder1.path: folder1, folder2.path: folder2},
+        cached_results_map={},
+    )
+
+    pair = next(iter(pairs.values()))
+    assert pair.final_score == 90.0
+    assert "review_threshold" in pair.reason_codes
+    assert "safe_threshold" not in pair.reason_codes
+
+
 def test_scoring_service_skips_gemini_outside_review_band(monkeypatch):
     folder1 = make_folder("C:/music/A")
     folder2 = make_folder("D:/music/B")
@@ -193,13 +230,13 @@ def test_scoring_service_discards_pairs_below_review_threshold_but_keeps_cache_e
     comparison = FolderComparisonResult(
         folder1_path=folder1.path,
         folder2_path=folder2.path,
-        weighted_score=60.0,
+        weighted_score=58.0,
         similarity_scores={"title": 0.7, "album": 0.4, "additional_metadata_details": {"genre": 0.0}},
     )
 
     service = ScoringService(use_gemini=False)
     monkeypatch.setattr(service.ml_model, "model_loaded", True)
-    monkeypatch.setattr(service.ml_model, "predict_similarities_for_pairs", lambda *args, **kwargs: [62.0])
+    monkeypatch.setattr(service.ml_model, "predict_similarities_for_pairs", lambda *args, **kwargs: [60.0])
 
     cached_results = []
     pairs, _ = service.apply_scores(
@@ -211,5 +248,5 @@ def test_scoring_service_discards_pairs_below_review_threshold_but_keeps_cache_e
 
     assert pairs == {}
     assert len(cached_results) == 1
-    assert cached_results[0].ml_similarity_score == 62.0
+    assert cached_results[0].ml_similarity_score == 60.0
     assert cached_results[0].similarity_scores == {}

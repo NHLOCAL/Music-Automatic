@@ -247,7 +247,7 @@ final_score = base_score
 
 - בונה graph בין תיקיות שיש ביניהן:
   - `identical_by_hash`, או
-  - `final_score >= REVIEW_MIN_SIMILARITY`
+  - `final_score > REVIEW_MIN_SIMILARITY`
 - מוצא connected components.
 - כל component עם יותר מאלבום אחד הופך ל-`cluster`.
 
@@ -297,14 +297,14 @@ final_score = base_score
 - `BASE_SCORE_ML_WEIGHT = 0.55`
 - `FINAL_SCORE_BASE_WEIGHT = 0.85`
 - `FINAL_SCORE_GEMINI_WEIGHT = 0.15`
-- `REVIEW_MIN_SIMILARITY = 85.0`
-- `SAFE_DELETE_MIN_SIMILARITY = 97.0`
+- `REVIEW_MIN_SIMILARITY = 60.0`
+- `SAFE_DELETE_MIN_SIMILARITY = 90.0`
 
 ### מתי pair נכנס ל-review
 
 כאשר:
 
-- `85 <= final_score < 97`, או
+- `60 < final_score <= 90`, או
 - אין `keeper` ברור, או
 - יש חוסר ודאות עסקי בתוך cluster
 
@@ -314,7 +314,7 @@ final_score = base_score
 
 - כל הקשרים הרלוונטיים בטוחים:
   - `identical_by_hash`, או
-  - `final_score >= 97`
+  - `final_score > 90`
 - יש `keeper` יחיד וברור
 - אותו keeper "מכסה" את שאר חברי ה-cluster
 

@@ -69,9 +69,9 @@ HIGH_BITRATE_TARGET = 320  # kbps
 MID_BITRATE_TARGET = 128   # kbps
 BITRATE_SCORE_TOLERANCE = 192 # For 128kbps target, how far can it be to still get some score
 MIN_SIMILARITY_FOR_MERGE = 80.0
-DEFAULT_MIN_SIMILARITY_FOR_DELETE = 85.0
-REVIEW_MIN_SIMILARITY = 85.0
-SAFE_DELETE_MIN_SIMILARITY = 97.0
+DEFAULT_MIN_SIMILARITY_FOR_DELETE = 60.0
+REVIEW_MIN_SIMILARITY = 60.0
+SAFE_DELETE_MIN_SIMILARITY = 90.0
 DEFAULT_LOG_LEVEL = "INFO"
 LOG_FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
 MAX_WORKERS = None # os.cpu_count() will be used by default if None
@@ -82,7 +82,7 @@ GEMINI_API_KEY_ENV_VAR = "GEMINI_API_KEY" # שם משתנה הסביבה
 # קובץ ההנחיות ל-Gemini, נמצא יחסית למיקום קובץ זה, בתיקיית 'external' של music_dup_lib
 GEMINI_SYSTEM_INST_FILE = MUSIC_DUP_LIB_ROOT / "external" / "gemini_system_instruction.txt"
 GEMINI_MODEL_NAME = "gemini-2.5-flash" # "gemini-2.5-flash-preview-05-20" # "gemini-2.0-flash-lite"
-DEFAULT_GEMINI_SIMILARITY_RANGE = "40-90" # Min-Max % for sending pairs to Gemini
+DEFAULT_GEMINI_SIMILARITY_RANGE = "60-90" # Min-Max % for sending pairs to Gemini
 GEMINI_API_DELAY_SECONDS = 0.5 # Delay between API calls (seconds)
 GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE = 95.0
 GEMINI_REVIEW_MIN = REVIEW_MIN_SIMILARITY
@@ -96,3 +96,15 @@ API_DEV_CORS_ORIGINS = [
 # If data_preparation.py defines its own, these are just for reference or album_deduplicator's internal use.
 FILTER_PAIRS_BY_FILE_COUNT_FOR_ML = True
 FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI = True # Filter pairs for Gemini labeling if music file counts differ
+
+
+def is_review_candidate(score: float) -> bool:
+    return score > REVIEW_MIN_SIMILARITY
+
+
+def is_safe_delete_candidate(score: float) -> bool:
+    return score > SAFE_DELETE_MIN_SIMILARITY
+
+
+def is_gemini_review_candidate(score: float) -> bool:
+    return REVIEW_MIN_SIMILARITY < score <= SAFE_DELETE_MIN_SIMILARITY

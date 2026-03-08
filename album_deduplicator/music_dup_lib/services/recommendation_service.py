@@ -53,7 +53,7 @@ class RecommendationService:
         eligible_pairs = [
             pair
             for pair in pairs.values()
-            if pair.is_identical_by_hash or pair.final_score >= config.REVIEW_MIN_SIMILARITY
+            if pair.is_identical_by_hash or config.is_review_candidate(pair.final_score)
         ]
         for pair in eligible_pairs:
             graph[pair.folder1_id].add(pair.folder2_id)
@@ -72,7 +72,7 @@ class RecommendationService:
             component_pairs = self._component_pairs(component, pair_lookup_by_folder_ids)
             recommended_keeper_id, keeper_reasons, reason_codes, clear_keeper = self._pick_keeper(component, albums)
             all_pairs_safe = all(
-                pair.is_identical_by_hash or pair.final_score >= config.SAFE_DELETE_MIN_SIMILARITY
+                pair.is_identical_by_hash or config.is_safe_delete_candidate(pair.final_score)
                 for pair in (pairs[pair_id] for pair_id in component_pairs)
             )
             keeper_covers_members = self._keeper_covers_members(component, component_pairs, pairs, recommended_keeper_id)
@@ -217,7 +217,7 @@ class RecommendationService:
         safe_neighbors: Set[str] = set()
         for pair_id in component_pairs:
             pair = pairs[pair_id]
-            if not (pair.is_identical_by_hash or pair.final_score >= config.SAFE_DELETE_MIN_SIMILARITY):
+            if not (pair.is_identical_by_hash or config.is_safe_delete_candidate(pair.final_score)):
                 continue
             if pair.folder1_id == keeper_id:
                 safe_neighbors.add(pair.folder2_id)
@@ -260,7 +260,7 @@ class RecommendationService:
                 "האיכותי ביותר בקבוצה."
             )
 
-        if min_score >= config.REVIEW_MIN_SIMILARITY:
+        if config.is_review_candidate(min_score):
             return (
                 f"האלבומים נראים דומים מאוד, אבל עדיין חסר ביטחון מספיק למחיקה אוטומטית. "
                 f"ההמלצה הראשונית היא לשמור את \"{keeper.name}\"."

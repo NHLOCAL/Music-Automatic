@@ -134,9 +134,9 @@ class ScoringService:
 
                 if result.is_identical_by_hash:
                     reason_codes.append("identical_by_hash")
-                elif final_score >= config.SAFE_DELETE_MIN_SIMILARITY:
+                elif config.is_safe_delete_candidate(final_score):
                     reason_codes.append("safe_threshold")
-                elif final_score >= config.REVIEW_MIN_SIMILARITY:
+                elif config.is_review_candidate(final_score):
                     reason_codes.append("review_threshold")
 
                 if self._should_cache_result(result, final_score):
@@ -177,7 +177,7 @@ class ScoringService:
         return pairs, warnings
 
     def _should_retain_pair(self, result: FolderComparisonResult, final_score: float) -> bool:
-        return result.is_identical_by_hash or final_score >= config.REVIEW_MIN_SIMILARITY
+        return result.is_identical_by_hash or config.is_review_candidate(final_score)
 
     def _should_cache_result(self, result: FolderComparisonResult, final_score: float) -> bool:
         return result.is_identical_by_hash or final_score >= config.MIN_SCORE_FOR_CACHING
@@ -283,7 +283,7 @@ class ScoringService:
         return (
             self.use_gemini
             and not is_identical_by_hash
-            and config.GEMINI_REVIEW_MIN <= base_score < config.GEMINI_REVIEW_MAX
+            and config.is_gemini_review_candidate(base_score)
         )
 
     def _resolve_gemini(
