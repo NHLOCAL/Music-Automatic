@@ -234,7 +234,7 @@ export function buildDeletionWorkflowModel(clusters = [], preview = null, decisi
 
   const deleteAttemptMap = new Map(Object.entries(deleteAttemptResults));
 
-  const groups = clusters
+  const allGroups = clusters
     .map((cluster, index) => {
       const activeKeeperId = getActiveKeeperId(cluster, decisions);
       const albums = Array.isArray(cluster.albums) ? cluster.albums : [];
@@ -326,16 +326,19 @@ export function buildDeletionWorkflowModel(clusters = [], preview = null, decisi
       return left.order - right.order;
     });
 
-  const deletedCount = groups.reduce((sum, group) => sum + group.deletedCount, 0);
-  const deletedSizeMb = groups.reduce((sum, group) => sum + group.deletedSizeMb, 0);
-  const keeperCount = groups.filter((group) => group.keeper).length;
-  const failedCount = groups.reduce((sum, group) => sum + group.failedCount, 0);
-  const additionalKeptCount = groups.reduce((sum, group) => sum + group.additionalKeptCopies.length, 0);
-  const unresolvedClusters = groups.filter((group) => !group.keeper).length;
-  const partiallyCompletedClusters = groups.filter((group) => group.pendingCount > 0 && group.deletedCount > 0).length;
+  const visibleGroups = allGroups.filter((group) => group.pendingCount > 0);
+
+  const deletedCount = allGroups.reduce((sum, group) => sum + group.deletedCount, 0);
+  const deletedSizeMb = allGroups.reduce((sum, group) => sum + group.deletedSizeMb, 0);
+  const keeperCount = allGroups.filter((group) => group.keeper).length;
+  const failedCount = allGroups.reduce((sum, group) => sum + group.failedCount, 0);
+  const additionalKeptCount = allGroups.reduce((sum, group) => sum + group.additionalKeptCopies.length, 0);
+  const unresolvedClusters = allGroups.filter((group) => !group.keeper).length;
+  const partiallyCompletedClusters = allGroups.filter((group) => group.pendingCount > 0 && group.deletedCount > 0).length;
 
   return {
-    groups,
+    groups: visibleGroups,
+    allGroups,
     summary: {
       pendingCount: safePreview.total_count ?? previewItems.length,
       pendingSizeMb: safePreview.total_size_mb ?? 0,
@@ -348,6 +351,8 @@ export function buildDeletionWorkflowModel(clusters = [], preview = null, decisi
       additionalKeptCount,
       unresolvedClusters,
       partiallyCompletedClusters,
+      visibleGroupCount: visibleGroups.length,
+      allGroupCount: allGroups.length,
     },
     previewByFolderId,
   };

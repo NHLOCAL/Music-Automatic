@@ -478,17 +478,19 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "פתח את שלב ההעברה" }));
 
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "העברה סופית לסל המחזור" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: "אישור העברה לסל המחזור" })).toBeInTheDocument(),
     );
-    expect(screen.getAllByText("ממתינות להעברה").length).toBeGreaterThan(0);
-    expect(screen.getByText("עותק נשמר")).toBeInTheDocument();
+    expect(screen.getByText("Archive Copy")).toBeInTheDocument();
     expect(screen.getByText("נבחר אוטומטית")).toBeInTheDocument();
+    expect(screen.queryByText("עותק נשמר")).not.toBeInTheDocument();
+    expect(screen.queryByText("כבר הועברו")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "העבר 1 תיקיות לסל המחזור" }));
 
-    await waitFor(() => expect(screen.getAllByText("כבר הועברו").length).toBeGreaterThan(0));
-    expect(screen.getByText("הועבר בהצלחה לסל המחזור")).toBeInTheDocument();
-    expect(screen.getByText("אין כרגע תיקיות שממתינות להעברה. אפשר לחזור לסקירה או להתחיל סריקה חדשה.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("אין כרגע קבוצות שממתינות למחיקה")).toBeInTheDocument());
+    expect(screen.queryByText("Archive Copy")).not.toBeInTheDocument();
+    expect(screen.queryByText("הועבר בהצלחה לסל המחזור")).not.toBeInTheDocument();
+    expect(screen.getByText("תיקיות שכבר הועברו")).toBeInTheDocument();
   });
 
   it("waits for summary data before switching from scanning to summary", async () => {
