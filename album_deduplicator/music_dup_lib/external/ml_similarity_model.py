@@ -54,18 +54,25 @@ class MLSimilarityModel:
 
     def __init__(self, model_path: Path = config.ML_MODEL_FILE):
         self.model_path = model_path
+        self.resolved_model_path: Optional[Path] = None
         self.model = None
         self.model_loaded = False
         self._load_model()
 
     def _load_model(self):
         try:
-            if not self.model_path.exists():
-                logger.warning(f"ML model file not found at: {self.model_path}. ML-based similarity will be disabled.")
+            candidate_paths = [self.model_path, config.SIMILARITY_MODEL_FALLBACK_FILE]
+            existing_path = next((path for path in candidate_paths if path.exists()), None)
+            if existing_path is None:
+                logger.warning(
+                    "ML model file not found at any known location: %s. ML-based similarity will be disabled.",
+                    ", ".join(str(path) for path in candidate_paths),
+                )
                 return
-            self.model = joblib.load(self.model_path)
+            self.resolved_model_path = existing_path
+            self.model = joblib.load(existing_path)
             self.model_loaded = True
-            logger.info(f"ML similarity model loaded successfully from: {self.model_path}")
+            logger.info(f"ML similarity model loaded successfully from: {existing_path}")
         except Exception as e:
             logger.error(f"Error loading ML similarity model from {self.model_path}: {e}", exc_info=True)
             self.model = None

@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 MUSIC_DUP_LIB_ROOT = Path(__file__).resolve().parent
 ALBUM_DEDUP_PROJECT_ROOT = MUSIC_DUP_LIB_ROOT.parent
+REPO_ROOT = ALBUM_DEDUP_PROJECT_ROOT.parent
 DATA_DIR = ALBUM_DEDUP_PROJECT_ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 LOGS_DIR = ALBUM_DEDUP_PROJECT_ROOT / "logs"
@@ -14,6 +15,7 @@ ARTIST_CSV_FILENAME = "singer-list.csv"
 ARTIST_CSV_FILE = DATA_DIR / ARTIST_CSV_FILENAME
 ML_MODEL_FILENAME = "lgbm_regressor_model.joblib"
 ML_MODEL_FILE = DATA_DIR / ML_MODEL_FILENAME
+SIMILARITY_MODEL_FALLBACK_FILE = REPO_ROOT / "similarity_model" / "models" / ML_MODEL_FILENAME
 ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
 LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
 IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini',
@@ -45,6 +47,10 @@ SIMILARITY_WEIGHTS = {
 }
 GEMINI_SCORE_WEIGHT = 0.7
 ALGORITHMIC_SCORE_WEIGHT = 0.3
+BASE_SCORE_ALGORITHMIC_WEIGHT = 0.45
+BASE_SCORE_ML_WEIGHT = 0.55
+FINAL_SCORE_BASE_WEIGHT = 0.85
+FINAL_SCORE_GEMINI_WEIGHT = 0.15
 QUALITY_WEIGHTS = {
     'hebrew_metadata': 2.0,
     'metadata_completeness': 2.0,
@@ -61,6 +67,8 @@ MID_BITRATE_TARGET = 128   # kbps
 BITRATE_SCORE_TOLERANCE = 192 # For 128kbps target, how far can it be to still get some score
 MIN_SIMILARITY_FOR_MERGE = 80.0
 DEFAULT_MIN_SIMILARITY_FOR_DELETE = 85.0
+REVIEW_MIN_SIMILARITY = 85.0
+SAFE_DELETE_MIN_SIMILARITY = 97.0
 DEFAULT_LOG_LEVEL = "INFO"
 LOG_FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
 MAX_WORKERS = None # os.cpu_count() will be used by default if None
@@ -74,6 +82,12 @@ GEMINI_MODEL_NAME = "gemini-2.5-flash" # "gemini-2.5-flash-preview-05-20" # "gem
 DEFAULT_GEMINI_SIMILARITY_RANGE = "40-90" # Min-Max % for sending pairs to Gemini
 GEMINI_API_DELAY_SECONDS = 0.5 # Delay between API calls (seconds)
 GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE = 95.0
+GEMINI_REVIEW_MIN = REVIEW_MIN_SIMILARITY
+GEMINI_REVIEW_MAX = SAFE_DELETE_MIN_SIMILARITY
+API_DEV_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 # --- הגדרות עבור data_preparation.py (אם משתמשים ב-config זה כמקור) ---
 # These might be used if data_preparation.py imports this config and needs these values.
 # If data_preparation.py defines its own, these are just for reference or album_deduplicator's internal use.
