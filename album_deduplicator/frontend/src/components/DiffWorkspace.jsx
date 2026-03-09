@@ -61,6 +61,22 @@ function getAlbumRibbon(album, currentKeeperId, recommendedKeeperId) {
   return null;
 }
 
+function PathSummary({ name, path }) {
+  return (
+    <Space orientation="vertical" size={2} style={{ width: "100%" }}>
+      <Typography.Text strong ellipsis={{ tooltip: name }}>
+        {name}
+      </Typography.Text>
+      <Typography.Paragraph
+        className="decision-path"
+        ellipsis={{ rows: 2, tooltip: path, expandable: "collapsible", symbol: "עוד" }}
+      >
+        {path}
+      </Typography.Paragraph>
+    </Space>
+  );
+}
+
 export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openExplorer }) {
   const visibleAlbums = useMemo(
     () => cluster?.albums?.filter((album) => !album.is_deleted) ?? [],
@@ -124,11 +140,13 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
         width: 280,
         render: (_, row) => (
           <div className="track-main-cell">
-            <Typography.Text strong>
+            <Typography.Text strong className="track-main-title" ellipsis={{ tooltip: row.title }}>
               <Icon name="music" size={14} /> {row.title}
             </Typography.Text>
             <div className="track-main-meta">
-              <Typography.Text type="secondary">{row.artist}</Typography.Text>
+              <Typography.Text type="secondary" ellipsis={{ tooltip: row.artist }}>
+                {row.artist}
+              </Typography.Text>
               <span className="track-chip">{formatDuration(row.duration)}</span>
             </div>
           </div>
@@ -142,10 +160,10 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
         return {
           title: (
             <div className="track-column-title">
-              <Typography.Text strong ellipsis={{ tooltip: album.name }}>
+              <Typography.Text strong className="track-column-name" ellipsis={{ tooltip: album.name }}>
                 {album.name}
               </Typography.Text>
-              <Typography.Text type="secondary">
+              <Typography.Text type="secondary" className="track-column-subtitle">
                 {album.folder_id === activeComparisonId
                   ? "בסיס ההשוואה"
                   : pairToActive?.is_identical_by_hash
@@ -157,7 +175,7 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
             </div>
           ),
           key: album.folder_id,
-          width: 260,
+          width: 228,
           render: (_, row) => {
             const entry = row.entries[album.folder_id];
             const referenceEntry = activeComparisonId ? row.entries[activeComparisonId] : null;
@@ -178,7 +196,9 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
               <div className="track-entry">
                 <span className="track-entry-name">
                   <Icon name="music" size={14} />
-                  {entry.filename}
+                  <Typography.Text className="track-entry-filename" ellipsis={{ tooltip: entry.filename }}>
+                    {entry.filename}
+                  </Typography.Text>
                 </span>
                 <div className="track-entry-meta">
                   <span className={`track-chip ${bitrateDifferent ? "is-different" : ""}`}>
@@ -213,14 +233,11 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
   }
 
   const decisionItems = [
-    {
-      key: "current",
-      label: "העותק שיישמר כעת",
+      {
+        key: "current",
+        label: "העותק שיישמר כעת",
       children: explicitKeeperAlbum ? (
-        <Space orientation="vertical" size={2}>
-          <Typography.Text strong>{explicitKeeperAlbum.name}</Typography.Text>
-          <Typography.Text type="secondary">{explicitKeeperAlbum.path}</Typography.Text>
-        </Space>
+        <PathSummary name={explicitKeeperAlbum.name} path={explicitKeeperAlbum.path} />
       ) : (
         <Typography.Text type="secondary">עדיין לא נבחר keeper ידני</Typography.Text>
       ),
@@ -229,10 +246,7 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
       key: "recommended",
       label: "המלצת המערכת",
       children: recommendedAlbum ? (
-        <Space orientation="vertical" size={2}>
-          <Typography.Text strong>{recommendedAlbum.name}</Typography.Text>
-          <Typography.Text type="secondary">{recommendedAlbum.path}</Typography.Text>
-        </Space>
+        <PathSummary name={recommendedAlbum.name} path={recommendedAlbum.path} />
       ) : (
         <Typography.Text type="secondary">אין המלצה חד-משמעית לקבוצה הזאת</Typography.Text>
       ),
@@ -273,7 +287,12 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
         <Flex className="diff-header-grid" justify="space-between" align="flex-start" gap={16} wrap>
           <div className="diff-header-copy">
             <Space wrap size={12}>
-              <Typography.Title level={2} style={{ margin: 0 }}>
+              <Typography.Title
+                level={2}
+                style={{ margin: 0 }}
+                className="diff-header-title"
+                ellipsis={{ tooltip: cluster.human_summary }}
+              >
                 {cluster.human_summary}
               </Typography.Title>
               <StatusTag
@@ -320,7 +339,7 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
         <Card className="decision-strip cartoon-panel" variant="borderless">
           <Descriptions
             bordered
-            column={2}
+            column={{ xs: 1, sm: 1, lg: 2, xxl: 4 }}
             size="small"
             className="decision-descriptions"
             items={decisionItems}
@@ -358,8 +377,8 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
           <div
             className="album-grid"
             style={{
-              gridTemplateColumns: `repeat(${visibleAlbums.length}, minmax(320px, 1fr))`,
-              minWidth: `${visibleAlbums.length * 336}px`,
+              gridTemplateColumns: `repeat(${visibleAlbums.length}, minmax(280px, 1fr))`,
+              minWidth: `${visibleAlbums.length * 296}px`,
             }}
           >
             {visibleAlbums.map((album, index) => {
@@ -379,30 +398,39 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
                   <Flex justify="space-between" align="flex-start" gap={12} wrap>
                     <div className="album-card-heading">
                       <Space wrap size={8}>
-                        <Typography.Title level={4} style={{ margin: 0 }}>
+                        <Typography.Title
+                          level={4}
+                          style={{ margin: 0 }}
+                          className="album-card-title"
+                          ellipsis={{ tooltip: album.name }}
+                        >
                           {album.name}
                         </Typography.Title>
                         <StatusTag tone={isKeeper ? "success" : isTrash ? "danger" : "neutral"}>
                           עותק {index + 1}
                         </StatusTag>
                       </Space>
-                      <Typography.Text type="secondary">
+                      <Typography.Paragraph
+                        className="album-heading-path"
+                        type="secondary"
+                        ellipsis={{ rows: 2, tooltip: album.path, expandable: "collapsible", symbol: "עוד" }}
+                      >
                         {album.path}
-                      </Typography.Text>
+                      </Typography.Paragraph>
                     </div>
 
                     <div className="album-actions">
                       <Button
                         type={isKeeper ? "primary" : "default"}
                         danger={isTrash}
-                        size="large"
+                        size="middle"
                         icon={<Icon name={isKeeper ? "check-circle" : isTrash ? "trash" : "shield"} size={16} />}
                         onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}
                       >
                         {isKeeper ? "נבחר לשמירה" : isTrash ? "מיועד למחיקה" : "שמור עותק זה"}
                       </Button>
                       <Button
-                        size="large"
+                        size="middle"
                         icon={<Icon name="folder" size={16} />}
                         title="פתח בתיקייה"
                         aria-label="פתח בתיקייה"
@@ -454,7 +482,7 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
                     className="album-descriptions"
                     size="small"
                     bordered
-                    column={2}
+                    column={{ xs: 1, sm: 2 }}
                     items={[
                       {
                         key: "quality",
@@ -556,7 +584,9 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
             pagination={false}
             rowKey="key"
             rowClassName={(row) => `track-row-${getTrackRowTone(row, visibleAlbumIds)}`}
-            scroll={{ x: Math.max(1080, visibleAlbums.length * 260 + 280), y: 520 }}
+            size="small"
+            tableLayout="fixed"
+            scroll={{ x: Math.max(920, visibleAlbums.length * 228 + 240), y: 440 }}
             sticky={{ offsetHeader: 8 }}
             summary={() => (
               <Table.Summary fixed>
