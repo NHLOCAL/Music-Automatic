@@ -1,57 +1,62 @@
 import React from "react";
-import { Badge, Button, Icon } from "./UI";
+import { Alert, Button, Card, Col, Result, Row, Statistic, Typography } from "antd";
+
+import { Icon, StatusTag } from "./UI";
 
 export function SummaryScreen({ summary, onStartReview, onBackToSetup }) {
   if (!summary?.counts) return null;
   const { safe_clusters, review_clusters } = summary.counts;
-  
+
   return (
-    <div className="centered-view">
-      <div className="summary-container">
-        <div className="success-icon">
-          <Icon name="check-circle" size={40} />
-        </div>
-        
-        <Badge tone="success" icon="shield">מוכן למעבר על התוצאות</Badge>
-        <h1 className="summary-title">הסריקה הושלמה!</h1>
-        <p className="summary-description">
-           המודל המתמטי ומנוע ה-AI סיימו לנתח את הקבצים. במסך הבא תוכל לראות גם את פירוק הציונים בצורה מלאה יותר.
-        </p>
-
-        <div className="summary-stats-grid">
-          <div className="stat-card highlight">
-            <div className="stat-card-head">
-              <Icon name="shield" size={16} />
-              בטוח למחיקה
+    <div className="screen-center">
+      <div className="summary-shell">
+        <Result
+          className="cartoon-card"
+          icon={<Icon name="check-circle" size={68} />}
+          title={<Typography.Title level={1}>הסריקה הושלמה!</Typography.Title>}
+          subTitle={(
+            <Typography.Paragraph style={{ margin: 0 }}>
+              המודל המתמטי ומנוע ה-AI סיימו לנתח את הקבצים. במסך הבא תוכל לראות גם את פירוק הציונים בצורה מלאה יותר.
+            </Typography.Paragraph>
+          )}
+          extra={(
+            <div className="screen-actions">
+              <Button type="default" size="large" icon={<Icon name="arrow-left" size={16} />} onClick={onBackToSetup}>
+                סריקה חדשה
+              </Button>
+              <Button type="primary" size="large" icon={<Icon name="compare" size={16} />} onClick={onStartReview}>
+                התחל לעבור על התוצאות
+              </Button>
             </div>
-            <div className="stat-value">{safe_clusters}</div>
-            <div className="stat-label">עותקים בטוחים למחיקה</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-card-head warning">
-              <Icon name="alert" size={16} />
-              דורש בדיקה
-            </div>
-            <div className="stat-value stat-value-warning">{review_clusters}</div>
-            <div className="stat-label">דורשים סקירה</div>
-          </div>
-        </div>
+          )}
+        >
+          <StatusTag tone="success" icon="shield">
+            מוכן למעבר על התוצאות
+          </StatusTag>
 
-        <div className="summary-note">
-          <Icon name="info" size={16} />
-          שום קובץ לא יועבר עדיין. במסך הסקירה תוכל לאשר כל החלטה ידנית.
-        </div>
+          <Row gutter={[16, 16]} className="summary-stats">
+            <Col xs={24} md={12}>
+              <Card className="summary-stat-card cartoon-panel" variant="borderless">
+                <Statistic title="בטוח למחיקה" value={safe_clusters} prefix={<Icon name="shield" size={18} />} />
+                <div className="muted-copy">עותקים בטוחים למחיקה</div>
+              </Card>
+            </Col>
+            <Col xs={24} md={12}>
+              <Card className="summary-stat-card cartoon-panel" variant="borderless">
+                <Statistic title="דורש בדיקה" value={review_clusters} prefix={<Icon name="alert" size={18} />} />
+                <div className="muted-copy">דורשים סקירה</div>
+              </Card>
+            </Col>
+          </Row>
 
-        <div className="summary-actions">
-          <Button variant="secondary" size="lg" className="summary-action-button" onClick={onBackToSetup}>
-            <Icon name="arrow-left" size={16} />
-            סריקה חדשה
-          </Button>
-          <Button variant="primary" size="lg" className="summary-action-button is-primary" onClick={onStartReview}>
-            <Icon name="compare" size={16} />
-            התחל לעבור על התוצאות
-          </Button>
-        </div>
+          <Alert
+            className="summary-note"
+            type="info"
+            showIcon
+            icon={<Icon name="info" size={16} />}
+            title="שום קובץ לא יועבר עדיין. במסך הסקירה תוכל לאשר כל החלטה ידנית."
+          />
+        </Result>
       </div>
     </div>
   );

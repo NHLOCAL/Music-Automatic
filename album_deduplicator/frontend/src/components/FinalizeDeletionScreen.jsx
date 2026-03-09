@@ -1,81 +1,79 @@
 import React from "react";
-import { Badge, Button, Icon } from "./UI";
+import { Alert, Button, Card, Empty, Flex, Space, Statistic, Typography } from "antd";
+
+import { Icon, StatusTag } from "./UI";
 import { formatSizeMb, getClusterDisplayTitle } from "../utils";
 
 function KeeperPanel({ keeper, openExplorer }) {
   if (!keeper) {
     return (
-      <div className="finalize-keeper-panel is-warning">
-        <div className="finalize-keeper-copy">
-          <div className="finalize-keeper-label">עותק נשמר</div>
-          <div className="finalize-keeper-name">עדיין לא נבחר keeper לקבוצה זו</div>
-        </div>
-      </div>
+      <Alert
+        type="warning"
+        showIcon
+        title="העותק שנשמר"
+        description="עדיין לא נבחר keeper לקבוצה זו"
+      />
     );
   }
 
   return (
-    <div className="finalize-keeper-panel">
-      <div className="finalize-keeper-copy">
-        <div className="finalize-keeper-label">העותק שנשמר</div>
-        <div className="finalize-keeper-name">{keeper.name}</div>
-        <div className="finalize-keeper-path" title={keeper.path}>{keeper.path}</div>
-      </div>
-      <div className="finalize-keeper-meta">
-        <span>{keeper.file_count} קבצים</span>
-        <span>•</span>
-        <span>{formatSizeMb(keeper.total_size_mb)}</span>
-      </div>
-      <Button variant="secondary" size="sm" onClick={() => openExplorer(keeper.path)}>
-        <Icon name="folder" size={14} />
-        פתח keeper
-      </Button>
-    </div>
+    <Card className="finalize-keeper-card cartoon-panel" variant="borderless">
+      <Space orientation="vertical" size={10} style={{ width: "100%" }}>
+        <Typography.Text type="secondary">העותק שנשמר</Typography.Text>
+        <Typography.Title level={4} style={{ margin: 0 }}>
+          {keeper.name}
+        </Typography.Title>
+        <div className="finalize-path" title={keeper.path}>{keeper.path}</div>
+        <div className="finalize-item-meta">
+          <span>{keeper.file_count} קבצים</span>
+          <span>{formatSizeMb(keeper.total_size_mb)}</span>
+        </div>
+        <Button type="default" icon={<Icon name="folder" size={14} />} onClick={() => openExplorer(keeper.path)}>
+          פתח keeper
+        </Button>
+      </Space>
+    </Card>
   );
 }
 
-function ItemRow({ item, keeper, variant = "pending", openExplorer }) {
+function ItemCard({ item, keeper, variant = "pending", openExplorer }) {
   const isHistory = variant === "history";
-  const rowClass = isHistory ? "finalize-item-row is-history" : "finalize-item-row";
 
   return (
-    <div className={rowClass}>
-      <div className="finalize-item-copy">
-        <div className="finalize-item-title-row">
-          <div className="finalize-item-name">{item.name}</div>
-          <Badge tone={item.status_tone ?? (isHistory ? "success" : "warning")}>{item.status_label}</Badge>
-        </div>
-        <div className="finalize-item-path" title={item.path}>{item.path}</div>
-        <div className="finalize-item-meta">
-          <span>{item.file_count} קבצים</span>
-          <span>•</span>
-          <span>{formatSizeMb(item.estimated_size_mb ?? item.total_size_mb)}</span>
-          {keeper ? (
-            <>
-              <span>•</span>
-              <span>{isHistory ? `נמחק מול ${keeper.name}` : `יישמר מול ${keeper.name}`}</span>
-            </>
+    <Card className={`finalize-item-card cartoon-panel ${isHistory ? "is-history" : ""}`} variant="borderless">
+      <Flex justify="space-between" align="flex-start" gap={16} wrap>
+        <Space orientation="vertical" size={8} style={{ flex: 1 }}>
+          <Space align="center" wrap>
+            <Typography.Text strong>{item.name}</Typography.Text>
+            <StatusTag tone={item.status_tone ?? (isHistory ? "success" : "warning")}>
+              {item.status_label}
+            </StatusTag>
+          </Space>
+          <div className="finalize-path" title={item.path}>{item.path}</div>
+          <div className="finalize-item-meta">
+            <span>{item.file_count} קבצים</span>
+            <span>{formatSizeMb(item.estimated_size_mb ?? item.total_size_mb)}</span>
+            {keeper ? <span>{isHistory ? `נמחק מול ${keeper.name}` : `יישמר מול ${keeper.name}`}</span> : null}
+          </div>
+          {item.failure_message ? (
+            <Typography.Text type="danger">{item.failure_message}</Typography.Text>
           ) : null}
-        </div>
-        {item.failure_message ? (
-          <div className="finalize-item-note">{item.failure_message}</div>
-        ) : null}
-      </div>
-      <div className="finalize-item-actions">
-        {!isHistory ? (
-          <Button variant="secondary" size="sm" onClick={() => openExplorer(item.path)}>
-            <Icon name="folder" size={14} />
-            פתח תיקייה
-          </Button>
-        ) : null}
-        {keeper ? (
-          <Button variant="ghost" size="sm" onClick={() => openExplorer(keeper.path)}>
-            <Icon name="shield" size={14} />
-            פתח keeper
-          </Button>
-        ) : null}
-      </div>
-    </div>
+        </Space>
+
+        <Space wrap>
+          {!isHistory ? (
+            <Button type="default" icon={<Icon name="folder" size={14} />} onClick={() => openExplorer(item.path)}>
+              פתח תיקייה
+            </Button>
+          ) : null}
+          {keeper ? (
+            <Button type="default" icon={<Icon name="shield" size={14} />} onClick={() => openExplorer(keeper.path)}>
+              פתח keeper
+            </Button>
+          ) : null}
+        </Space>
+      </Flex>
+    </Card>
   );
 }
 
@@ -83,50 +81,47 @@ function GroupCard({ group, sectionTitle, sectionTone, items, openExplorer, show
   if (!items.length) return null;
 
   return (
-    <article className="finalize-group-card rich">
-      <div className="finalize-group-head rich">
-        <div className="finalize-group-copy">
-          <div className="finalize-group-title-row">
-            <h3>{getClusterDisplayTitle(group.cluster)}</h3>
-            <Badge tone={group.status.tone}>{group.status.label}</Badge>
-          </div>
-          <div className="finalize-group-summary-row">
-            <span>{group.cluster.human_summary}</span>
-          </div>
+    <Card className="finalize-group-card cartoon-card" variant="borderless">
+      <div className="finalize-group-head">
+        <div>
+          <Space align="center" wrap>
+            <Typography.Title level={3} style={{ margin: 0 }}>
+              {getClusterDisplayTitle(group.cluster)}
+            </Typography.Title>
+            <StatusTag tone={group.status.tone}>{group.status.label}</StatusTag>
+          </Space>
+          <Typography.Paragraph className="muted-copy" style={{ margin: "8px 0 0" }}>
+            {group.cluster.human_summary}
+          </Typography.Paragraph>
         </div>
-        <div className="finalize-group-side-meta">
-          <div>{sectionTitle}</div>
-          <strong>{items.length}</strong>
-        </div>
+        <StatusTag tone={sectionTone}>{items.length}</StatusTag>
       </div>
 
-      <div className="finalize-group-body">
+      <Space orientation="vertical" size={16} style={{ width: "100%" }}>
         <KeeperPanel keeper={group.keeper} openExplorer={openExplorer} />
-
-        <div className={`finalize-section-block tone-${sectionTone}`}>
-          <div className="finalize-section-block-head">
-            <h4>{sectionTitle}</h4>
-            <Badge tone={sectionTone}>{items.length}</Badge>
-          </div>
-          {showHistoryHint ? (
-            <p className="finalize-section-hint">אלו תיקיות שכבר הועברו לסל המחזור, לצד העותק שנשמר להשוואה והקשר.</p>
-          ) : (
-            <p className="finalize-section-hint">אלו התיקיות שייכנסו עכשיו לסל המחזור אם תאשר את הפעולה.</p>
-          )}
-          <div className="finalize-item-list">
-            {items.map((item) => (
-              <ItemRow
-                key={item.folder_id}
-                item={item}
-                keeper={group.keeper}
-                variant={showHistoryHint ? "history" : "pending"}
-                openExplorer={openExplorer}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </article>
+        <Alert
+          type={showHistoryHint ? "success" : "warning"}
+          showIcon
+          title={sectionTitle}
+          description={
+            showHistoryHint
+              ? "אלו תיקיות שכבר הועברו לסל המחזור, לצד העותק שנשמר להשוואה והקשר."
+              : "אלו התיקיות שייכנסו עכשיו לסל המחזור אם תאשר את הפעולה."
+          }
+        />
+        <Space orientation="vertical" size={12} style={{ width: "100%" }}>
+          {items.map((item) => (
+            <ItemCard
+              key={item.folder_id}
+              item={item}
+              keeper={group.keeper}
+              variant={showHistoryHint ? "history" : "pending"}
+              openExplorer={openExplorer}
+            />
+          ))}
+        </Space>
+      </Space>
+    </Card>
   );
 }
 
@@ -143,99 +138,105 @@ export function FinalizeDeletionScreen({
 
   return (
     <div className="finalize-shell">
-      <div className="finalize-header rich">
-        <div>
-          <div className="finalize-eyebrow">שלב 3 מתוך 3</div>
-          <h1>מרכז ההעברה וההשוואה</h1>
-          <p>
-            כאן רואים גם מה עומד להימחק עכשיו וגם מה כבר נמחק קודם, תמיד לצד העותק שנשמר.
-            כך אפשר לאשר בביטחון, או לחזור לבדוק את ההחלטות לפני ההעברה.
-          </p>
-        </div>
-        <div className="finalize-header-actions">
-          <Button variant="secondary" size="lg" onClick={onBackToReview}>
-            <Icon name="compare" size={16} />
-            חזור לסקירה
-          </Button>
-          <Button variant="secondary" size="lg" onClick={onBackToSetup}>
-            <Icon name="arrow-left" size={16} />
-            סריקה חדשה
-          </Button>
-        </div>
-      </div>
-
-      <div className="finalize-layout rich">
-        <aside className="finalize-sidebar">
-          <section className="finalize-sidebar-card rich emphasize">
-            <div className="finalize-sidebar-kicker">מבט מהיר</div>
-            <div className="finalize-sidebar-primary">
-              <strong>{summary.pendingCount}</strong>
-              <span>תיקיות ממתינות להעברה</span>
+      <Card className="cartoon-card" variant="borderless" style={{ marginBottom: 18 }}>
+        <Flex justify="space-between" align="flex-start" gap={18} wrap>
+          <div>
+            <div className="soft-kicker">
+              <Icon name="compare" size={14} />
+              שלב 3 מתוך 3
             </div>
-            <div className="finalize-sidebar-secondary">
-              <span>{formatSizeMb(summary.pendingSizeMb)}</span>
-              <span>•</span>
-              <span>{summary.pendingGroupCount} קבוצות פעילות</span>
-            </div>
-            <div className="finalize-sidebar-note">
-              {summary.autoSelectedCount > 0 ? `${summary.autoSelectedCount} נבחרו אוטומטית` : "אין כרגע בחירות אוטומטיות"}
-              {summary.manualSelectedCount > 0 ? ` • ${summary.manualSelectedCount} נבחרו ידנית` : ""}
-            </div>
-            <Button
-              variant="danger"
-              size="lg"
-              onClick={onExecute}
-              disabled={!hasPending || isExecuting}
-              style={{ width: "100%" }}
-            >
-              <Icon name="trash" size={16} />
-              {isExecuting
-                ? "מעביר לסל המחזור..."
-                : hasPending
-                  ? `העבר ${summary.pendingCount} תיקיות לסל המחזור`
-                  : "אין פריטים להעברה"}
+            <Typography.Title level={1} style={{ marginBottom: 8 }}>
+              מרכז ההעברה וההשוואה
+            </Typography.Title>
+            <Typography.Paragraph className="page-subtitle" style={{ marginBottom: 0, maxWidth: 760 }}>
+              כאן רואים גם מה עומד להימחק עכשיו וגם מה כבר נמחק קודם, תמיד לצד העותק שנשמר.
+              כך אפשר לאשר בביטחון, או לחזור לבדוק את ההחלטות לפני ההעברה.
+            </Typography.Paragraph>
+          </div>
+          <div className="screen-actions">
+            <Button type="default" size="large" icon={<Icon name="compare" size={16} />} onClick={onBackToReview}>
+              חזור לסקירה
             </Button>
-          </section>
+            <Button type="default" size="large" icon={<Icon name="arrow-left" size={16} />} onClick={onBackToSetup}>
+              סריקה חדשה
+            </Button>
+          </div>
+        </Flex>
+      </Card>
 
-          <section className="finalize-sidebar-card rich">
-            <h3>מה כבר קרה</h3>
-            <div className="finalize-kpi-list">
-              <div className="finalize-kpi-row">
-                <span>תיקיות שכבר הועברו</span>
-                <strong>{summary.deletedCount}</strong>
+      <div className="finalize-layout">
+        <aside className="finalize-sidebar">
+          <Card className="cartoon-card" variant="borderless">
+            <Space orientation="vertical" size={14} style={{ width: "100%" }}>
+              <div className="soft-kicker">
+                <Icon name="trash" size={14} />
+                מבט מהיר
               </div>
-              <div className="finalize-kpi-row">
-                <span>קבוצות עם היסטוריית מחיקה</span>
-                <strong>{summary.historyGroupCount}</strong>
-              </div>
-              <div className="finalize-kpi-row">
-                <span>עותקי keeper שנשמרו</span>
-                <strong>{summary.keeperCount}</strong>
-              </div>
-              <div className="finalize-kpi-row">
-                <span>העברות שנכשלו</span>
-                <strong>{summary.failedCount}</strong>
-              </div>
+              <Statistic title="תיקיות ממתינות להעברה" value={summary.pendingCount} />
+              <Typography.Text type="secondary">
+                {formatSizeMb(summary.pendingSizeMb)} • {summary.pendingGroupCount} קבוצות פעילות
+              </Typography.Text>
+              <Typography.Text type="secondary">
+                {summary.autoSelectedCount > 0 ? `${summary.autoSelectedCount} נבחרו אוטומטית` : "אין כרגע בחירות אוטומטיות"}
+                {summary.manualSelectedCount > 0 ? ` • ${summary.manualSelectedCount} נבחרו ידנית` : ""}
+              </Typography.Text>
+              <Button
+                type="primary"
+                danger
+                size="large"
+                icon={<Icon name="trash" size={16} />}
+                onClick={onExecute}
+                disabled={!hasPending || isExecuting}
+              >
+                {isExecuting
+                  ? "מעביר לסל המחזור..."
+                  : hasPending
+                    ? `העבר ${summary.pendingCount} תיקיות לסל המחזור`
+                    : "אין פריטים להעברה"}
+              </Button>
+            </Space>
+          </Card>
+
+          <Card className="cartoon-card" variant="borderless">
+            <Typography.Title level={4}>מה כבר קרה</Typography.Title>
+            <div className="finalize-kpi-grid">
+              {[
+                ["תיקיות שכבר הועברו", summary.deletedCount],
+                ["קבוצות עם היסטוריית מחיקה", summary.historyGroupCount],
+                ["עותקי keeper שנשמרו", summary.keeperCount],
+                ["העברות שנכשלו", summary.failedCount],
+              ].map(([label, value]) => (
+                <Card key={label} className="finalize-kpi-card cartoon-panel" variant="borderless">
+                  <Typography.Text>{label}</Typography.Text>
+                  <Typography.Text strong>{value}</Typography.Text>
+                </Card>
+              ))}
             </div>
-          </section>
+          </Card>
         </aside>
 
         <div className="finalize-content">
-          <section className="finalize-major-section">
-            <div className="finalize-major-head">
+          <Card className="finalize-section-card cartoon-card" variant="borderless">
+            <Flex justify="space-between" align="flex-start" gap={12} wrap>
               <div>
-                <h2>ממתינות להעברה עכשיו</h2>
-                <p>החלק היחיד שיבוצע בלחיצה על אישור. כל פריט מופיע מול התיקייה שנשמרת במקומו.</p>
+                <Typography.Title level={2} style={{ marginBottom: 6 }}>
+                  ממתינות להעברה עכשיו
+                </Typography.Title>
+                <Typography.Paragraph className="muted-copy" style={{ marginBottom: 0 }}>
+                  החלק היחיד שיבוצע בלחיצה על אישור. כל פריט מופיע מול התיקייה שנשמרת במקומו.
+                </Typography.Paragraph>
               </div>
-              <Badge tone="warning">{summary.pendingCount}</Badge>
-            </div>
+              <StatusTag tone="warning">{summary.pendingCount}</StatusTag>
+            </Flex>
+
             {pendingGroups.length === 0 ? (
-              <div className="finalize-empty-state-card">
-                <h3>אין כרגע קבוצות שממתינות למחיקה</h3>
-                <p>הכל כבר טופל, או שאין כרגע תיקיות שסומנו להעברה המרוכזת.</p>
-              </div>
+              <Empty
+                className="desktop-empty"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="אין כרגע קבוצות שממתינות למחיקה"
+              />
             ) : (
-              <div className="finalize-group-list">
+              <Space orientation="vertical" size={16} style={{ width: "100%" }}>
                 {pendingGroups.map((group) => (
                   <GroupCard
                     key={`pending-${group.cluster.cluster_id}`}
@@ -246,25 +247,31 @@ export function FinalizeDeletionScreen({
                     openExplorer={openExplorer}
                   />
                 ))}
-              </div>
+              </Space>
             )}
-          </section>
+          </Card>
 
-          <section className="finalize-major-section">
-            <div className="finalize-major-head">
+          <Card className="finalize-section-card cartoon-card" variant="borderless">
+            <Flex justify="space-between" align="flex-start" gap={12} wrap>
               <div>
-                <h2>כבר הועברו קודם</h2>
-                <p>היסטוריית הפעולות שבוצעו עד כה, יחד עם ה־keeper שנשאר בכל קבוצה כדי לאפשר השוואה חוזרת.</p>
+                <Typography.Title level={2} style={{ marginBottom: 6 }}>
+                  כבר הועברו קודם
+                </Typography.Title>
+                <Typography.Paragraph className="muted-copy" style={{ marginBottom: 0 }}>
+                  היסטוריית הפעולות שבוצעו עד כה, יחד עם ה־keeper שנשאר בכל קבוצה כדי לאפשר השוואה חוזרת.
+                </Typography.Paragraph>
               </div>
-              <Badge tone="success">{summary.deletedCount}</Badge>
-            </div>
+              <StatusTag tone="success">{summary.deletedCount}</StatusTag>
+            </Flex>
+
             {historyGroups.length === 0 ? (
-              <div className="finalize-empty-state-card subtle">
-                <h3>עדיין אין היסטוריית מחיקות להצגה</h3>
-                <p>ברגע שתבוצע העברה, תראה כאן את הפריטים שנמחקו ואת התיקיות שנשמרו מולם.</p>
-              </div>
+              <Empty
+                className="desktop-empty"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="עדיין אין היסטוריית מחיקות להצגה"
+              />
             ) : (
-              <div className="finalize-group-list">
+              <Space orientation="vertical" size={16} style={{ width: "100%" }}>
                 {historyGroups.map((group) => (
                   <GroupCard
                     key={`history-${group.cluster.cluster_id}`}
@@ -276,9 +283,9 @@ export function FinalizeDeletionScreen({
                     showHistoryHint
                   />
                 ))}
-              </div>
+              </Space>
             )}
-          </section>
+          </Card>
         </div>
       </div>
     </div>

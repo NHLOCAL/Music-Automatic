@@ -1,0 +1,173 @@
+:root {
+  color-scheme: light;
+  --app-bg: #e8eefb;
+  --app-bg-deep: #d7e2ff;
+  --surface-glow: rgba(255, 255, 255, 0.9);
+  --surface-border: rgba(137, 167, 245, 0.42);
+  --surface-border-strong: rgba(37, 114, 255, 0.2);
+  --text-main: #182033;
+  --text-secondary: #5f6884;
+  --text-tertiary: #8791af;
+  --primary-soft: rgba(37, 114, 255, 0.12);
+  --success-soft: rgba(29, 159, 95, 0.12);
+  --warning-soft: rgba(245, 166, 35, 0.16);
+  --danger-soft: rgba(239, 83, 80, 0.14);
+  --surface-shadow: 0 20px 45px rgba(43, 80, 181, 0.12);
+  --surface-shadow-soft: 0 12px 26px rgba(28, 44, 92, 0.08);
+  --outline-shadow: 0 0 0 2px rgba(37, 114, 255, 0.12);
+  --mono-font: "Cascadia Code", Consolas, Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Rubik", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), transparent 28%),
+    radial-gradient(circle at top right, rgba(103, 167, 255, 0.25), transparent 24%),
+    linear-gradient(180deg, #f8fbff 0%, var(--app-bg) 38%, #dbe5fb 100%);
+  color: var(--text-main);
+  overflow: hidden;
+  user-select: none;
+}
+
+input,
+textarea,
+select {
+  user-select: text;
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(83, 125, 226, 0.48);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-shell.ant-layout {
+  width: 100%;
+  min-height: 100%;
+  background: transparent;
+}
+
+.window-content.ant-layout-content {
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.screen-center {
+  min-height: 100%;
+  padding: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+
+.screen-stack {
+  width: min(1120px, 100%);
+}
+
+.cartoon-card.ant-card,
+.cartoon-card.ant-result,
+.cartoon-surface {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 255, 0.94));
+  border: 2px solid var(--surface-border);
+  box-shadow: var(--surface-shadow);
+}
+
+.cartoon-panel {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow-soft);
+  border-radius: 22px;
+}
+
+.cartoon-tag.ant-tag {
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 20px rgba(39, 65, 139, 0.08);
+  padding-inline: 12px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-title.ant-typography,
+.page-subtitle.ant-typography {
+  color: var(--text-main);
+}
+
+.page-subtitle.ant-typography {
+  color: var(--text-secondary);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.muted-copy {
+  color: var(--text-secondary);
+}
+
+.mono-copy {
+  font-family: var(--mono-font);
+  direction: ltr;
+  text-align: right;
+}
+
+.soft-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--surface-border);
+  color: #3962c7;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.desktop-empty {
+  padding: 36px 24px;
+}
+
+.desktop-empty .ant-empty-description {
+  color: var(--text-secondary);
+}
+
+.screen-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .screen-center {
+    padding: 18px;
+  }
+}

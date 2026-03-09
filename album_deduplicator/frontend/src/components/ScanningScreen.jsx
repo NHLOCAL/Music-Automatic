@@ -1,9 +1,10 @@
 import React from "react";
+import { Card, Col, Progress, Row, Statistic, Typography } from "antd";
+
 import { Icon } from "./UI";
 
 export function ScanningScreen({ progress }) {
   const percent = Math.round(progress.percent || 0);
-  const offset = 440 - (440 * percent) / 100; // 2 * PI * 70 approx 440
   const progressDetails = [
     {
       icon: "folder",
@@ -23,44 +24,43 @@ export function ScanningScreen({ progress }) {
   ];
 
   return (
-    <div className="centered-view">
-      <div className="scanning-wrapper">
-        <div className="scanning-header-chip">
-          <Icon name="sparkle" size={14} />
-          סריקה חכמה בתהליך
-        </div>
-        <div className="progress-ring">
-          <svg viewBox="0 0 160 160">
-            <circle className="progress-ring-bg" cx="80" cy="80" r="70" />
-            <circle 
-              className="progress-ring-val" 
-              cx="80" cy="80" r="70" 
-              strokeDasharray="440" 
-              strokeDashoffset={offset} 
-            />
-          </svg>
-          <div className="progress-text">{percent}%</div>
-        </div>
-        
-        <div className="scanning-info">
-          <h2>{progress.message}</h2>
-          <p>{progress.human_message}</p>
-        </div>
+    <div className="screen-center">
+      <Card className="scanning-shell cartoon-card" variant="borderless">
+        <div className="scanning-progress-wrap">
+          <div className="soft-kicker">
+            <Icon name="sparkle" size={14} />
+            סריקה חכמה בתהליך
+          </div>
 
-        <div className="scan-status-grid">
-          {progressDetails.map((item) => (
-            <div key={item.label} className="scan-status-card">
-              <span className="scan-status-icon">
-                <Icon name={item.icon} size={15} />
-              </span>
-              <div>
-                <div className="scan-status-label">{item.label}</div>
-                <strong className="scan-status-value">{item.value}</strong>
-              </div>
-            </div>
-          ))}
+          <Progress
+            type="circle"
+            percent={percent}
+            strokeWidth={10}
+            size={220}
+            percentPosition={{ align: "center", type: "inner" }}
+          />
+
+          <div>
+            <Typography.Title level={2} className="page-title" style={{ marginBottom: 8 }}>
+              {progress.message}
+            </Typography.Title>
+            <Typography.Paragraph className="page-subtitle" style={{ margin: 0 }}>
+              {progress.human_message}
+            </Typography.Paragraph>
+          </div>
+
+          <Row gutter={[14, 14]} className="scanning-status-grid">
+            {progressDetails.map((item) => (
+              <Col key={item.label} xs={24} md={8}>
+                <Card className="scanning-status-card cartoon-panel" variant="borderless">
+                  <Icon name={item.icon} size={18} />
+                  <Statistic title={item.label} value={item.value} />
+                </Card>
+              </Col>
+            ))}
+          </Row>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

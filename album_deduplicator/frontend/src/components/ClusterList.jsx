@@ -1,5 +1,7 @@
 import React from "react";
-import { Badge, Icon } from "./UI";
+import { Card, Empty, Segmented, Space, Typography } from "antd";
+
+import { Icon, StatusTag } from "./UI";
 import {
   formatScore,
   getClusterDisplayTitle,
@@ -9,7 +11,20 @@ import {
   hasClusterDecision,
 } from "../utils";
 
-export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
+const SEGMENT_OPTIONS = [
+  { label: "בטוחים", value: "safe" },
+  { label: "לסקירה", value: "review" },
+  { label: "הכל", value: "all" },
+];
+
+export function ClusterList({
+  clusters,
+  selectedClusterId,
+  setSelectedClusterId,
+  decisions,
+  selectedTab,
+  setSelectedTab,
+}) {
   const filteredClusters = clusters
     .filter((cluster) => {
       if (selectedTab === "all") return true;
@@ -25,87 +40,87 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
     .map(({ cluster }) => cluster);
 
   return (
-    <div className="cluster-sidebar">
-      <div className="cluster-sidebar-top">
-        <div className="cluster-sidebar-title">
-          <div>
-            <span className="sidebar-kicker">מרכז סקירה</span>
-            <h3>קבוצות אלבומים</h3>
+    <Card className="cluster-sidebar cartoon-card" variant="borderless">
+      <div className="cluster-sidebar-head">
+        <Space align="center" size={12}>
+          <div className="soft-kicker">
+            <Icon name="layers" size={14} />
+            מרכז סקירה
           </div>
-          <Badge tone="neutral" icon="layers">{filteredClusters.length}</Badge>
-        </div>
-        <p>בחר קבוצה אחת, השווה בין העותקים, והחלט איזה עותק נשאר.</p>
+          <StatusTag tone="primary" icon="layers">
+            {filteredClusters.length}
+          </StatusTag>
+        </Space>
+        <Typography.Title level={3} style={{ margin: 0 }}>
+          קבוצות אלבומים
+        </Typography.Title>
+        <Typography.Paragraph className="muted-copy" style={{ margin: 0 }}>
+          בחר קבוצה אחת, השווה בין העותקים, והחלט איזה עותק נשאר.
+        </Typography.Paragraph>
       </div>
-      <div className="sidebar-tabs">
-        <div className="tab-group">
-          <div className={`tab-item ${selectedTab === 'safe' ? 'active' : ''}`} onClick={() => setSelectedTab('safe')}>
-            <Icon name="shield" size={16} /> בטוחים
-          </div>
-          <div className={`tab-item ${selectedTab === 'review' ? 'active' : ''}`} onClick={() => setSelectedTab('review')}>
-            <Icon name="alert" size={16} /> לסקירה
-          </div>
-          <div className={`tab-item ${selectedTab === 'all' ? 'active' : ''}`} onClick={() => setSelectedTab('all')}>
-            <Icon name="folder" size={16} /> הכל
-          </div>
-        </div>
-      </div>
-      
+
+      <Segmented
+        block
+        size="large"
+        value={selectedTab}
+        options={SEGMENT_OPTIONS}
+        onChange={setSelectedTab}
+      />
+
       <div className="cluster-scroll">
         {filteredClusters.length === 0 ? (
-          <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-tertiary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-            <Icon name="check-circle" size={32} />
-            <span>אין פריטים להצגה</span>
-          </div>
+          <Empty
+            className="desktop-empty"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="אין פריטים להצגה"
+          />
         ) : (
           filteredClusters.map((cluster) => {
             const isActive = cluster.cluster_id === selectedClusterId;
             const hasDecision = hasClusterDecision(decisions, cluster.cluster_id);
             const statusMeta = getClusterStatusMeta(cluster, hasDecision && decisions[cluster.cluster_id] !== null);
             const representativePair = getRepresentativeClusterPair(cluster, cluster.recommended_keeper_id);
-            
             const scoreLine = representativePair
               ? representativePair.is_identical_by_hash
                 ? "התאמה מלאה"
                 : `התאמה: ${formatScore(representativePair.final_score)}`
               : "דורש בדיקה";
 
-            const bucketIcon = cluster.confidence_bucket === "safe" ? "shield" : "alert";
-
             return (
-              <div
+              <Card
                 key={cluster.cluster_id}
-                className={`cluster-card ${isActive ? "active" : ""} ${statusMeta.label === "נבדק ומוכן" ? "status-ready" : ""}`}
+                className={`cluster-card cartoon-panel ${isActive ? "is-active" : ""}`}
+                variant="borderless"
                 onClick={() => setSelectedClusterId(cluster.cluster_id)}
               >
-                <div className="cluster-header">
-                  <div className="cluster-name" title={getClusterDisplayTitle(cluster)}>
-                    {getClusterDisplayTitle(cluster)}
+                <div className="cluster-card-headline">
+                  <Typography.Text strong>{getClusterDisplayTitle(cluster)}</Typography.Text>
+                  {!isActive && (
+                    <StatusTag tone={statusMeta.tone} icon={statusMeta.tone === "success" ? "check" : "alert"}>
+                      {statusMeta.label}
+                    </StatusTag>
+                  )}
+                </div>
+
+                <Space orientation="vertical" size={10} style={{ width: "100%" }}>
+                  <Typography.Text className="muted-copy">
+                    <Icon name="music" size={12} /> {scoreLine}
+                  </Typography.Text>
+
+                  <div className="cluster-card-meta">
+                    <span>
+                      <Icon name="layers" size={12} /> {cluster.albums.filter((album) => !album.is_deleted).length} עותקים
+                    </span>
+                    <span>
+                      <Icon name="folder" size={12} /> {cluster.confidence_bucket === "safe" ? "מוכן לפעולה" : "דורש החלטה"}
+                    </span>
                   </div>
-                  {!isActive && <Icon name={statusMeta.label === "נבדק ומוכן" ? "check" : bucketIcon} size={14} className={`tone-${statusMeta.tone}`} />}
-                </div>
-                
-                <div className="cluster-info">
-                  <span className="cluster-scoreline">
-                    <Icon name="music" size={12} />
-                    {scoreLine}
-                  </span>
-                  {!isActive && <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>}
-                </div>
-                <div className="cluster-meta">
-                  <span>
-                    <Icon name="layers" size={12} />
-                    {cluster.albums.filter((album) => !album.is_deleted).length} עותקים
-                  </span>
-                  <span>
-                    <Icon name="folder" size={12} />
-                    {cluster.confidence_bucket === "safe" ? "מוכן לפעולה" : "דורש החלטה"}
-                  </span>
-                </div>
-              </div>
+                </Space>
+              </Card>
             );
           })
         )}
       </div>
-    </div>
+    </Card>
   );
 }

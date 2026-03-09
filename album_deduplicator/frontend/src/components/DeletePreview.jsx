@@ -1,39 +1,56 @@
 import React from "react";
-import { Button, Icon } from "./UI";
+import { Button, Card, Typography } from "antd";
+
+import { Icon } from "./UI";
 import { formatSizeMb } from "../utils";
 
 export function DeletePreview({ workflowSummary, onOpenFinalize, isExecuting }) {
-  if (!workflowSummary || (workflowSummary.pendingCount === 0 && workflowSummary.deletedCount === 0 && workflowSummary.failedCount === 0)) {
+  if (
+    !workflowSummary
+    || (workflowSummary.pendingCount === 0
+      && workflowSummary.deletedCount === 0
+      && workflowSummary.failedCount === 0)
+  ) {
     return null;
   }
 
   return (
-    <div className="fab-container">
-      <div className="fab-info">
-        <div className="fab-badge">
-          <Icon name="trash" size={14} />
-          {workflowSummary.pendingCount}
-        </div>
-        <div>
-          <div className="fab-title">שלב ההעברה הסופי מוכן</div>
-          <div className="fab-copy">
-            {workflowSummary.pendingCount > 0
-              ? `ממתינות ${workflowSummary.pendingCount} תיקיות להעברה • ${formatSizeMb(workflowSummary.pendingSizeMb)}`
-              : "אין כרגע פריטים חדשים שממתינים להעברה"}
+    <Card className="delete-preview-card cartoon-card" variant="borderless">
+      <div className="delete-preview-body">
+        <div className="delete-preview-copy">
+          <div className="delete-preview-badge">
+            <Icon name="trash" size={16} />
+            {workflowSummary.pendingCount}
           </div>
-          <div className="fab-subcopy">
-            {workflowSummary.deletedCount > 0
-              ? `${workflowSummary.deletedCount} כבר הועברו`
-              : "עדיין לא בוצעה העברה מתוך הזרימה המרוכזת"}
-            {workflowSummary.failedCount > 0 ? ` • ${workflowSummary.failedCount} דורשות טיפול` : ""}
+          <div>
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              שלב ההעברה הסופי מוכן
+            </Typography.Title>
+            <Typography.Paragraph style={{ margin: "4px 0 0" }}>
+              {workflowSummary.pendingCount > 0
+                ? `ממתינות ${workflowSummary.pendingCount} תיקיות להעברה • ${formatSizeMb(workflowSummary.pendingSizeMb)}`
+                : "אין כרגע פריטים חדשים שממתינים להעברה"}
+            </Typography.Paragraph>
+            <Typography.Text type="secondary">
+              {workflowSummary.deletedCount > 0
+                ? `${workflowSummary.deletedCount} כבר הועברו`
+                : "עדיין לא בוצעה העברה מתוך הזרימה המרוכזת"}
+              {workflowSummary.failedCount > 0 ? ` • ${workflowSummary.failedCount} דורשות טיפול` : ""}
+            </Typography.Text>
           </div>
         </div>
+
+        <Button
+          size="large"
+          type="primary"
+          danger
+          icon={<Icon name="trash" size={16} />}
+          onClick={onOpenFinalize}
+          disabled={isExecuting}
+        >
+          פתח את שלב ההעברה
+        </Button>
       </div>
-      
-      <Button variant="danger" size="lg" onClick={onOpenFinalize} disabled={isExecuting}>
-        <Icon name="trash" size={16} />
-        פתח את שלב ההעברה
-      </Button>
-    </div>
+    </Card>
   );
 }

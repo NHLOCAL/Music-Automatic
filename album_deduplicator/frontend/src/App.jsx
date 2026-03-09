@@ -1,4 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { App as AntApp, ConfigProvider, Layout, notification } from "antd";
+import heIL from "antd/locale/he_IL";
+import { HappyProvider } from "@ant-design/happy-work-theme";
+
 import { useDeduplicator } from "./hooks/useDeduplicator";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import * as api from "./api";
@@ -11,6 +15,7 @@ import { DiffWorkspace } from "./components/DiffWorkspace";
 import { DeletePreview } from "./components/DeletePreview";
 import { FinalizeDeletionScreen } from "./components/FinalizeDeletionScreen";
 import { buildDeletionWorkflowModel, getActiveKeeperId, mergeDeleteAttemptResults } from "./utils";
+import { antTheme } from "./theme/antdTheme";
 
 function normalizeFolderPaths(entries) {
   return entries.map((entry) => entry.path.trim()).filter(Boolean);
@@ -21,6 +26,7 @@ function mergeFolderInputs(currentEntries, nextPaths) {
   if (!uniqueNextPaths.length) return currentEntries;
   const nextEntries = currentEntries.map((entry) => ({ ...entry }));
   const existingPaths = new Set(nextEntries.map((entry) => entry.path.trim()).filter(Boolean));
+
   uniqueNextPaths.forEach((path) => {
     if (existingPaths.has(path)) return;
     const emptyEntry = nextEntries.find((entry) => !entry.path.trim());
@@ -28,13 +34,15 @@ function mergeFolderInputs(currentEntries, nextPaths) {
     else nextEntries.push({ id: `folder-${Date.now()}-${Math.random()}`, path });
     existingPaths.add(path);
   });
+
   return nextEntries;
 }
 
-export default function App() {
-  const [appView, setAppView] = useState('setup');
+function AppContent() {
+  const antContext = AntApp.useApp();
+  const [appView, setAppView] = useState("setup");
   const [form, setForm] = useState({
-    folders:[{ id: 'f1', path: "" }, { id: 'f2', path: "" }],
+    folders: [{ id: "f1", path: "" }, { id: "f2", path: "" }],
     preferred_root: "",
     force_rescan: false,
     clear_cache: false,
@@ -42,51 +50,78 @@ export default function App() {
     bitrate_mode: "128",
     gemini_enabled: false,
   });
-  
   const [executingDelete, setExecutingDelete] = useState(false);
   const [focusedAlbumId, setFocusedAlbumId] = useState(null);
   const [runtimeInfo, setRuntimeInfo] = useState(getRuntimeSnapshot());
   const [deleteAttemptResults, setDeleteAttemptResults] = useState({});
-  
   const d = useDeduplicator();
-  
+
   const selectedCluster = d.clusters.find((cluster) => cluster.cluster_id === d.selectedClusterId) || null;
   const currentKeeperId = getActiveKeeperId(selectedCluster, d.decisions);
-  
   const deletionWorkflow = buildDeletionWorkflowModel(d.allClusters, d.preview, d.decisions, deleteAttemptResults);
 
   useEffect(() => {
     let active = true;
-    getRuntimeInfo().then((info) => { if (active) setRuntimeInfo(info); }).catch(() => {});
-    return () => { active = false; };
-  },[]);
+    getRuntimeInfo().then((info) => {
+      if (active) setRuntimeInfo(info);
+    }).catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
-    if (d.status === 'running') setAppView('scanning');
-    if (d.status === 'completed' && d.summary && appView === 'scanning') setAppView('summary');
-  }, [d.status, d.summary, appView]);
+    if (d.status === "running") setAppView("scanning");
+    if (d.status === "completed" && d.summary && appView === "scanning") setAppView("summary");
+  }, [appView, d.status, d.summary]);
 
   useEffect(() => {
     setFocusedAlbumId(null);
   }, [d.selectedClusterId, d.selectedTab]);
+
+  useEffect(() => {
+    if (!d.error) return;
+    antContext.notification.error({
+      message: "שגיאה",
+      description: d.error,
+      placement: "topLeft",
+      duration: 5,
+    });
+    d.setError("");
+  }, [antContext.notification, d]);
+
+  useEffect(() => {
+    if (!d.successSummary) return;
+    antContext.notification.success({
+      message: "העברה הושלמה",
+      description: `הועברו ${d.successSummary.moved_count} תיקיות לסל המחזור.`,
+      placement: "topLeft",
+      duration: 4,
+    });
+    d.setSuccessSummary(null);
+  }, [antContext.notification, d]);
 
   const handleScanSubmit = async (event) => {
     event.preventDefault();
     d.setError("");
     d.setSuccessSummary(null);
     try {
-      const payload = { ...form, folders: normalizeFolderPaths(form.folders), preferred_root: form.preferred_root || null };
+      const payload = {
+        ...form,
+        folders: normalizeFolderPaths(form.folders),
+        preferred_root: form.preferred_root || null,
+      };
       const created = await api.createAnalysisSession(payload);
       d.setSessionId(created.session_id);
       d.setStatus(created.status);
       d.setClusters([]);
       d.setDecisions({});
       d.setDeleteSelections({});
-      d.setPreview({ items:[], total_count: 0, total_size_mb: 0 });
+      d.setPreview({ items: [], total_count: 0, total_size_mb: 0, auto_selected_count: 0, manual_selected_count: 0 });
       d.setAllClusters([]);
       d.setSelectedClusterId(null);
       setDeleteAttemptResults({});
-      setAppView('scanning');
+      setAppView("scanning");
     } catch (err) {
       d.setError(err.message);
     }
@@ -129,12 +164,20 @@ export default function App() {
   const handlePickFolders = async () => {
     const [defaultPath] = normalizeFolderPaths(form.folders);
     const paths = await pickScanFolders({ defaultPath });
-    if (paths.length) setForm(prev => ({...prev, folders: mergeFolderInputs(prev.folders, paths)}));
+    if (paths.length) {
+      setForm((prev) => ({ ...prev, folders: mergeFolderInputs(prev.folders, paths) }));
+    }
   };
 
   const handlePickPreferredRoot = async () => {
     const path = await pickPreferredRoot();
-    if (path) setForm(prev => ({...prev, folders: mergeFolderInputs(prev.folders, [path]), preferred_root: path}));
+    if (path) {
+      setForm((prev) => ({
+        ...prev,
+        folders: mergeFolderInputs(prev.folders, [path]),
+        preferred_root: path,
+      }));
+    }
   };
 
   useKeyboardShortcuts({
@@ -154,9 +197,9 @@ export default function App() {
   });
 
   return (
-    <div className="app-container">
-      <div className="window-content">
-        {appView === 'setup' && (
+    <Layout className="app-shell">
+      <Layout.Content className="window-content">
+        {appView === "setup" && (
           <SetupScreen
             form={form}
             setForm={setForm}
@@ -166,15 +209,19 @@ export default function App() {
             runtimeInfo={runtimeInfo}
           />
         )}
-        
-        {appView === 'scanning' && <ScanningScreen progress={d.progress} />}
-        
-        {appView === 'summary' && d.summary && (
-          <SummaryScreen summary={d.summary} onStartReview={() => setAppView('review')} onBackToSetup={goToSetup} />
+
+        {appView === "scanning" && <ScanningScreen progress={d.progress} />}
+
+        {appView === "summary" && d.summary && (
+          <SummaryScreen
+            summary={d.summary}
+            onStartReview={() => setAppView("review")}
+            onBackToSetup={goToSetup}
+          />
         )}
-        
-        {appView === 'review' && d.status === 'completed' && (
-          <div className="workspace-layout">
+
+        {appView === "review" && d.status === "completed" && (
+          <div className="review-workspace" data-testid="review-workspace">
             <ClusterList
               clusters={d.clusters}
               selectedClusterId={d.selectedClusterId}
@@ -183,7 +230,7 @@ export default function App() {
               selectedTab={d.selectedTab}
               setSelectedTab={d.setSelectedTab}
             />
-            <div className="workspace-main">
+            <div className="review-main" data-testid="review-main">
               <DiffWorkspace
                 key={`${d.selectedTab}-${d.selectedClusterId ?? "empty"}`}
                 cluster={selectedCluster}
@@ -191,7 +238,9 @@ export default function App() {
                 handleDecision={updateClusterDecision}
                 openExplorer={openExplorer}
               />
-              {(deletionWorkflow.summary.pendingCount > 0 || deletionWorkflow.summary.deletedCount > 0 || deletionWorkflow.summary.failedCount > 0) && (
+              {(deletionWorkflow.summary.pendingCount > 0
+                || deletionWorkflow.summary.deletedCount > 0
+                || deletionWorkflow.summary.failedCount > 0) && (
                 <DeletePreview
                   workflowSummary={deletionWorkflow.summary}
                   onOpenFinalize={() => setAppView("finalize")}
@@ -201,7 +250,7 @@ export default function App() {
             </div>
           </div>
         )}
-        
+
         {appView === "finalize" && d.status === "completed" && (
           <FinalizeDeletionScreen
             workflow={deletionWorkflow}
@@ -212,14 +261,19 @@ export default function App() {
             openExplorer={openExplorer}
           />
         )}
-      </div>
-      
-      {d.error && (
-        <div style={{ position: 'fixed', top: 20, left: 20, background: 'var(--color-danger)', color: 'white', padding: '12px 24px', borderRadius: 'var(--radius-md)', zIndex: 9999 }}>
-          {d.error}
-          <button style={{ marginRight: '16px', textDecoration: 'underline' }} onClick={() => d.setError("")}>סגור</button>
-        </div>
-      )}
-    </div>
+      </Layout.Content>
+    </Layout>
+  );
+}
+
+export default function App() {
+  return (
+    <HappyProvider>
+      <ConfigProvider direction="rtl" locale={heIL} theme={antTheme}>
+        <AntApp notification={{ placement: "topLeft" }}>
+          <AppContent />
+        </AntApp>
+      </ConfigProvider>
+    </HappyProvider>
   );
 }

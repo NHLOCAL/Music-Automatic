@@ -62,7 +62,7 @@
 
 ## 4. משימות לפיתוח (Frontend - React + CSS)
 
-- [ ] **הטמעת ספריות UI מודרניות:** שימוש ב-Tailwind CSS או ספריה כמו Radix UI / MUI לעיצוב נקי ונגיש.
+- [x] **הטמעת ספריית UI מודרנית:** ה־frontend עבר ל־`Ant Design 6` עם `Happy Work Theme`, RTL מלא, ו־theme tokens בסגנון `Cartoon Desktop` מתון.
 - [x] **פיתוח קומפוננטת Visual Diff:** נבנתה תצוגת השוואה רוחבית שמדגישה שדות עדיפים/חלשים בין כל עותקי ה-`AlbumSummary` בקבוצה.
 - [x] **שילוב פקודות מערכת מתוך הדפדפן:** 
     *   נוסף Endpoint ב-FastAPI: `POST /api/system/open-explorer` לפתיחת נתיב ב-Windows Explorer.
@@ -72,3 +72,4 @@
 - [x] **מסך finalize עצמאי למחיקה מרוכזת:** נוסף מסך דסקטופי נפרד עם פירוק מלא של "יימחק / יישמר / כבר הועבר", כולל סטטוס חלקי למחיקה בשלבים.
 - [x] **דחיסת סביבת העבודה ושיפור גלילה:** אזור ה-`review` עבר לפריסה קומפקטית יותר בסגנון desktop, עם header דביק, גלילה מלאה למסך, גלילה אופקית יציבה בהשוואת עותקים, וטבלת שירים עם scrolling פנימי יעיל.
 - [x] **שילוב סמלים עקבי בכל המסכים:** מסכי `setup`, `scanning`, `summary`, `review` ו-`finalize` קיבלו אייקונים עקביים לשיפור היררכיה חזותית ופעולות מהירות בלי להעמיס על המשתמש.
+- [x] **איחוד מערכת ה־UI למסכי desktop:** מסכי `setup`, `scanning`, `summary`, `review` ו-`finalize` שוכתבו לרכיבי `AntD` (`Card`, `Segmented`, `Collapse`, `Table`, `Result`, `Progress`, `Statistic`) עם שכבת overrides ייעודית שמדגישה playful surfaces, פינות רכות, ו-flow של desktop tool.

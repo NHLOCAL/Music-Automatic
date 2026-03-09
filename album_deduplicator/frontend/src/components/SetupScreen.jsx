@@ -1,206 +1,245 @@
-import React, { useState } from "react";
-import { Badge, Button, Icon } from "./UI";
+import React, { useMemo, useState } from "react";
+import { Alert, Button, Card, Checkbox, Collapse, Flex, Input, Space, Typography } from "antd";
+
+import { Icon, StatusTag } from "./UI";
+
+const TRUST_ITEMS = [
+  { icon: "folder", text: "כמה תיקיות שורש באותה סריקה" },
+  { icon: "chart", text: "ניתוח איכות והשוואת ציונים" },
+  { icon: "shield", text: "מחיקה בטוחה לסל המחזור בלבד" },
+];
+
+const ADVANCED_OPTIONS = [
+  {
+    key: "force_rescan",
+    label: "סריקה מחדש מלאה",
+    description: "התעלם מנתונים שמורים ב-Cache וסרוק את הדיסק מחדש.",
+    icon: "database",
+    ariaLabel: "סריקה מחדש מלאה",
+  },
+  {
+    key: "full_hash_scan",
+    label: "סריקת Hash מלאה",
+    description: "חשב hash מלא לכל קובץ להשוואה מדויקת יותר. איטי יותר ולכן כבוי כברירת מחדל.",
+    icon: "compare",
+    ariaLabel: "סריקת Hash מלאה",
+  },
+  {
+    key: "gemini_enabled",
+    label: "אימות AI (Gemini)",
+    description: "השתמש בבינה מלאכותית להכרעה במקרים גבוליים.",
+    icon: "sparkle",
+    ariaLabel: "אימות AI (Gemini)",
+  },
+];
 
 export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPreferredRoot, runtimeInfo }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const hasFolders = form.folders.some((folder) => folder.path.trim());
+  const hasFolders = useMemo(
+    () => form.folders.some((folder) => folder.path.trim()),
+    [form.folders],
+  );
 
   const handlePathChange = (id, path) => {
-    setForm(prev => ({
+    setForm((prev) => ({
       ...prev,
-      folders: prev.folders.map(f => f.id === id ? { ...f, path } : f)
+      folders: prev.folders.map((folder) => (folder.id === id ? { ...folder, path } : folder)),
     }));
   };
 
   const addFolder = () => {
-    setForm(prev => ({
+    setForm((prev) => ({
       ...prev,
-      folders: [...prev.folders, { id: `manual-${Date.now()}`, path: "" }]
+      folders: [...prev.folders, { id: `manual-${Date.now()}`, path: "" }],
     }));
   };
 
   const removeFolder = (id) => {
-    setForm(prev => ({
+    setForm((prev) => ({
       ...prev,
-      folders: prev.folders.filter(f => f.id !== id)
+      folders: prev.folders.filter((folder) => folder.id !== id),
     }));
   };
 
   return (
-    <div className="centered-view">
-      <div className="setup-container">
-        <div className="setup-header">
-          <div className="setup-brand-row">
-            <div className="setup-brand-mark">
-              <Icon name="sparkle" size={24} />
-            </div>
-            <div className="setup-brand">
-              <h1>Music Automatic</h1>
-              <p>ניקוי כפילויות חכם לאוסף המוזיקה שלך</p>
-            </div>
-            <Badge tone="success" icon="shield">Recycle Bin בלבד</Badge>
-          </div>
-          <div className="setup-trust-strip">
-            <div className="setup-trust-item">
-              <Icon name="folder" size={14} />
-              כמה תיקיות שורש באותה סריקה
-            </div>
-            <div className="setup-trust-item">
-              <Icon name="chart" size={14} />
-              ניתוח איכות והשוואת ציונים
-            </div>
-            <div className="setup-trust-item">
-              <Icon name="shield" size={14} />
-              מחיקה בטוחה לסל המחזור בלבד
-            </div>
-          </div>
-        </div>
-
-        <form className="setup-body" onSubmit={onSubmit}>
-          <div className="setup-section">
-            <div className="setup-section-header">
-              <label className="setup-section-title">
-                <Icon name="folder" size={16} />
-                תיקיות לסריקה
-              </label>
-              <div className="folder-actions">
-                {runtimeInfo?.isElectron && (
-                  <Button type="button" variant="secondary" size="sm" onClick={onPickFolders}>
-                    <Icon name="plus" size={14} />
-                    + בחר כמה תיקיות
-                  </Button>
-                )}
-                <Button type="button" variant="ghost" size="sm" onClick={addFolder}>
-                  <Icon name="plus" size={14} />
-                  + הוסף שורה ידנית
-                </Button>
+    <div className="screen-center">
+      <Card className="setup-shell cartoon-card" variant="borderless">
+        <div className="setup-hero">
+          <div className="setup-brand">
+            <div className="setup-brand-main">
+              <div className="setup-brand-mark">
+                <Icon name="sparkle" size={28} />
+              </div>
+              <div>
+                <Typography.Title level={1} className="page-title" style={{ margin: 0 }}>
+                  Music Automatic
+                </Typography.Title>
+                <Typography.Paragraph className="page-subtitle" style={{ margin: "6px 0 0" }}>
+                  ניקוי כפילויות חכם לאוסף המוזיקה שלך
+                </Typography.Paragraph>
               </div>
             </div>
-            
-            <div className="folder-list">
-              {form.folders.map((folder, idx) => (
-                <div key={folder.id} className="folder-row">
-                  <div className="input-field input-field-path">
-                     <Icon name="folder" size={16} className="input-leading-icon" />
-                     <input
-                        type="text"
-                        aria-label={`תיקייה לסריקה ${idx + 1}`}
-                        className="input-plain"
-                        placeholder={`נתיב לתיקייה ${idx + 1}...`}
-                        value={folder.path}
-                        onChange={(e) => handlePathChange(folder.id, e.target.value)}
-                     />
+            <StatusTag tone="success" icon="shield">
+              Recycle Bin בלבד
+            </StatusTag>
+          </div>
+
+          <div className="trust-strip">
+            {TRUST_ITEMS.map((item) => (
+              <div key={item.text} className="trust-item">
+                <Icon name={item.icon} size={16} />
+                <span>{item.text}</span>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={onSubmit}>
+            <div className="setup-grid">
+              <Card
+                className="setup-section-card cartoon-panel"
+                title={(
+                  <Flex align="center" gap={10}>
+                    <Icon name="folder" size={18} />
+                    <span>תיקיות לסריקה</span>
+                  </Flex>
+                )}
+                variant="borderless"
+              >
+                <div className="setup-section-head">
+                  <Typography.Paragraph className="muted-copy" style={{ margin: 0 }}>
+                    ניתן לבחור מספר תיקיות שורש. המערכת תחפש כפילויות בין כל התיקיות.
+                  </Typography.Paragraph>
+                  <div className="folder-actions">
+                    {runtimeInfo?.isElectron && (
+                      <Button type="default" icon={<Icon name="plus" size={14} />} onClick={onPickFolders}>
+                        + בחר כמה תיקיות
+                      </Button>
+                    )}
+                    <Button type="default" icon={<Icon name="plus" size={14} />} onClick={addFolder}>
+                      + הוסף שורה ידנית
+                    </Button>
                   </div>
-                  {form.folders.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeFolder(folder.id)} title="הסר">
-                      <Icon name="x" size={16} />
+                </div>
+
+                <div className="folder-list">
+                  {form.folders.map((folder, index) => (
+                    <div key={folder.id} className="folder-row">
+                      <Input
+                        size="large"
+                        prefix={<Icon name="folder" size={16} />}
+                        aria-label={`תיקייה לסריקה ${index + 1}`}
+                        placeholder={`נתיב לתיקייה ${index + 1}...`}
+                        value={folder.path}
+                        onChange={(event) => handlePathChange(folder.id, event.target.value)}
+                      />
+                      {form.folders.length > 1 && (
+                        <Button
+                          aria-label={`הסר תיקייה ${index + 1}`}
+                          icon={<Icon name="x" size={14} />}
+                          onClick={() => removeFolder(folder.id)}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <Card
+                className="setup-section-card cartoon-panel"
+                title={(
+                  <Flex align="center" gap={10}>
+                    <Icon name="shield" size={18} />
+                    <span>תיקייה מועדפת (אופציונלי)</span>
+                  </Flex>
+                )}
+                variant="borderless"
+              >
+                <div className="folder-row">
+                  <Input
+                    size="large"
+                    prefix={<Icon name="shield" size={16} />}
+                    aria-label="תיקייה מועדפת לשמירה"
+                    placeholder={"למשל: C:\\Music\\Best"}
+                    value={form.preferred_root}
+                    onChange={(event) => setForm({ ...form, preferred_root: event.target.value })}
+                  />
+                  {runtimeInfo?.isElectron && (
+                    <Button type="default" icon={<Icon name="folder" size={14} />} onClick={onPickPreferredRoot}>
+                      עיון...
                     </Button>
                   )}
                 </div>
-              ))}
-            </div>
-            <p className="input-helper">ניתן לבחור מספר תיקיות שורש. המערכת תחפש כפילויות בין כל התיקיות.</p>
-          </div>
+                <Typography.Paragraph className="muted-copy" style={{ margin: 0 }}>
+                  אם יימצא עותק בתיקייה זו, הוא יקבל עדיפות אוטומטית לשמירה.
+                </Typography.Paragraph>
+              </Card>
 
-          <div className="setup-section">
-            <label className="setup-section-title">
-              <Icon name="shield" size={16} />
-              תיקייה מועדפת (אופציונלי)
-            </label>
-            <div className="folder-row">
-               <div className="input-field input-field-path">
-                 <Icon name="shield" size={16} className="input-leading-icon" />
-                 <input
-                    type="text"
-                    aria-label="תיקייה מועדפת לשמירה"
-                    className="input-plain"
-                    placeholder="למשל: C:\Music\Best"
-                    value={form.preferred_root}
-                    onChange={(e) => setForm({ ...form, preferred_root: e.target.value })}
-                 />
-               </div>
-               {runtimeInfo?.isElectron && (
-                  <Button type="button" variant="secondary" onClick={onPickPreferredRoot}>
-                    <Icon name="folder" size={14} />
-                    עיון...
-                  </Button>
-               )}
-            </div>
-            <p className="input-helper">אם יימצא עותק בתיקייה זו, הוא יקבל עדיפות אוטומטית לשמירה.</p>
-          </div>
+              <Collapse
+                activeKey={showAdvanced ? ["advanced"] : []}
+                className="cartoon-panel"
+                onChange={(keys) => setShowAdvanced(keys.length > 0)}
+                items={[
+                  {
+                    key: "advanced",
+                    label: (
+                      <Flex align="center" gap={10}>
+                        <Icon name="settings" size={16} />
+                        <span>הגדרות מתקדמות</span>
+                      </Flex>
+                    ),
+                    children: (
+                      <div className="advanced-option-grid">
+                        {ADVANCED_OPTIONS.map((option) => (
+                          <Card key={option.key} className="advanced-option-card" variant="borderless">
+                            <Checkbox
+                              checked={form[option.key]}
+                              aria-label={option.ariaLabel}
+                              onChange={(event) => setForm({ ...form, [option.key]: event.target.checked })}
+                            >
+                              <div className="advanced-option-content">
+                                <Space size={10} align="center">
+                                  <Icon name={option.icon} size={16} />
+                                  <Typography.Text strong>{option.label}</Typography.Text>
+                                </Space>
+                                <Typography.Text type="secondary">{option.description}</Typography.Text>
+                              </div>
+                            </Checkbox>
+                          </Card>
+                        ))}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
 
-          <div className="setup-section">
-            <button type="button" className="advanced-trigger" onClick={() => setShowAdvanced(!showAdvanced)}>
-              <span className="advanced-trigger-label">
-                <Icon name="settings" size={15} />
-                הגדרות מתקדמות
-              </span>
-              <Icon name="chevron-down" size={16} className={showAdvanced ? "chevron-open" : ""} />
-            </button>
-
-            {showAdvanced && (
-              <div className="advanced-panel">
-                <label className="checkbox-card">
-                  <input
-                    type="checkbox"
-                    aria-label="סריקה מחדש מלאה"
-                    checked={form.force_rescan}
-                    onChange={(e) => setForm({...form, force_rescan: e.target.checked})}
-                  />
-                  <div className="checkbox-content">
-                    <span className="checkbox-icon">
-                      <Icon name="database" size={16} />
-                    </span>
-                    <h4>סריקה מחדש מלאה</h4>
-                    <p>התעלם מנתונים שמורים ב-Cache וסרוק את הדיסק מחדש.</p>
-                  </div>
-                </label>
-                <label className="checkbox-card">
-                  <input
-                    type="checkbox"
-                    aria-label="סריקת Hash מלאה"
-                    checked={form.full_hash_scan}
-                    onChange={(e) => setForm({...form, full_hash_scan: e.target.checked})}
-                  />
-                  <div className="checkbox-content">
-                    <span className="checkbox-icon">
-                      <Icon name="compare" size={16} />
-                    </span>
-                    <h4>סריקת Hash מלאה</h4>
-                    <p>חשב hash מלא לכל קובץ להשוואה מדויקת יותר. איטי יותר ולכן כבוי כברירת מחדל.</p>
-                  </div>
-                </label>
-                <label className="checkbox-card">
-                  <input
-                    type="checkbox"
-                    aria-label="אימות AI (Gemini)"
-                    checked={form.gemini_enabled}
-                    onChange={(e) => setForm({...form, gemini_enabled: e.target.checked})}
-                  />
-                  <div className="checkbox-content">
-                    <span className="checkbox-icon">
-                      <Icon name="sparkle" size={16} />
-                    </span>
-                    <h4>אימות AI (Gemini)</h4>
-                    <p>השתמש בבינה מלאכותית להכרעה במקרים גבוליים.</p>
-                  </div>
-                </label>
+              <div className="setup-footer">
+                <div className={`setup-footer-state ${hasFolders ? "is-ready" : ""}`}>
+                  <Icon name={hasFolders ? "check-circle" : "alert"} size={16} />
+                  <span>{hasFolders ? "מוכן לסריקה" : "יש להוסיף לפחות תיקייה אחת"}</span>
+                </div>
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<Icon name="sparkle" size={16} />}
+                  htmlType="submit"
+                  disabled={!hasFolders}
+                >
+                  התחל סריקה חכמה
+                </Button>
               </div>
-            )}
-          </div>
 
-          <div className="setup-footer">
-            <span className={`setup-footer-state ${hasFolders ? "is-ready" : ""}`}>
-              <Icon name={hasFolders ? "check-circle" : "alert"} size={14} />
-              {hasFolders ? "מוכן לסריקה" : "יש להוסיף לפחות תיקייה אחת"}
-            </span>
-            <Button type="submit" variant="primary" size="lg" disabled={!hasFolders}>
-              <Icon name="sparkle" size={16} />
-              התחל סריקה חכמה
-            </Button>
-          </div>
-        </form>
-      </div>
+              {!runtimeInfo?.isElectron && (
+                <Alert
+                  type="info"
+                  showIcon
+                  title="מצב דפדפן"
+                  description="בחירת התיקיות מתבצעת ידנית כי האפליקציה כרגע לא רצה בתוך Electron."
+                />
+              )}
+            </div>
+          </form>
+        </div>
+      </Card>
     </div>
   );
 }

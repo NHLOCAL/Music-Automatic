@@ -6,7 +6,7 @@
 
 - `FastAPI` משמש כ-backend רשמי עם sessions, `SSE` להתקדמות, ו-DTOs יציבים לפרונטנד.
 - `Electron` משמש כמעטפת desktop הראשית: הוא פותח חלון, מרים את ה-backend, ומספק יכולות מערכת דרך `preload bridge`.
-- `React` משמש כ-renderer הראשי החדש, עם tabs של `בטוח למחיקה`, `דורש סקירה`, ו-`כל התוצאות`.
+- `React` משמש כ-renderer הראשי החדש, עם `Ant Design 6`, `Happy Work Theme`, RTL מלא, ו-tabs של `בטוח למחיקה`, `דורש סקירה`, ו-`כל התוצאות`.
 - מסך הסריקה מציג roots בשדות נפרדים עם הוספה/הסרה ברורה, במקום שדה טקסט יחיד.
 - בדו-שיח בחירת התיקיות של ה-Desktop אפשר לבחור כמה roots יחד ולהוסיף אותם בבת אחת למסך הסריקה.
 - מסך הסריקה ב-Desktop שומר גם על fallback ידני של הוספת שורות, למקרים שבהם דו-שיח Windows native נכשל על תיקיות מסוימות.
@@ -67,6 +67,7 @@
   - in-memory session store
 - `frontend/`
   - אפליקציית `React + Vite`
+  - שכבת UI מבוססת `Ant Design 6` עם `HappyProvider`
   - מעטפת `Electron` תחת `frontend/electron`
 - `main.py`
   - ממשק `CLI` שמפעיל את אותה שכבת services של ה-API
@@ -88,6 +89,8 @@ pip install -r requirements.txt
 cd album_deduplicator/frontend
 npm install
 ```
+
+ה־frontend משתמש כעת גם ב־`antd`, `@ant-design/icons`, `@ant-design/happy-work-theme`, ו־`@fontsource/rubik`.
 
 ## הרצה
 
@@ -164,6 +167,8 @@ cd frontend
 npm test
 npm run build
 ```
+
+ה־build הנוכחי של ה־frontend כולל גם את נכסי הפונט `Rubik` ואת חבילת `Ant Design`; כתוצאה מכך חבילת ה־renderer גדולה יותר מבעבר, אך מספקת מערכת רכיבים עקבית למסכי ה־desktop.
 
 ### Desktop Packaging
 

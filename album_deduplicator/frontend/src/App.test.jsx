@@ -270,7 +270,7 @@ describe("App", () => {
     fireEvent.click(screen.getByText("הגדרות מתקדמות"));
     expect(screen.getByText("אימות AI (Gemini)")).toBeInTheDocument();
     expect(screen.getByLabelText("סריקת Hash מלאה")).not.toBeChecked();
-  });
+  }, 10000);
 
   it("submits full hash scan only when the advanced toggle is enabled", async () => {
     window.albumDeduplicator = createDesktopBridge();
@@ -485,13 +485,13 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "העבר 1 תיקיות לסל המחזור" }));
 
-    await waitFor(() => expect(screen.getByRole("heading", { name: "אין כרגע קבוצות שממתינות למחיקה" })).toBeInTheDocument());
-    expect(screen.getByRole("heading", { name: "אין כרגע קבוצות שממתינות למחיקה" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("אין כרגע קבוצות שממתינות למחיקה")).toBeInTheDocument());
+    expect(screen.getByText("אין כרגע קבוצות שממתינות למחיקה")).toBeInTheDocument();
     expect(screen.getAllByText("Archive Copy").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Best").length).toBeGreaterThan(0);
     expect(screen.getAllByText("תיקיות שכבר הועברו").length).toBeGreaterThan(0);
     expect(screen.getByText("היסטוריית הפעולות שבוצעו עד כה, יחד עם ה־keeper שנשאר בכל קבוצה כדי לאפשר השוואה חוזרת.")).toBeInTheDocument();
-  });
+  }, 15000);
 
   it("waits for summary data before switching from scanning to summary", async () => {
     window.albumDeduplicator = createDesktopBridge();

@@ -149,6 +149,8 @@
 
 - `src/App.jsx`
   - flow ראשי.
+  - עוטף את כל ה־renderer ב־`HappyProvider` + `ConfigProvider` של `Ant Design`.
+  - מגדיר `RTL`, theme tokens, ו-notifications דרך `AntD App`.
   - מזהה אם היישום רץ בתוך `Electron`
   - יצירת session.
   - האזנה ל-`SSE`.
@@ -163,9 +165,12 @@
   - פתיחה מיידית של נתיבים ב-Explorer.
   - מחיקה בודדת מיידית מתוך ה-cluster.
   - delete confirmation.
+- `src/theme/antdTheme.js`
+  - seed tokens ו-component tokens של `Ant Design 6`.
+  - קובע palette, typography, radius, shadows ו-motion עבור שפת `Cartoon Desktop`.
 - `src/styles.css`
   - entrypoint של הסטיילים בפרונטאנד.
-  - מייבא partials תחת `src/styles/` עבור `base`, מסכי setup/scan/summary, סביבת העבודה, ומסך finalize.
+  - מייבא partials קטנים תחת `src/styles/` עבור shell כללי, מסכי setup/scan/summary, סביבת review, ומסך finalize.
 - `src/desktop.js`
   - abstraction ליכולות desktop ול-runtime metadata.
 - `src/App.test.jsx`
@@ -470,6 +475,8 @@ final_score = base_score
 - רשימות שירים
 - מידע על האלבומים בקבוצה
 - מגירת `advanced details` למשתמשים מתקדמים עם פירוט מלא לכל `pair`, כולל `reason_codes` ו-`technical_summary`
+
+ה־implementation הנוכחי מבוסס על רכיבי `Ant Design` כמו `Collapse`, `Card`, `Segmented`, `Table`, `Result`, `Progress`, ו-`Statistic`, עם overrides ממוקדים כדי לשמור על שפת desktop ולא מראה web generic.
 
 ### delete confirmation
 

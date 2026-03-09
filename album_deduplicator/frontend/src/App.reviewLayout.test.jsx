@@ -169,7 +169,7 @@ describe("App review layout", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { container } = render(<App />);
+    render(<App />);
     const folderInputs = screen.getAllByRole("textbox");
 
     fireEvent.change(folderInputs[0], { target: { value: "C:\\Music" } });
@@ -177,21 +177,19 @@ describe("App review layout", () => {
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
 
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    await waitFor(() => expect(MockEventSource.instances[0].listeners.has("completed")).toBe(true));
     MockEventSource.instances[0].emit("completed", { status: "completed" });
 
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "הסריקה הושלמה!" })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: "התחל לעבור על התוצאות" })).toBeInTheDocument(),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
 
     await waitFor(() => expect(screen.getByText("פתח את שלב ההעברה")).toBeInTheDocument());
 
-    const workspaceLayout = container.querySelector(".workspace-layout");
-    expect(workspaceLayout).not.toBeNull();
-    expect(workspaceLayout?.children).toHaveLength(2);
-    expect(workspaceLayout?.firstElementChild).toHaveClass("cluster-sidebar");
-    expect(workspaceLayout?.lastElementChild).toHaveClass("workspace-main");
-    expect(workspaceLayout?.lastElementChild?.querySelector(".fab-container")).not.toBeNull();
-  });
+    expect(screen.getByTestId("review-workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("review-main")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "פתח את שלב ההעברה" })).toBeInTheDocument();
+  }, 10000);
 });

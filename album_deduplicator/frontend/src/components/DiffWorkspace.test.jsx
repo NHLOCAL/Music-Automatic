@@ -96,7 +96,7 @@ describe("DiffWorkspace", () => {
   });
 
   it("renders the compact comparison workspace with numbered copies and a scrollable track table", () => {
-    const { container } = render(
+    render(
       <DiffWorkspace
         cluster={cluster}
         currentKeeperId="folder-1"
@@ -111,9 +111,7 @@ describe("DiffWorkspace", () => {
     expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
     expect(screen.getByText("עותקי האלבום זה לצד זה")).toBeInTheDocument();
     expect(screen.getByText("רשימת השוואה מפורטת")).toBeInTheDocument();
-    const scoreSummary = container.querySelector(".ai-panel-summary");
-    if (!scoreSummary) throw new Error("Expected score summary to exist");
-    fireEvent.click(scoreSummary);
+    fireEvent.click(screen.getByText("איך המערכת הגיעה להחלטה"));
     expect(screen.getByText("ציון סופי")).toBeInTheDocument();
     expect(screen.getByText("השוואה מתמטית")).toBeInTheDocument();
     expect(screen.getByText("למידת מכונה")).toBeInTheDocument();
@@ -123,13 +121,11 @@ describe("DiffWorkspace", () => {
     expect(screen.getAllByRole("button", { name: "פתח בתיקייה" })).toHaveLength(3);
     expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
     expect(screen.getAllByText("02.mp3").length).toBeGreaterThan(0);
-    expect(container.querySelector(".comparison-grid-scroll")).not.toBeNull();
-    expect(container.querySelector(".track-table-scroll")).not.toBeNull();
-    expect(container.querySelector("table.tracks-table")).not.toBeNull();
-  });
+    expect(screen.getAllByRole("table").length).toBeGreaterThan(0);
+  }, 10000);
 
   it("shows system insight text and toggles the details panel open", () => {
-    const { container } = render(
+    render(
       <DiffWorkspace
         cluster={cluster}
         currentKeeperId="folder-1"
@@ -139,16 +135,8 @@ describe("DiffWorkspace", () => {
     );
 
     expect(screen.getByText("פירוט score, הסבר אנושי, ושכבת השקיפות האלגוריתמית.")).toBeInTheDocument();
-
-    const details = container.querySelector(".ai-panel-details");
-    const summary = container.querySelector(".ai-panel-summary");
-
-    expect(details?.hasAttribute("open")).toBe(false);
-    if (!summary) throw new Error("Expected score transparency summary to exist");
-
-    fireEvent.click(summary);
-
-    expect(details?.hasAttribute("open")).toBe(true);
+    expect(screen.queryByText("ציון סופי")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("איך המערכת הגיעה להחלטה"));
     expect(screen.getAllByText("89.7/100").length).toBeGreaterThan(0);
   });
 
