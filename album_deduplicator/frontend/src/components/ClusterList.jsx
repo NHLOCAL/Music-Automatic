@@ -10,7 +10,7 @@ import {
   hasClusterDecision,
 } from "../utils";
 
-const SEGMENT_OPTIONS =[
+const SEGMENT_OPTIONS = [
   { label: "בטוחים", value: "safe" },
   { label: "לסקירה", value: "review" },
   { label: "הכל", value: "all" },
@@ -39,24 +39,22 @@ export function ClusterList({
     .map(({ cluster }) => cluster);
 
   return (
-    <Card className="cluster-sidebar cartoon-card" variant="borderless">
+    <Card className="cluster-sidebar cartoon-panel" variant="borderless">
       <div className="cluster-sidebar-head">
-        <Space align="center" size={12} style={{ marginBottom: 4 }}>
-          <div className="soft-kicker">
-            <Icon name="layers" size={14} />
+        <Space align="center" size={8} style={{ marginBottom: 2 }}>
+          <div className="soft-kicker" style={{ padding: "4px 8px", fontSize: "11px" }}>
+            <Icon name="layers" size={12} />
             רשימת קבוצות
           </div>
         </Space>
-        
         <Segmented
           block
-          size="middle"
+          size="small"
           value={selectedTab}
           options={SEGMENT_OPTIONS}
           onChange={setSelectedTab}
         />
       </div>
-      
       <div className="cluster-scroll" data-testid="cluster-scroll">
         {filteredClusters.length === 0 ? (
           <Empty
@@ -70,7 +68,6 @@ export function ClusterList({
             const hasDecision = hasClusterDecision(decisions, cluster.cluster_id);
             const statusMeta = getClusterStatusMeta(cluster, hasDecision && decisions[cluster.cluster_id] !== null);
             const representativePair = getRepresentativeClusterPair(cluster, cluster.recommended_keeper_id);
-            
             const scoreLine = representativePair
               ? representativePair.is_identical_by_hash
                 ? "התאמה מלאה"
@@ -85,22 +82,21 @@ export function ClusterList({
                 onClick={() => setSelectedClusterId(cluster.cluster_id)}
               >
                 <div className="cluster-card-headline">
-                  <Typography.Text strong ellipsis={{ tooltip: getClusterDisplayTitle(cluster) }} style={{ flex: 1, minWidth: 0 }}>
+                  <Typography.Text strong ellipsis={{ tooltip: getClusterDisplayTitle(cluster) }} style={{ flex: 1, minWidth: 0, fontSize: "12px" }}>
                     {getClusterDisplayTitle(cluster)}
                   </Typography.Text>
                   {!isActive && (
-                    <StatusTag tone={statusMeta.tone} style={{ padding: "0 6px", minHeight: "22px", fontSize: "11px" }}>
+                    <StatusTag tone={statusMeta.tone} style={{ padding: "0 4px", minHeight: "18px", fontSize: "10px", border: "none" }}>
                       {statusMeta.label}
                     </StatusTag>
                   )}
                 </div>
-                
-                <div className="cluster-card-meta" style={{ marginTop: 10 }}>
+                <div className="cluster-card-meta">
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Icon name="music" size={12} /> {scoreLine}
+                    <Icon name="music" size={10} /> {scoreLine}
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Icon name="layers" size={12} /> {cluster.albums.filter((album) => !album.is_deleted).length} עותקים
+                    <Icon name="layers" size={10} /> {cluster.albums.filter((album) => !album.is_deleted).length} עותקים
                   </span>
                 </div>
               </Card>

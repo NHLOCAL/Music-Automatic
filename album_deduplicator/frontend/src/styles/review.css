@@ -1,44 +1,34 @@
-/* =========================================================
-   Review Workspace Layout
-   ========================================================= */
 .review-workspace {
   height: 100%;
   min-height: 0;
   display: flex;
-  gap: 24px;
-  padding: 24px;
+  gap: 16px;
+  padding: 16px;
   overflow: hidden;
+  background-color: var(--bg-app);
 }
-
-/* =========================================================
-   Sidebar (Cluster List)
-   ========================================================= */
 .cluster-sidebar.ant-card {
-  width: 340px;
+  width: 280px;
   flex-shrink: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(12px);
-  border-radius: 24px;
+  border-radius: 12px;
 }
-
 .cluster-sidebar.ant-card .ant-card-body {
   flex: 1;
   min-height: 0;
-  padding: 20px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
-
 .cluster-sidebar-head {
   display: flex;
   flex-direction: column;
   gap: 8px;
   flex-shrink: 0;
 }
-
 .cluster-scroll {
   flex: 1;
   min-height: 0;
@@ -46,388 +36,343 @@
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-inline-end: 8px;
+  gap: 8px;
+  padding-inline-end: 4px;
 }
-
 .cluster-card.ant-card {
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   border-width: 1px;
+  border-radius: 8px;
 }
-
-.cluster-card.ant-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--surface-shadow-soft);
+.cluster-card.ant-card .ant-card-body {
+  padding: 10px;
 }
-
 .cluster-card.is-active.ant-card {
-  border-color: rgba(47, 103, 232, 0.5);
-  box-shadow: 0 8px 24px rgba(47, 103, 232, 0.12);
-  background: linear-gradient(180deg, #ffffff, rgba(244, 247, 255, 0.9));
+  border-color: var(--color-primary);
+  background: rgba(47, 103, 232, 0.04);
+  box-shadow: 0 2px 8px rgba(47, 103, 232, 0.08);
 }
-
 .cluster-card-headline {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   align-items: flex-start;
+  font-size: 13px;
 }
-
 .cluster-card-meta {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
   color: var(--text-secondary);
+  font-size: 11px;
+  margin-top: 6px;
 }
-
-/* =========================================================
-   Main Workspace Area
-   ========================================================= */
 .review-main {
   flex: 1;
-  min-width: 0; /* Critical to prevent flex blowout */
+  min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 24px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-inline-end: 8px;
-  scroll-behavior: smooth;
 }
-
 .workspace-empty {
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .diff-shell {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   min-height: max-content;
-  padding-bottom: 24px;
+  padding-bottom: 16px;
 }
-
-/* =========================================================
-   Top Overview Section
-   ========================================================= */
-.diff-overview-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 24px;
-  align-items: start;
-}
-
-.diff-overview-card.ant-card .ant-card-body,
-.diff-state-card.ant-card .ant-card-body {
+.diff-compact-header {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 24px;
+  gap: 12px;
+  background: var(--bg-surface);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--shadow-sm);
 }
-
-.diff-overview-copy-head {
+.diff-header-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   flex-wrap: wrap;
 }
-
 .diff-header-title.ant-typography {
-  font-size: clamp(1.4rem, 1.5vw, 1.8rem);
-  line-height: 1.3;
+  font-size: 1.2rem;
+  line-height: 1.2;
   margin: 0;
-}
-
-.diff-trust-strip {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: rgba(34, 131, 87, 0.08);
-  border: 1px solid rgba(34, 131, 87, 0.15);
-  color: #1a6d49;
   font-weight: 600;
-  width: fit-content;
 }
-
-.decision-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-}
-
-.decision-card.ant-card {
-  background: var(--bg-app);
-  border-radius: 16px;
-}
-
-.decision-card.ant-card .ant-card-body {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.diff-side-rail {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
 .diff-kpi-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
 }
-
-.diff-kpi-card.ant-card .ant-card-body {
-  padding: 16px;
+.diff-kpi-item {
+  display: flex;
+  flex-direction: column;
 }
-
-.diff-kpi-card .ant-statistic-content {
-  font-size: 1.4rem;
+.diff-kpi-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.diff-kpi-value {
+  font-size: 1.1rem;
   font-weight: 700;
+  line-height: 1;
 }
-
-/* =========================================================
-   Album Cards Section (Horizontal Scroll)
-   ========================================================= */
+.decision-strip {
+  display: flex;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+.compact-decision-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.compact-decision-item.tone-success {
+  background: rgba(34, 131, 87, 0.08);
+  border-color: rgba(34, 131, 87, 0.2);
+}
+.compact-decision-item.tone-primary {
+  background: rgba(47, 103, 232, 0.08);
+  border-color: rgba(47, 103, 232, 0.2);
+}
+.compact-decision-item.tone-warning {
+  background: rgba(214, 144, 31, 0.08);
+  border-color: rgba(214, 144, 31, 0.2);
+}
+.decision-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.decision-value {
+  font-family: var(--mono-font);
+  direction: ltr;
+  color: var(--text-main);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .workspace-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
-
 .section-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 16px;
   padding: 0 4px;
 }
-
 .comparison-scroller {
   display: flex;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 8px 4px 16px;
-  gap: 20px;
-  scroll-snap-type: x mandatory;
+  padding: 4px;
+  gap: 12px;
 }
-
 .album-card-shell {
-  flex: 0 0 340px;
+  flex: 0 0 280px;
   min-width: 0;
-  scroll-snap-align: start;
 }
-
-.album-card-shell .ant-ribbon-wrapper {
-  height: 100%;
-}
-
 .album-card.ant-card {
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-radius: 20px;
-  transition: all 0.2s ease;
+  border-radius: 10px;
 }
-
 .album-card.ant-card .ant-card-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px;
+  gap: 10px;
+  padding: 12px;
 }
-
 .album-card.is-keeper.ant-card {
   border: 2px solid var(--colorSuccess);
-  background: linear-gradient(180deg, #ffffff, rgba(234, 251, 241, 0.4));
-  box-shadow: 0 12px 24px rgba(34, 131, 87, 0.08);
+  background: rgba(234, 251, 241, 0.3);
 }
-
 .album-card.is-deleted.ant-card {
-  opacity: 0.85;
-  border: 2px dashed rgba(217, 91, 83, 0.4);
+  opacity: 0.75;
+  border: 1px dashed rgba(217, 91, 83, 0.4);
   background: var(--bg-app);
 }
-
-.album-card-heading {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
 .album-card-title.ant-typography {
   margin: 0;
+  font-size: 14px;
   line-height: 1.2;
 }
-
-.album-actions {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-}
-
-.album-actions > button:first-child {
-  flex: 1;
-}
-
 .album-path-inline {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  min-width: 0;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
 }
-
 .album-inline-path.ant-typography {
   margin: 0;
   direction: ltr;
   text-align: right;
   font-family: var(--mono-font);
-  font-size: 11px;
+  font-size: 10px;
   flex: 1;
   min-width: 0;
 }
-
+.album-actions {
+  display: flex;
+  gap: 6px;
+}
+.album-actions > button {
+  height: 28px;
+  font-size: 12px;
+}
+.album-actions > button:first-child {
+  flex: 1;
+}
 .album-metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
   margin-top: auto;
 }
-
+.metric-tile.ant-card {
+  border-radius: 6px;
+}
 .metric-tile.ant-card .ant-card-body {
-  padding: 12px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
-
 .metric-value {
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 13px;
 }
-
-/* =========================================================
-   Tracks Table Section
-   ========================================================= */
 .comparison-control-card.ant-card {
-  border-radius: 16px;
+  border-radius: 8px;
 }
-
 .comparison-control-card.ant-card .ant-card-body {
-  padding: 20px;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.track-table-card.ant-card {
+  border-radius: 8px;
+  overflow: hidden;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
-
-.track-table-card.ant-card {
-  min-width: 0; /* Crucial for table responsiveness */
-  border-radius: 16px;
-  overflow: hidden;
-}
-
 .track-table-card.ant-card .ant-card-body {
-  padding: 0; /* Remove padding to let table fill */
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
-
 .tracks-table {
   width: 100%;
 }
-
-.tracks-table .ant-table-content {
-  overflow-x: auto;
+.tracks-table .ant-table-wrapper, 
+.tracks-table .ant-spin-nested-loading, 
+.tracks-table .ant-spin-container, 
+.tracks-table .ant-table {
+  height: 100%;
 }
-
+.tracks-table .ant-table-cell {
+  padding: 6px 8px !important;
+  font-size: 12px;
+}
 .track-main-cell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 0;
+  gap: 2px;
 }
-
 .track-entry {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 0;
+  gap: 4px;
 }
-
 .track-entry-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
-
 .track-chip {
-  padding: 2px 8px;
-  border-radius: 12px;
+  padding: 0 6px;
+  border-radius: 4px;
   background: var(--bg-app);
-  font-size: 11px;
+  font-size: 10px;
   font-family: var(--mono-font);
   color: var(--text-secondary);
-  white-space: nowrap;
+  border: 1px solid var(--border-subtle);
 }
-
 .track-chip.is-different {
-  background: rgba(214, 144, 31, 0.15);
+  background: rgba(214, 144, 31, 0.1);
   color: #a36b00;
+  border-color: rgba(214, 144, 31, 0.3);
   font-weight: 600;
 }
-
-/* =========================================================
-   Responsive Breakpoints
-   ========================================================= */
-@media (max-width: 1300px) {
-  .diff-overview-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .diff-side-rail {
-    flex-direction: row;
-    align-items: stretch;
-  }
-  
-  .diff-side-rail > * {
-    flex: 1;
-    min-width: 0;
-  }
+.score-panel .ant-collapse-header {
+  padding: 8px 12px !important;
 }
-
+.score-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.score-panel-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.score-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.score-metric-card.ant-card .ant-card-body {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+}
 @media (max-width: 992px) {
   .review-workspace {
     flex-direction: column;
     overflow-y: auto;
   }
-  
   .cluster-sidebar.ant-card {
     width: 100%;
-    height: 300px;
+    height: 250px;
     flex-shrink: 0;
   }
-  
   .review-main {
     overflow-y: visible;
-    padding-inline-end: 0;
-  }
-  
-  .diff-side-rail {
-    flex-direction: column;
   }
 }
