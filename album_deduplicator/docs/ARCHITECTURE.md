@@ -167,11 +167,12 @@
   - delete confirmation.
 - `src/theme/antdTheme.js`
   - seed tokens ו-component tokens של `Ant Design 6`.
-  - קובע palette, typography, radius, shadows ו-motion עבור שפת `Cartoon Desktop`.
+  - קובע palette, typography, radius, shadows ו-motion עבור שפת `Cartoon Desktop` מעודנת יותר, עם density רגועה ו-border hierarchy מתונה.
 - `src/styles.css`
   - entrypoint של הסטיילים בפרונטאנד.
   - מייבא partials קטנים תחת `src/styles/` עבור shell כללי, מסכי setup/scan/summary, סביבת review, ומסך finalize.
   - מגדיר גם `scroll containers` ברורים ברמת ה-shell, review workspace, ו-finalize כדי למנוע clipping כאשר תצוגות ארוכות או רחבות.
+  - מסכי `scan` ו-`summary` משתמשים ב-grid ייעודי ל-KPI-ים במקום overrides על `Row/Col`, כדי לשמור על layout יציב גם בחלונות צרים או צפופים.
 - `src/desktop.js`
   - abstraction ליכולות desktop ול-runtime metadata.
 - `src/App.test.jsx`

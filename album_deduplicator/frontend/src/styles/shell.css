@@ -1,20 +1,20 @@
 :root {
   color-scheme: light;
-  --app-bg: #e8eefb;
-  --app-bg-deep: #d7e2ff;
-  --surface-glow: rgba(255, 255, 255, 0.9);
-  --surface-border: rgba(137, 167, 245, 0.42);
-  --surface-border-strong: rgba(37, 114, 255, 0.2);
+  --app-bg: #e7edf8;
+  --app-bg-deep: #dce5f4;
+  --surface-glow: rgba(255, 255, 255, 0.92);
+  --surface-border: rgba(123, 145, 196, 0.28);
+  --surface-border-strong: rgba(47, 103, 232, 0.18);
   --text-main: #182033;
-  --text-secondary: #5f6884;
-  --text-tertiary: #8791af;
-  --primary-soft: rgba(37, 114, 255, 0.12);
-  --success-soft: rgba(29, 159, 95, 0.12);
-  --warning-soft: rgba(245, 166, 35, 0.16);
-  --danger-soft: rgba(239, 83, 80, 0.14);
-  --surface-shadow: 0 20px 45px rgba(43, 80, 181, 0.12);
-  --surface-shadow-soft: 0 12px 26px rgba(28, 44, 92, 0.08);
-  --outline-shadow: 0 0 0 2px rgba(37, 114, 255, 0.12);
+  --text-secondary: #5d6782;
+  --text-tertiary: #8691aa;
+  --primary-soft: rgba(47, 103, 232, 0.10);
+  --success-soft: rgba(34, 131, 87, 0.12);
+  --warning-soft: rgba(214, 144, 31, 0.14);
+  --danger-soft: rgba(217, 91, 83, 0.14);
+  --surface-shadow: 0 18px 38px rgba(39, 69, 145, 0.10);
+  --surface-shadow-soft: 0 10px 24px rgba(19, 34, 73, 0.07);
+  --outline-shadow: 0 0 0 2px rgba(47, 103, 232, 0.10);
   --mono-font: "Cascadia Code", Consolas, Menlo, monospace;
 }
 
@@ -33,9 +33,9 @@ body,
 body {
   font-family: "Rubik", "Segoe UI", sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), transparent 28%),
-    radial-gradient(circle at top right, rgba(103, 167, 255, 0.25), transparent 24%),
-    linear-gradient(180deg, #f8fbff 0%, var(--app-bg) 38%, #dbe5fb 100%);
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 26%),
+    radial-gradient(circle at top right, rgba(141, 177, 244, 0.18), transparent 22%),
+    linear-gradient(180deg, #f7f9fd 0%, var(--app-bg) 34%, #dfe7f4 100%);
   color: var(--text-main);
   overflow: hidden;
   user-select: none;
@@ -80,13 +80,17 @@ select {
 .screen-center {
   height: 100%;
   min-height: 0;
-  padding: 24px 28px 28px;
+  padding: 20px 24px 24px;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable both-edges;
+}
+
+.screen-center--compact {
+  align-items: center;
 }
 
 .screen-stack {
@@ -97,22 +101,22 @@ select {
 .cartoon-card.ant-result,
 .cartoon-surface {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 255, 0.94));
-  border: 2px solid var(--surface-border);
+  border: 1px solid var(--surface-border);
   box-shadow: var(--surface-shadow);
 }
 
 .cartoon-panel {
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.84);
   border: 1px solid var(--surface-border);
   box-shadow: var(--surface-shadow-soft);
-  border-radius: 22px;
+  border-radius: 20px;
 }
 
 .cartoon-tag.ant-tag {
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 8px 20px rgba(39, 65, 139, 0.08);
-  padding-inline: 12px;
-  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  box-shadow: 0 6px 16px rgba(39, 65, 139, 0.06);
+  padding-inline: 11px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -147,9 +151,9 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.78);
   border: 1px solid var(--surface-border);
   color: #3962c7;
   font-weight: 700;

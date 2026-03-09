@@ -1,11 +1,34 @@
 import React from "react";
-import { Alert, Button, Card, Col, Result, Row, Statistic, Typography } from "antd";
+import { Alert, Button, Card, Result, Statistic, Typography } from "antd";
 
 import { Icon, StatusTag } from "./UI";
 
 export function SummaryScreen({ summary, onStartReview, onBackToSetup }) {
   if (!summary?.counts) return null;
-  const { safe_clusters, review_clusters } = summary.counts;
+  const { compared_pairs, folders, review_clusters, safe_clusters } = summary.counts;
+  const summaryStats = [
+    {
+      key: "safe",
+      title: "בטוח למחיקה",
+      value: safe_clusters,
+      icon: "shield",
+      copy: "קבוצות שהמערכת סיווגה כבטוחות יחסית לפעולה.",
+    },
+    {
+      key: "review",
+      title: "דורש בדיקה",
+      value: review_clusters,
+      icon: "alert",
+      copy: "קבוצות שדורשות החלטה ידנית לפני כל מחיקה.",
+    },
+    {
+      key: "pairs",
+      title: "זוגות שנבדקו",
+      value: compared_pairs ?? 0,
+      icon: "compare",
+      copy: `${folders ?? 0} תיקיות השתתפו בניתוח הנוכחי.`,
+    },
+  ];
 
   return (
     <div className="screen-center">
@@ -30,24 +53,23 @@ export function SummaryScreen({ summary, onStartReview, onBackToSetup }) {
             </div>
           )}
         >
-          <StatusTag tone="success" icon="shield">
-            מוכן למעבר על התוצאות
-          </StatusTag>
+          <div className="summary-topline">
+            <StatusTag tone="success" icon="shield">
+              מוכן למעבר על התוצאות
+            </StatusTag>
+            <Typography.Text type="secondary">
+              כל ההחלטות עדיין הפיכות לפני שלב ההעברה.
+            </Typography.Text>
+          </div>
 
-          <Row gutter={[16, 16]} className="summary-stats">
-            <Col xs={24} md={12}>
-              <Card className="summary-stat-card cartoon-panel" variant="borderless">
-                <Statistic title="בטוח למחיקה" value={safe_clusters} prefix={<Icon name="shield" size={18} />} />
-                <div className="muted-copy">עותקים בטוחים למחיקה</div>
+          <div className="summary-stats" data-testid="summary-stats">
+            {summaryStats.map((item) => (
+              <Card key={item.key} className="summary-stat-card cartoon-panel" variant="borderless">
+                <Statistic title={item.title} value={item.value} prefix={<Icon name={item.icon} size={18} />} />
+                <div className="muted-copy">{item.copy}</div>
               </Card>
-            </Col>
-            <Col xs={24} md={12}>
-              <Card className="summary-stat-card cartoon-panel" variant="borderless">
-                <Statistic title="דורש בדיקה" value={review_clusters} prefix={<Icon name="alert" size={18} />} />
-                <div className="muted-copy">דורשים סקירה</div>
-              </Card>
-            </Col>
-          </Row>
+            ))}
+          </div>
 
           <Alert
             className="summary-note"
