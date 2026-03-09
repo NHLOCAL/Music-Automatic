@@ -82,12 +82,40 @@
   z-index: 3;
 }
 
+.diff-header-card.ant-card .ant-card-body {
+  display: grid;
+  gap: 18px;
+}
+
 .diff-header-grid {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
   flex-wrap: wrap;
+}
+
+.diff-header-copy {
+  flex: 1 1 520px;
+  display: grid;
+  gap: 12px;
+}
+
+.diff-header-summary.ant-typography {
+  margin: 0;
+  max-width: 78ch;
+}
+
+.diff-trust-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(29, 159, 95, 0.12), rgba(255, 255, 255, 0.94));
+  border: 1px solid rgba(29, 159, 95, 0.2);
+  color: #156f44;
+  font-weight: 700;
 }
 
 .diff-kpi-row {
@@ -99,6 +127,24 @@
 .diff-kpi-card.ant-card {
   min-width: 128px;
   background: linear-gradient(180deg, rgba(37, 114, 255, 0.12), rgba(255, 255, 255, 0.92));
+}
+
+.decision-strip.ant-card {
+  background: linear-gradient(180deg, rgba(244, 248, 255, 0.98), rgba(255, 255, 255, 0.98));
+}
+
+.decision-descriptions .ant-descriptions-view {
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.decision-descriptions .ant-descriptions-item-label {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.decision-descriptions .ant-descriptions-item-content {
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .workspace-section {
@@ -114,9 +160,14 @@
   flex-wrap: wrap;
 }
 
+.section-subcopy.ant-typography {
+  margin: 6px 0 0;
+  max-width: 72ch;
+}
+
 .comparison-scroller {
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding: 4px 2px 8px;
 }
 
 .album-grid {
@@ -125,9 +176,28 @@
   align-items: stretch;
 }
 
+.album-card-shell,
+.album-card-shell .ant-ribbon-wrapper {
+  min-height: 100%;
+}
+
+.album-card-shell .ant-ribbon-wrapper {
+  display: block;
+}
+
+.album-card-shell .ant-ribbon {
+  font-weight: 700;
+  box-shadow: 0 10px 22px rgba(26, 42, 86, 0.16);
+}
+
 .album-card.ant-card {
   min-height: 100%;
   border-width: 2px;
+}
+
+.album-card.ant-card .ant-card-body {
+  display: grid;
+  gap: 14px;
 }
 
 .album-card.is-keeper.ant-card {
@@ -141,7 +211,13 @@
   border-style: dashed;
 }
 
-.album-card-topline,
+.album-card-heading {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
 .album-path-flags,
 .album-actions {
   display: flex;
@@ -150,8 +226,28 @@
   align-items: center;
 }
 
+.album-card-heading .ant-typography {
+  word-break: break-word;
+}
+
 .album-actions {
-  margin-block: 12px;
+  justify-content: flex-end;
+}
+
+.album-actions .ant-btn:first-child {
+  min-width: 168px;
+}
+
+.album-relationship-banner {
+  display: inline-flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(37, 114, 255, 0.08), rgba(255, 255, 255, 0.96));
+  border: 1px solid rgba(37, 114, 255, 0.16);
+  color: var(--text-main);
+  font-weight: 600;
 }
 
 .album-path-box {
@@ -168,6 +264,21 @@
   word-break: break-all;
 }
 
+.album-descriptions .ant-descriptions-view {
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.album-descriptions .ant-descriptions-item-label {
+  width: 110px;
+  font-weight: 700;
+}
+
+.album-descriptions .ant-descriptions-item-content {
+  background: rgba(255, 255, 255, 0.98);
+  color: var(--text-main);
+}
+
 .album-metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -182,6 +293,10 @@
 .metric-value {
   font-weight: 700;
   color: var(--text-main);
+}
+
+.metric-hint {
+  min-height: 18px;
 }
 
 .score-panel.ant-collapse {
@@ -236,6 +351,18 @@
   gap: 6px;
 }
 
+.track-main-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.track-column-title {
+  display: grid;
+  gap: 2px;
+}
+
 .track-entry-name {
   display: inline-flex;
   gap: 8px;
@@ -262,6 +389,27 @@
   background: rgba(245, 166, 35, 0.18);
   color: #9a6200;
   font-weight: 700;
+}
+
+.tracks-table .ant-table-thead > tr > th {
+  vertical-align: top;
+}
+
+.tracks-table .ant-table-summary {
+  background: #f8fbff;
+}
+
+.track-summary-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.tracks-table .track-row-different td {
+  background: rgba(245, 166, 35, 0.08);
+}
+
+.tracks-table .track-row-same td {
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .track-missing {
@@ -320,5 +468,18 @@
   .delete-preview-body,
   .diff-header-grid {
     align-items: stretch;
+  }
+
+  .decision-descriptions .ant-descriptions-item {
+    display: block;
+  }
+
+  .album-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .album-actions .ant-btn {
+    flex: 1 1 auto;
   }
 }

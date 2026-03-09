@@ -95,7 +95,7 @@ describe("DiffWorkspace", () => {
     cleanup();
   });
 
-  it("renders the compact comparison workspace with numbered copies and a scrollable track table", () => {
+  it("renders the redesigned comparison workspace with a decision strip and a track summary", () => {
     render(
       <DiffWorkspace
         cluster={cluster}
@@ -108,6 +108,10 @@ describe("DiffWorkspace", () => {
     expect(screen.getAllByText("עותק 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("עותק 2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("עותק 3").length).toBeGreaterThan(0);
+    expect(screen.getByText("העותק שיישמר כעת")).toBeInTheDocument();
+    expect(screen.getByText("המלצת המערכת")).toBeInTheDocument();
+    expect(screen.getByText("בסיס ההשוואה בטבלת השירים")).toBeInTheDocument();
+    expect(screen.getByText("מה יועבר לסל המחזור")).toBeInTheDocument();
     expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
     expect(screen.getByText("עותקי האלבום זה לצד זה")).toBeInTheDocument();
     expect(screen.getByText("רשימת השוואה מפורטת")).toBeInTheDocument();
@@ -121,6 +125,8 @@ describe("DiffWorkspace", () => {
     expect(screen.getAllByRole("button", { name: "פתח בתיקייה" })).toHaveLength(3);
     expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
     expect(screen.getAllByText("02.mp3").length).toBeGreaterThan(0);
+    expect(screen.getByText("סיכום זמינות")).toBeInTheDocument();
+    expect(screen.getAllByText("2 שירים זמינים").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("table").length).toBeGreaterThan(0);
   }, 10000);
 
@@ -151,7 +157,8 @@ describe("DiffWorkspace", () => {
     );
 
     expect(screen.getAllByRole("button", { name: "שמור עותק זה" })).toHaveLength(3);
-    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getByText("עדיין לא נבחר keeper ידני")).toBeInTheDocument();
+    expect(screen.getByText("0 עותקים")).toBeInTheDocument();
     expect(screen.queryAllByRole("button", { name: "מיועד למחיקה" })).toHaveLength(0);
   });
 });

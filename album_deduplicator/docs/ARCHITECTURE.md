@@ -477,6 +477,7 @@ final_score = base_score
 - מגירת `advanced details` למשתמשים מתקדמים עם פירוט מלא לכל `pair`, כולל `reason_codes` ו-`technical_summary`
 
 ה־implementation הנוכחי מבוסס על רכיבי `Ant Design` כמו `Collapse`, `Card`, `Segmented`, `Table`, `Result`, `Progress`, ו-`Statistic`, עם overrides ממוקדים כדי לשמור על שפת desktop ולא מראה web generic.
+בפרט, `DiffWorkspace` משתמש כעת גם ב-`Badge.Ribbon`, `Descriptions`, `Flex`, `sticky table header`, ו-`Table.Summary` כדי להציג decision flow ברור יותר בין keeper, המלצת מערכת, metadata, ורמת הכיסוי של tracklist בכל עותק.
 
 ### delete confirmation
 
