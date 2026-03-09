@@ -67,7 +67,7 @@ export function ClusterList({
         onChange={setSelectedTab}
       />
 
-      <div className="cluster-scroll">
+      <div className="cluster-scroll" data-testid="cluster-scroll">
         {filteredClusters.length === 0 ? (
           <Empty
             className="desktop-empty"

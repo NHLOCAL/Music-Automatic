@@ -112,6 +112,9 @@ describe("DiffWorkspace", () => {
     expect(screen.getByText("המלצת המערכת")).toBeInTheDocument();
     expect(screen.getByText("בסיס ההשוואה בטבלת השירים")).toBeInTheDocument();
     expect(screen.getByText("מה יועבר לסל המחזור")).toBeInTheDocument();
+    expect(screen.getByTestId("diff-shell")).toBeInTheDocument();
+    expect(screen.getByTestId("comparison-scroller")).toBeInTheDocument();
+    expect(screen.getByTestId("track-table-card")).toBeInTheDocument();
     expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
     expect(screen.getByText("עותקי האלבום זה לצד זה")).toBeInTheDocument();
     expect(screen.getByText("רשימת השוואה מפורטת")).toBeInTheDocument();

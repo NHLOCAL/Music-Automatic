@@ -171,6 +171,7 @@
 - `src/styles.css`
   - entrypoint של הסטיילים בפרונטאנד.
   - מייבא partials קטנים תחת `src/styles/` עבור shell כללי, מסכי setup/scan/summary, סביבת review, ומסך finalize.
+  - מגדיר גם `scroll containers` ברורים ברמת ה-shell, review workspace, ו-finalize כדי למנוע clipping כאשר תצוגות ארוכות או רחבות.
 - `src/desktop.js`
   - abstraction ליכולות desktop ול-runtime metadata.
 - `src/App.test.jsx`

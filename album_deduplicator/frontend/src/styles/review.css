@@ -1,18 +1,27 @@
 .review-workspace {
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   gap: 18px;
   padding: 18px;
+  overflow: hidden;
 }
 
-.cluster-sidebar {
+.cluster-sidebar.ant-card {
   min-width: 0;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  height: 100%;
+  overflow: hidden;
   backdrop-filter: blur(10px);
+}
+
+.cluster-sidebar.ant-card .ant-card-body {
+  height: 100%;
+  min-height: 0;
+  padding: 18px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 16px;
 }
 
 .cluster-sidebar-head {
@@ -26,6 +35,7 @@
   display: grid;
   gap: 12px;
   padding-inline-end: 4px;
+  align-content: start;
 }
 
 .cluster-card.ant-card {
@@ -60,22 +70,42 @@
 .review-main {
   min-width: 0;
   min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overflow: auto;
+  padding-inline-end: 6px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
 }
 
 .workspace-empty {
-  min-height: calc(100vh - 36px);
+  min-height: 100%;
 }
 
-.diff-shell { 
-  min-height: 0; 
+.workspace-empty.ant-card .ant-card-body {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diff-shell {
+  min-height: 100%;
   display: flex; 
   flex-direction: column; 
   gap: 18px; 
-  overflow: hidden;
-} 
+  overflow: visible;
+  padding-bottom: 6px;
+}
+
+.diff-primary-stack,
+.diff-content-stack {
+  display: grid;
+  gap: 18px;
+  min-height: 0;
+}
 
 .diff-header-card.ant-card {
   position: sticky;
@@ -204,8 +234,9 @@
   max-width: 72ch;
 }
 
-.comparison-scroller { 
-  overflow: auto; 
+.comparison-scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-gutter: stable both-edges;
   padding: 4px 2px 8px; 
   max-width: 100%;
@@ -406,11 +437,14 @@
   margin-top: 10px;
 }
 
-.track-table-card.ant-card { 
-  overflow: hidden; 
-} 
+.track-table-card.ant-card {
+  overflow: hidden;
+  min-height: 0;
+}
 
 .track-table-card.ant-card .ant-card-body {
+  display: grid;
+  min-height: 0;
   padding: 10px 12px 12px;
 }
 
@@ -555,37 +589,49 @@
 } 
 
 .cluster-scroll,
+.review-main,
 .comparison-scroller,
 .album-path-box,
 .tracks-table .ant-table-content,
-.tracks-table .ant-table-body {
+.tracks-table .ant-table-body,
+.screen-center,
+.finalize-shell {
   scrollbar-width: thin;
   scrollbar-color: rgba(80, 118, 212, 0.55) rgba(228, 236, 255, 0.9);
 }
 
 .cluster-scroll::-webkit-scrollbar,
+.review-main::-webkit-scrollbar,
 .comparison-scroller::-webkit-scrollbar,
 .album-path-box::-webkit-scrollbar,
 .tracks-table .ant-table-content::-webkit-scrollbar,
-.tracks-table .ant-table-body::-webkit-scrollbar {
+.tracks-table .ant-table-body::-webkit-scrollbar,
+.screen-center::-webkit-scrollbar,
+.finalize-shell::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
 .cluster-scroll::-webkit-scrollbar-track,
+.review-main::-webkit-scrollbar-track,
 .comparison-scroller::-webkit-scrollbar-track,
 .album-path-box::-webkit-scrollbar-track,
 .tracks-table .ant-table-content::-webkit-scrollbar-track,
-.tracks-table .ant-table-body::-webkit-scrollbar-track {
+.tracks-table .ant-table-body::-webkit-scrollbar-track,
+.screen-center::-webkit-scrollbar-track,
+.finalize-shell::-webkit-scrollbar-track {
   background: rgba(228, 236, 255, 0.82);
   border-radius: 999px;
 }
 
 .cluster-scroll::-webkit-scrollbar-thumb,
+.review-main::-webkit-scrollbar-thumb,
 .comparison-scroller::-webkit-scrollbar-thumb,
 .album-path-box::-webkit-scrollbar-thumb,
 .tracks-table .ant-table-content::-webkit-scrollbar-thumb,
-.tracks-table .ant-table-body::-webkit-scrollbar-thumb {
+.tracks-table .ant-table-body::-webkit-scrollbar-thumb,
+.screen-center::-webkit-scrollbar-thumb,
+.finalize-shell::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, rgba(79, 116, 211, 0.7), rgba(37, 114, 255, 0.52));
   border-radius: 999px;
   border: 2px solid rgba(228, 236, 255, 0.82);
@@ -594,6 +640,26 @@
 @media (max-width: 1180px) { 
   .review-workspace { 
     grid-template-columns: 1fr; 
+    overflow: auto;
+    scrollbar-gutter: stable both-edges;
+  }
+
+  .cluster-sidebar.ant-card,
+  .review-main {
+    height: auto;
+  }
+
+  .cluster-sidebar.ant-card .ant-card-body {
+    grid-template-rows: auto auto auto;
+  }
+
+  .cluster-scroll {
+    max-height: 320px;
+  }
+
+  .review-main {
+    overflow: visible;
+    padding-inline-end: 0;
   } 
 
   .diff-kpi-row {

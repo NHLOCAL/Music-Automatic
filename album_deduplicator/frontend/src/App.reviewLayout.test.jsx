@@ -189,7 +189,9 @@ describe("App review layout", () => {
     await waitFor(() => expect(screen.getByText("פתח את שלב ההעברה")).toBeInTheDocument());
 
     expect(screen.getByTestId("review-workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("cluster-scroll")).toBeInTheDocument();
     expect(screen.getByTestId("review-main")).toBeInTheDocument();
+    expect(screen.getByTestId("diff-shell")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "פתח את שלב ההעברה" })).toBeInTheDocument();
   }, 10000);
 });

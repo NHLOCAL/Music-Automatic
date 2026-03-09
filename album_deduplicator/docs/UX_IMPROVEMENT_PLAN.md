@@ -75,3 +75,4 @@
 - [x] **איזון sizing וגלילה בסביבת ה-review:** אזורים רוחביים וארוכים קיבלו `overflow` ו-scrollbars יציבים, עמודות הטבלה והכרטיסים הוצרו למידות desktop סבירות יותר, וטקסטים ארוכים עברו ל-`ellipsis + tooltip` כדי למנוע שבירת layout בנתיבים, כותרות ושמות קבצים.
 - [x] **שילוב סמלים עקבי בכל המסכים:** מסכי `setup`, `scanning`, `summary`, `review` ו-`finalize` קיבלו אייקונים עקביים לשיפור היררכיה חזותית ופעולות מהירות בלי להעמיס על המשתמש.
 - [x] **איחוד מערכת ה־UI למסכי desktop:** מסכי `setup`, `scanning`, `summary`, `review` ו-`finalize` שוכתבו לרכיבי `AntD` (`Card`, `Segmented`, `Collapse`, `Table`, `Result`, `Progress`, `Statistic`) עם שכבת overrides ייעודית שמדגישה playful surfaces, פינות רכות, ו-flow של desktop tool.
+- [x] **ייצוב גלילה בין כל ה-views:** לכל מסך ראשי הוגדר scroll container יחיד וברור ברמת ה-shell, וב-`review` הופרדו גלילת ה-sidebar, גלילת ה-workspace הראשי, הגלילה האופקית של כרטיסי האלבומים, וגלילת טבלת השירים כך שלא יחתכו זו את זו.
