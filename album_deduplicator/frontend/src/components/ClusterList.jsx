@@ -1,6 +1,5 @@
 import React from "react";
 import { Card, Empty, Segmented, Space, Typography } from "antd";
-
 import { Icon, StatusTag } from "./UI";
 import {
   formatScore,
@@ -11,7 +10,7 @@ import {
   hasClusterDecision,
 } from "../utils";
 
-const SEGMENT_OPTIONS = [
+const SEGMENT_OPTIONS =[
   { label: "בטוחים", value: "safe" },
   { label: "לסקירה", value: "review" },
   { label: "הכל", value: "all" },
@@ -42,31 +41,22 @@ export function ClusterList({
   return (
     <Card className="cluster-sidebar cartoon-card" variant="borderless">
       <div className="cluster-sidebar-head">
-        <Space align="center" size={12}>
+        <Space align="center" size={12} style={{ marginBottom: 4 }}>
           <div className="soft-kicker">
             <Icon name="layers" size={14} />
-            מרכז סקירה
+            רשימת קבוצות
           </div>
-          <StatusTag tone="primary" icon="layers">
-            {filteredClusters.length}
-          </StatusTag>
         </Space>
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          קבוצות אלבומים
-        </Typography.Title>
-        <Typography.Paragraph className="muted-copy" style={{ margin: 0 }}>
-          בחר קבוצה אחת, השווה בין העותקים, והחלט איזה עותק נשאר.
-        </Typography.Paragraph>
+        
+        <Segmented
+          block
+          size="middle"
+          value={selectedTab}
+          options={SEGMENT_OPTIONS}
+          onChange={setSelectedTab}
+        />
       </div>
-
-      <Segmented
-        block
-        size="large"
-        value={selectedTab}
-        options={SEGMENT_OPTIONS}
-        onChange={setSelectedTab}
-      />
-
+      
       <div className="cluster-scroll" data-testid="cluster-scroll">
         {filteredClusters.length === 0 ? (
           <Empty
@@ -80,6 +70,7 @@ export function ClusterList({
             const hasDecision = hasClusterDecision(decisions, cluster.cluster_id);
             const statusMeta = getClusterStatusMeta(cluster, hasDecision && decisions[cluster.cluster_id] !== null);
             const representativePair = getRepresentativeClusterPair(cluster, cluster.recommended_keeper_id);
+            
             const scoreLine = representativePair
               ? representativePair.is_identical_by_hash
                 ? "התאמה מלאה"
@@ -94,28 +85,24 @@ export function ClusterList({
                 onClick={() => setSelectedClusterId(cluster.cluster_id)}
               >
                 <div className="cluster-card-headline">
-                  <Typography.Text strong>{getClusterDisplayTitle(cluster)}</Typography.Text>
+                  <Typography.Text strong ellipsis={{ tooltip: getClusterDisplayTitle(cluster) }} style={{ flex: 1, minWidth: 0 }}>
+                    {getClusterDisplayTitle(cluster)}
+                  </Typography.Text>
                   {!isActive && (
-                    <StatusTag tone={statusMeta.tone} icon={statusMeta.tone === "success" ? "check" : "alert"}>
+                    <StatusTag tone={statusMeta.tone} style={{ padding: "0 6px", minHeight: "22px", fontSize: "11px" }}>
                       {statusMeta.label}
                     </StatusTag>
                   )}
                 </div>
-
-                <Space orientation="vertical" size={10} style={{ width: "100%" }}>
-                  <Typography.Text className="muted-copy">
+                
+                <div className="cluster-card-meta" style={{ marginTop: 10 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Icon name="music" size={12} /> {scoreLine}
-                  </Typography.Text>
-
-                  <div className="cluster-card-meta">
-                    <span>
-                      <Icon name="layers" size={12} /> {cluster.albums.filter((album) => !album.is_deleted).length} עותקים
-                    </span>
-                    <span>
-                      <Icon name="folder" size={12} /> {cluster.confidence_bucket === "safe" ? "מוכן לפעולה" : "דורש החלטה"}
-                    </span>
-                  </div>
-                </Space>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Icon name="layers" size={12} /> {cluster.albums.filter((album) => !album.is_deleted).length} עותקים
+                  </span>
+                </div>
               </Card>
             );
           })
