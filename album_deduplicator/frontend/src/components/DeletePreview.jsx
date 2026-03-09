@@ -1,7 +1,7 @@
 import React from "react";
-import { Button, Card, Typography } from "antd";
+import { Button, Card, Space, Typography } from "antd";
 
-import { Icon } from "./UI";
+import { Icon, StatusTag } from "./UI";
 import { formatSizeMb } from "../utils";
 
 export function DeletePreview({ workflowSummary, onOpenFinalize, isExecuting }) {
@@ -18,11 +18,11 @@ export function DeletePreview({ workflowSummary, onOpenFinalize, isExecuting }) 
     <Card className="delete-preview-card cartoon-card" variant="borderless">
       <div className="delete-preview-body">
         <div className="delete-preview-copy">
-          <div className="delete-preview-badge">
-            <Icon name="trash" size={16} />
-            {workflowSummary.pendingCount}
+          <div className="soft-kicker">
+            <Icon name="trash" size={14} />
+            מוכנות להעברה
           </div>
-          <div>
+          <div className="delete-preview-text">
             <Typography.Title level={4} style={{ margin: 0 }}>
               שלב ההעברה הסופי מוכן
             </Typography.Title>
@@ -39,6 +39,22 @@ export function DeletePreview({ workflowSummary, onOpenFinalize, isExecuting }) 
             </Typography.Text>
           </div>
         </div>
+
+        <Space className="delete-preview-stats" wrap size={8}>
+          <StatusTag tone={workflowSummary.pendingCount > 0 ? "warning" : "neutral"} icon="trash">
+            {workflowSummary.pendingCount} ממתינות
+          </StatusTag>
+          {workflowSummary.deletedCount > 0 ? (
+            <StatusTag tone="success" icon="check-circle">
+              {workflowSummary.deletedCount} הועברו
+            </StatusTag>
+          ) : null}
+          {workflowSummary.failedCount > 0 ? (
+            <StatusTag tone="danger" icon="alert">
+              {workflowSummary.failedCount} דורשות טיפול
+            </StatusTag>
+          ) : null}
+        </Space>
 
         <Button
           size="large"

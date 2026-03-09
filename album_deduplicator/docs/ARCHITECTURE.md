@@ -173,6 +173,7 @@
   - מייבא partials קטנים תחת `src/styles/` עבור shell כללי, מסכי setup/scan/summary, סביבת review, ומסך finalize.
   - מגדיר גם `scroll containers` ברורים ברמת ה-shell, review workspace, ו-finalize כדי למנוע clipping כאשר תצוגות ארוכות או רחבות.
   - מסכי `scan` ו-`summary` משתמשים ב-grid ייעודי ל-KPI-ים במקום overrides על `Row/Col`, כדי לשמור על layout יציב גם בחלונות צרים או צפופים.
+  - סביבת `review` משתמשת כעת ב-overview דו-עמודי: hero החלטה ראשי + side rail למצב הקבוצה ולשקיפות scoring, כדי לצמצם עומס ויזואלי ולהפריד בין summary, החלטות ותוכן השוואה.
 - `src/desktop.js`
   - abstraction ליכולות desktop ול-runtime metadata.
 - `src/App.test.jsx`
@@ -479,7 +480,7 @@ final_score = base_score
 - מגירת `advanced details` למשתמשים מתקדמים עם פירוט מלא לכל `pair`, כולל `reason_codes` ו-`technical_summary`
 
 ה־implementation הנוכחי מבוסס על רכיבי `Ant Design` כמו `Collapse`, `Card`, `Segmented`, `Table`, `Result`, `Progress`, ו-`Statistic`, עם overrides ממוקדים כדי לשמור על שפת desktop ולא מראה web generic.
-בפרט, `DiffWorkspace` משתמש כעת גם ב-`Badge.Ribbon`, `Descriptions`, `Flex`, `sticky table header`, ו-`Table.Summary` כדי להציג decision flow ברור יותר בין keeper, המלצת מערכת, metadata, ורמת הכיסוי של tracklist בכל עותק.
+בפרט, `DiffWorkspace` משתמש כעת ב-`Badge.Ribbon`, `Collapse`, `Segmented`, `Flex`, `sticky table header`, ו-`Table.Summary` כדי להציג decision flow ברור יותר בין keeper, המלצת מערכת, מצב הקבוצה, ורמת הכיסוי של tracklist בכל עותק, בלי להעמיס שכבות sticky חופפות.
 
 ### delete confirmation
 

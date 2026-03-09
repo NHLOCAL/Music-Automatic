@@ -4,7 +4,6 @@ import {
   Badge,
   Button,
   Card,
-  Descriptions,
   Empty,
   Flex,
   Progress,
@@ -48,6 +47,19 @@ function MetricTile({ label, value, percent, isWinner = false, color = "#2572ff"
           {hint}
         </Typography.Text>
       ) : null}
+    </Card>
+  );
+}
+
+function DecisionCard({ icon, label, tone = "primary", children }) {
+  return (
+    <Card className="decision-card cartoon-panel" variant="borderless">
+      <div className="decision-card-head">
+        <StatusTag tone={tone} icon={icon}>
+          {label}
+        </StatusTag>
+      </div>
+      <div className="decision-card-body">{children}</div>
     </Card>
   );
 }
@@ -155,6 +167,36 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
 
     return { differentRows, missingRows };
   }, [trackRows, visibleAlbumIds]);
+
+  const overviewMetrics = useMemo(
+    () => [
+      {
+        key: "albums",
+        title: "עותקים בקבוצה",
+        value: visibleAlbums.length,
+        icon: "layers",
+      },
+      {
+        key: "tracks",
+        title: "שירים להשוואה",
+        value: trackRows.length,
+        icon: "music",
+      },
+      {
+        key: "different",
+        title: "שורות שונות",
+        value: trackSummary.differentRows,
+        icon: "compare",
+      },
+      {
+        key: "delete",
+        title: "יסומנו למחיקה",
+        value: selectedDeleteCount,
+        icon: "trash",
+      },
+    ],
+    [selectedDeleteCount, trackRows.length, trackSummary.differentRows, visibleAlbums.length],
+  );
 
   const comparisonSummaryText = useMemo(() => {
     if (!activeComparisonAlbum) {
@@ -279,6 +321,8 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
     {
       key: "current",
       label: "העותק שיישמר כעת",
+      icon: "shield",
+      tone: explicitKeeperAlbum ? "success" : "neutral",
       children: explicitKeeperAlbum ? (
         <PathSummary name={explicitKeeperAlbum.name} path={explicitKeeperAlbum.path} />
       ) : (
@@ -288,6 +332,8 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
     {
       key: "recommended",
       label: "המלצת המערכת",
+      icon: "sparkle",
+      tone: recommendedAlbum ? "primary" : "neutral",
       children: recommendedAlbum ? (
         <PathSummary name={recommendedAlbum.name} path={recommendedAlbum.path} />
       ) : (
@@ -297,6 +343,8 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
     {
       key: "comparison",
       label: "בסיס ההשוואה בטבלת השירים",
+      icon: "compare",
+      tone: comparisonTarget === "auto" ? "primary" : "warning",
       children: activeComparisonAlbum ? (
         <Space orientation="vertical" size={6} style={{ width: "100%" }}>
           <Space align="center" size={8} wrap>
@@ -317,6 +365,8 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
     {
       key: "delete",
       label: "מה יועבר לסל המחזור",
+      icon: "trash",
+      tone: selectedDeleteCount ? "warning" : "neutral",
       children: (
         <Space align="center" size={8}>
           <StatusTag tone={selectedDeleteCount ? "warning" : "neutral"} icon="trash">
@@ -332,19 +382,15 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
 
   return (
     <div className="diff-shell" data-testid="diff-shell">
-      <div className="diff-primary-stack">
-        <Card className="diff-header-card cartoon-card" variant="borderless">
-          <Flex className="diff-header-grid" justify="space-between" align="flex-start" gap={16} wrap>
-            <div className="diff-header-copy">
-              <Space wrap size={12}>
-                <Typography.Title
-                  level={2}
-                  style={{ margin: 0 }}
-                  className="diff-header-title"
-                  ellipsis={{ tooltip: cluster.human_summary }}
-                >
-                  {cluster.human_summary}
-                </Typography.Title>
+      <section className="diff-overview-grid">
+        <Card className="diff-overview-card cartoon-card" variant="borderless">
+          <div className="diff-overview-copy">
+            <div className="diff-overview-copy-head">
+              <div className="soft-kicker">
+                <Icon name="compare" size={14} />
+                מרכז ההחלטה
+              </div>
+              <Space className="diff-overview-statuses" wrap size={8}>
                 <StatusTag
                   tone={cluster.confidence_bucket === "safe" ? "success" : "warning"}
                   icon={cluster.confidence_bucket === "safe" ? "shield" : "alert"}
@@ -359,46 +405,82 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
                   <StatusTag tone="primary" icon="sparkle">
                     קיימת המלצת מערכת
                   </StatusTag>
-                ) : null}
+                ) : (
+                  <StatusTag tone="neutral" icon="alert">
+                    ממתין להכרעה
+                  </StatusTag>
+                )}
               </Space>
-              <Typography.Paragraph className="muted-copy diff-header-summary">
-                בחר עותק אחד לשמירה. שאר העותקים יסומנו להעברה לסל המחזור, ותוכל לאמת כל נתיב לפני הפעולה.
-              </Typography.Paragraph>
-              <div className="diff-trust-strip">
-                <Icon name="shield" size={16} />
-                שום דבר לא נמחק לצמיתות. כל ההעברות נעשות אל סל המחזור בלבד.
+            </div>
+
+            <Typography.Title
+              level={2}
+              style={{ margin: 0 }}
+              className="diff-header-title"
+              ellipsis={{ tooltip: cluster.human_summary }}
+            >
+              {cluster.human_summary}
+            </Typography.Title>
+
+            <Typography.Paragraph className="muted-copy diff-overview-summary">
+              בחר עותק אחד לשמירה. שאר העותקים יסומנו להעברה לסל המחזור, ותוכל לאמת כל נתיב לפני הפעולה בלי לקפוץ בין אזורים חופפים.
+            </Typography.Paragraph>
+
+            <div className="diff-trust-strip">
+              <Icon name="shield" size={16} />
+              שום דבר לא נמחק לצמיתות. כל ההעברות נעשות אל סל המחזור בלבד.
+            </div>
+          </div>
+
+          <div className="decision-card-grid">
+            {decisionItems.map((item) => (
+              <DecisionCard key={item.key} icon={item.icon} label={item.label} tone={item.tone}>
+                {item.children}
+              </DecisionCard>
+            ))}
+          </div>
+        </Card>
+
+        <div className="diff-side-rail">
+          <Card className="diff-state-card cartoon-card" variant="borderless">
+            <div className="diff-state-copy">
+              <div className="soft-kicker">
+                <Icon name="layers" size={14} />
+                מצב הקבוצה
               </div>
+              <Typography.Title level={4} style={{ margin: 0 }}>
+                תמונת מצב מהירה
+              </Typography.Title>
+              <Typography.Paragraph className="muted-copy" style={{ margin: 0 }}>
+                המדדים כאן נועדו לסריקה מהירה של הקבוצה לפני שנכנסים לעומק כרטיסי העותקים וטבלת השירים.
+              </Typography.Paragraph>
             </div>
 
             <div className="diff-kpi-row">
-              <Card className="diff-kpi-card cartoon-panel" variant="borderless">
-                <Statistic title="עותקים בקבוצה" value={visibleAlbums.length} prefix={<Icon name="layers" size={16} />} />
-              </Card>
-              <Card className="diff-kpi-card cartoon-panel" variant="borderless">
-                <Statistic title="שירים להשוואה" value={trackRows.length} prefix={<Icon name="music" size={16} />} />
-              </Card>
-              <Card className="diff-kpi-card cartoon-panel" variant="borderless">
-                <Statistic title="שורות שונות" value={trackSummary.differentRows} prefix={<Icon name="compare" size={16} />} />
-              </Card>
-              <Card className="diff-kpi-card cartoon-panel" variant="borderless">
-                <Statistic title="יסומנו למחיקה" value={selectedDeleteCount} prefix={<Icon name="trash" size={16} />} />
-              </Card>
+              {overviewMetrics.map((metric) => (
+                <Card key={metric.key} className="diff-kpi-card cartoon-panel" variant="borderless">
+                  <Statistic
+                    title={metric.title}
+                    value={metric.value}
+                    prefix={<Icon name={metric.icon} size={16} />}
+                  />
+                </Card>
+              ))}
             </div>
-          </Flex>
 
-          <Card className="decision-strip cartoon-panel" variant="borderless">
-            <Descriptions
-              bordered
-              column={{ xs: 1, sm: 1, lg: 2, xxl: 4 }}
-              size="small"
-              className="decision-descriptions"
-              items={decisionItems}
-            />
+            <div className="diff-rail-tags">
+              <StatusTag tone="primary" icon="layers">
+                {visibleAlbums.length} עותקים פעילים
+              </StatusTag>
+              <StatusTag tone={trackSummary.missingRows ? "warning" : "success"} icon="music">
+                {trackSummary.missingRows ? `${trackSummary.missingRows} שורות עם חוסרים` : "כיסוי שירים מלא"}
+              </StatusTag>
+            </div>
           </Card>
-        </Card>
 
-        <ScoreTransparencyPanel cluster={cluster} currentKeeperId={currentKeeperId} />
-      </div>
+          <ScoreTransparencyPanel cluster={cluster} currentKeeperId={currentKeeperId} />
+        </div>
+      </section>
 
       <div className="diff-content-stack">
         <section className="workspace-section">
@@ -508,7 +590,12 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
                       </span>
                     </div>
 
-                    <div className="album-path-box" title={album.path}>{album.path}</div>
+                    <div className="album-path-inline mono-copy" title={album.path}>
+                      <Icon name="folder" size={14} />
+                      <Typography.Text className="album-inline-path" ellipsis={{ tooltip: album.path }}>
+                        {album.path}
+                      </Typography.Text>
+                    </div>
 
                     <div className="album-path-flags">
                       {album.in_preferred_root ? (
@@ -531,35 +618,6 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
                         </StatusTag>
                       ) : null}
                     </div>
-
-                    <Descriptions
-                      className="album-descriptions"
-                      size="small"
-                      bordered
-                      column={{ xs: 1, sm: 2 }}
-                      items={[
-                        {
-                          key: "quality",
-                          label: "דירוג איכות",
-                          children: formatPercent(album.quality_score),
-                        },
-                        {
-                          key: "bitrate",
-                          label: "ביטרייט ממוצע",
-                          children: formatBitrate(album.avg_bitrate),
-                        },
-                        {
-                          key: "size",
-                          label: "נפח תיקייה",
-                          children: formatSizeMb(album.total_size_mb),
-                        },
-                        {
-                          key: "files",
-                          label: "מספר קבצים",
-                          children: `${album.file_count} קבצים`,
-                        },
-                      ]}
-                    />
 
                     <div className="album-metrics">
                       <MetricTile
