@@ -76,3 +76,4 @@
 - [x] **שילוב סמלים עקבי בכל המסכים:** מסכי `setup`, `scanning`, `summary`, `review` ו-`finalize` קיבלו אייקונים עקביים לשיפור היררכיה חזותית ופעולות מהירות בלי להעמיס על המשתמש.
 - [x] **איחוד מערכת ה־UI למסכי desktop:** מסכי `setup`, `scanning`, `summary`, `review` ו-`finalize` שוכתבו לרכיבי `AntD` (`Card`, `Segmented`, `Collapse`, `Table`, `Result`, `Progress`, `Statistic`) עם שכבת overrides ייעודית שמדגישה playful surfaces, פינות רכות, ו-flow של desktop tool.
 - [x] **ייצוב גלילה בין כל ה-views:** לכל מסך ראשי הוגדר scroll container יחיד וברור ברמת ה-shell, וב-`review` הופרדו גלילת ה-sidebar, גלילת ה-workspace הראשי, הגלילה האופקית של כרטיסי האלבומים, וגלילת טבלת השירים כך שלא יחתכו זו את זו.
+- [x] **הוספת בקרת בסיס השוואה ב-Review:** טבלת השירים קיבלה `Segmented` לבחירת העותק שמולו מוצגים ההבדלים, `Alert` שמסביר אם הטבלה עוקבת אוטומטית אחרי ה-keeper או מקובעת ידנית, ו-legend קצר שמבהיר מצבי "זהה / שונה / חסר".

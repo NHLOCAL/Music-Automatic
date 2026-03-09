@@ -234,6 +234,45 @@
   max-width: 72ch;
 }
 
+.comparison-control-card.ant-card {
+  background: linear-gradient(180deg, rgba(243, 248, 255, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+.comparison-control-card.ant-card .ant-card-body {
+  display: grid;
+  gap: 14px;
+}
+
+.comparison-control-head {
+  align-items: flex-start;
+}
+
+.comparison-control-copy {
+  flex: 1 1 360px;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.comparison-control-summary.ant-typography {
+  margin: 0;
+  max-width: 66ch;
+}
+
+.comparison-segmented {
+  max-width: 100%;
+}
+
+.comparison-alert {
+  border-radius: 20px;
+}
+
+.track-legend-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .comparison-scroller {
   overflow-x: auto;
   overflow-y: hidden;
@@ -704,7 +743,11 @@
     padding: 16px;
   }
 
+  .comparison-segmented {
+    width: 100%;
+  }
+
   .track-table-card.ant-card .ant-card-body {
     padding: 8px;
   }
-} 
+}

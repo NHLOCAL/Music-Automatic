@@ -118,6 +118,9 @@ describe("DiffWorkspace", () => {
     expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
     expect(screen.getByText("עותקי האלבום זה לצד זה")).toBeInTheDocument();
     expect(screen.getByText("רשימת השוואה מפורטת")).toBeInTheDocument();
+    expect(screen.getByText("בחר מול איזה עותק מוצגים ההבדלים")).toBeInTheDocument();
+    expect(screen.getByText("הטבלה עוקבת אוטומטית אחרי בסיס ההחלטה")).toBeInTheDocument();
+    expect(screen.getByText("תואם לעותק הבסיס")).toBeInTheDocument();
     fireEvent.click(screen.getByText("איך המערכת הגיעה להחלטה"));
     expect(screen.getByText("ציון סופי")).toBeInTheDocument();
     expect(screen.getByText("השוואה מתמטית")).toBeInTheDocument();
@@ -147,6 +150,23 @@ describe("DiffWorkspace", () => {
     expect(screen.queryByText("ציון סופי")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("איך המערכת הגיעה להחלטה"));
     expect(screen.getAllByText("89.7/100").length).toBeGreaterThan(0);
+  });
+
+  it("lets the user pin the track comparison to a specific album copy", () => {
+    render(
+      <DiffWorkspace
+        cluster={cluster}
+        currentKeeperId="folder-1"
+        handleDecision={vi.fn()}
+        openExplorer={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: "עותק 2" }));
+
+    expect(screen.getByText("הטבלה מקובעת כרגע לבסיס השוואה ידני")).toBeInTheDocument();
+    expect(screen.getAllByText("הטבלה מציגה כעת את כל ההבדלים מול עותק 2.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("בסיס ידני").length).toBeGreaterThan(0);
   });
 
   it("keeps all copy actions selectable when no keeper has been chosen yet", () => {

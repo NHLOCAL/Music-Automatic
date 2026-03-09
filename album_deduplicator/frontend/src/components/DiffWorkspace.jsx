@@ -1,5 +1,6 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -7,9 +8,12 @@ import {
   Empty,
   Flex,
   Progress,
+  Segmented,
   Space,
   Statistic,
   Table,
+  Tag,
+  Tooltip,
   Typography,
 } from "antd";
 
@@ -78,6 +82,12 @@ function PathSummary({ name, path }) {
 }
 
 export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openExplorer }) {
+  const [comparisonTarget, setComparisonTarget] = useState("auto");
+
+  useEffect(() => {
+    setComparisonTarget("auto");
+  }, [cluster?.cluster_id, currentKeeperId]);
+
   const visibleAlbums = useMemo(
     () => cluster?.albums?.filter((album) => !album.is_deleted) ?? [],
     [cluster],
@@ -88,11 +98,16 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
   );
   const metricWinners = useMemo(() => getMetricWinners(visibleAlbums), [visibleAlbums]);
   const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
-  const activeComparisonId = currentKeeperId ?? cluster?.recommended_keeper_id ?? visibleAlbums[0]?.folder_id ?? null;
+  const defaultComparisonId = currentKeeperId ?? cluster?.recommended_keeper_id ?? visibleAlbums[0]?.folder_id ?? null;
+  const activeComparisonId = comparisonTarget === "auto" ? defaultComparisonId : comparisonTarget;
   const selectedDeleteCount = currentKeeperId ? Math.max(visibleAlbums.length - 1, 0) : 0;
 
   const activeComparisonAlbum = useMemo(
     () => visibleAlbums.find((album) => album.folder_id === activeComparisonId) ?? null,
+    [activeComparisonId, visibleAlbums],
+  );
+  const activeComparisonIndex = useMemo(
+    () => visibleAlbums.findIndex((album) => album.folder_id === activeComparisonId),
     [activeComparisonId, visibleAlbums],
   );
   const explicitKeeperAlbum = useMemo(
@@ -102,6 +117,16 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
   const recommendedAlbum = useMemo(
     () => visibleAlbums.find((album) => album.folder_id === cluster?.recommended_keeper_id) ?? null,
     [cluster?.recommended_keeper_id, visibleAlbums],
+  );
+  const comparisonOptions = useMemo(
+    () => [
+      { label: "אוטומטי", value: "auto" },
+      ...visibleAlbums.map((album, index) => ({
+        label: `עותק ${index + 1}`,
+        value: album.folder_id,
+      })),
+    ],
+    [visibleAlbums],
   );
 
   const maxValues = useMemo(() => {
@@ -130,6 +155,22 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
 
     return { differentRows, missingRows };
   }, [trackRows, visibleAlbumIds]);
+
+  const comparisonSummaryText = useMemo(() => {
+    if (!activeComparisonAlbum) {
+      return "אין עותק פעיל להצגת ההבדלים כרגע.";
+    }
+    if (comparisonTarget !== "auto" && activeComparisonIndex >= 0) {
+      return `הטבלה מציגה כעת את כל ההבדלים מול עותק ${activeComparisonIndex + 1}.`;
+    }
+    if (currentKeeperId) {
+      return "הטבלה עוקבת אוטומטית אחרי העותק שנבחר לשמירה.";
+    }
+    if (recommendedAlbum) {
+      return "הטבלה עוקבת אוטומטית אחרי המלצת המערכת.";
+    }
+    return "הטבלה עוקבת אוטומטית אחרי העותק הראשון בקבוצה.";
+  }, [activeComparisonAlbum, activeComparisonIndex, comparisonTarget, currentKeeperId, recommendedAlbum]);
 
   const trackColumns = useMemo(
     () => [
@@ -165,7 +206,9 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
               </Typography.Text>
               <Typography.Text type="secondary" className="track-column-subtitle">
                 {album.folder_id === activeComparisonId
-                  ? "בסיס ההשוואה"
+                  ? comparisonTarget === "auto"
+                    ? "בסיס אוטומטי"
+                    : "בסיס ידני"
                   : pairToActive?.is_identical_by_hash
                     ? "Hash זהה"
                     : pairToActive
@@ -217,7 +260,7 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
         };
       }),
     ],
-    [activeComparisonId, cluster, visibleAlbums],
+    [activeComparisonId, cluster, comparisonTarget, visibleAlbums],
   );
 
   if (!cluster) {
@@ -255,11 +298,17 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
       key: "comparison",
       label: "בסיס ההשוואה בטבלת השירים",
       children: activeComparisonAlbum ? (
-        <Space align="center" size={8}>
-          <StatusTag tone="primary" icon="compare">
-            {activeComparisonAlbum.name}
-          </StatusTag>
-          <Typography.Text type="secondary">ההבדלים מוצגים ביחס לעותק זה</Typography.Text>
+        <Space orientation="vertical" size={6} style={{ width: "100%" }}>
+          <Space align="center" size={8} wrap>
+            <StatusTag tone={comparisonTarget === "auto" ? "primary" : "warning"} icon="compare">
+              {comparisonTarget === "auto" ? "מעקב אוטומטי" : "בסיס ידני"}
+            </StatusTag>
+            <Typography.Text type="secondary">{comparisonSummaryText}</Typography.Text>
+          </Space>
+          <PathSummary
+            name={`${activeComparisonAlbum.name} - עותק ${activeComparisonIndex + 1}`}
+            path={activeComparisonAlbum.path}
+          />
         </Space>
       ) : (
         <Typography.Text type="secondary">אין עותק פעיל להשוואה</Typography.Text>
@@ -432,13 +481,15 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
                         >
                           {isKeeper ? "נבחר לשמירה" : isTrash ? "מיועד למחיקה" : "שמור עותק זה"}
                         </Button>
-                        <Button
-                          size="middle"
-                          icon={<Icon name="folder" size={16} />}
-                          title="פתח בתיקייה"
-                          aria-label="פתח בתיקייה"
-                          onClick={() => openExplorer(album.path)}
-                        />
+                        <Tooltip title={album.path}>
+                          <Button
+                            size="middle"
+                            icon={<Icon name="folder" size={16} />}
+                            title="פתח בתיקייה"
+                            aria-label="פתח בתיקייה"
+                            onClick={() => openExplorer(album.path)}
+                          />
+                        </Tooltip>
                       </div>
                     </Flex>
 
@@ -578,6 +629,57 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
               </StatusTag>
             </Space>
           </div>
+
+          <Card className="comparison-control-card cartoon-panel" variant="borderless">
+            <Flex className="comparison-control-head" justify="space-between" align="center" gap={16} wrap>
+              <div className="comparison-control-copy">
+                <div className="soft-kicker">
+                  <Icon name="layers" size={14} />
+                  בסיס ההשוואה
+                </div>
+                <Typography.Title level={5} style={{ margin: 0 }}>
+                  בחר מול איזה עותק מוצגים ההבדלים
+                </Typography.Title>
+                <Typography.Paragraph className="muted-copy comparison-control-summary">
+                  מצב אוטומטי עוקב אחרי ההחלטה הפעילה, ובחירה ידנית מאפשרת לבדוק כל עותק כבסיס להשוואה.
+                </Typography.Paragraph>
+              </div>
+              <Segmented
+                className="comparison-segmented"
+                options={comparisonOptions}
+                value={comparisonTarget}
+                onChange={(value) => setComparisonTarget(value)}
+              />
+            </Flex>
+
+            <Alert
+              className="comparison-alert"
+              showIcon
+              type={comparisonTarget === "auto" ? "info" : "warning"}
+              title={
+                comparisonTarget === "auto"
+                  ? "הטבלה עוקבת אוטומטית אחרי בסיס ההחלטה"
+                  : "הטבלה מקובעת כרגע לבסיס השוואה ידני"
+              }
+              description={activeComparisonAlbum ? (
+                <Space orientation="vertical" size={4} style={{ width: "100%" }}>
+                  <Typography.Text>{comparisonSummaryText}</Typography.Text>
+                  <PathSummary
+                    name={`${activeComparisonAlbum.name} - עותק ${activeComparisonIndex + 1}`}
+                    path={activeComparisonAlbum.path}
+                  />
+                </Space>
+              ) : (
+                comparisonSummaryText
+              )}
+            />
+
+            <div className="track-legend-row">
+              <Tag color="success">תואם לעותק הבסיס</Tag>
+              <Tag color="warning">ערך שונה</Tag>
+              <Tag color="error">חסר בעותק</Tag>
+            </div>
+          </Card>
 
           <Card className="track-table-card cartoon-card" variant="borderless" data-testid="track-table-card">
             <Table
