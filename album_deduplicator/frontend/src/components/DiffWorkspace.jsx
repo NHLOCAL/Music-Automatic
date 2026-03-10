@@ -111,12 +111,12 @@ function AudioPreviewCard({ audioPreview, onDismiss, onPlaybackStateChange }) {
       <div className="ide-audio-preview-controls">
         <Button
           size="small"
-          type="default"
+          type="text"
+          className="ide-audio-toggle-button"
+          icon={<Icon name={isPlaying ? "pause" : "play"} size={15} />}
           onClick={togglePlayback}
           aria-label={isPlaying ? `השהה את ${audioPreview.trackTitle}` : `נגן את ${audioPreview.trackTitle}`}
-        >
-          {isPlaying ? "השהה" : "נגן"}
-        </Button>
+        />
         <input
           className="ide-audio-range"
           type="range"
@@ -189,7 +189,7 @@ export function DiffWorkspace({
   };
 
   return (
-    <div className="ide-main" data-testid="diff-shell">
+    <div className="ide-main ide-diff-shell" data-testid="diff-shell">
       <div className="ide-toolbar">
         <div className="ide-toolbar-main">
           <span className={`badge ${cluster.confidence_bucket === "safe" ? "success" : "warning"}`}>
@@ -222,7 +222,8 @@ export function DiffWorkspace({
         </div>
       </div>
 
-      <div className="ide-diff-container" data-testid="comparison-scroller" style={{ overflow: "auto" }}>
+      <div className={`ide-review-scroll-shell ${audioPreview ? "has-audio-preview" : ""}`} data-testid="review-scroll-shell">
+        <div className="ide-diff-container" data-testid="comparison-scroller">
         {visibleAlbums.map((album, index) => {
           const isKeeper = currentKeeperId === album.folder_id;
           const isTrash = Boolean(currentKeeperId) && !isKeeper;
@@ -283,8 +284,8 @@ export function DiffWorkspace({
                       </div>
                       <Button
                         size="small"
-                        type={isPlaying ? "primary" : "default"}
-                        shape="circle"
+                        type="text"
+                        className={`ide-track-play-button ${isPlaying ? "is-playing" : ""}`}
                         icon={<Icon name={isPlaying ? "pause" : "play"} size={15} />}
                         onClick={() => handleTrackPreview(album, entry)}
                         disabled={!entry.stream_url}
@@ -308,16 +309,19 @@ export function DiffWorkspace({
             </div>
           );
         })}
+        </div>
       </div>
 
-      <AudioPreviewCard
-        audioPreview={audioPreview}
-        onDismiss={() => {
-          setAudioPreview(null);
-          setIsAudioPlaying(false);
-        }}
-        onPlaybackStateChange={setIsAudioPlaying}
-      />
+      {audioPreview ? (
+        <AudioPreviewCard
+          audioPreview={audioPreview}
+          onDismiss={() => {
+            setAudioPreview(null);
+            setIsAudioPlaying(false);
+          }}
+          onPlaybackStateChange={setIsAudioPlaying}
+        />
+      ) : null}
     </div>
   );
 }

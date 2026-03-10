@@ -4,7 +4,7 @@ import {
   ClockCircleOutlined, ClusterOutlined, CloseOutlined, CustomerServiceOutlined,
   DatabaseOutlined, DeleteOutlined, DownOutlined, ExclamationCircleOutlined,
   EyeOutlined, FolderOpenOutlined, InfoCircleOutlined, LineChartOutlined,
-  PauseCircleOutlined, PlayCircleOutlined, PlusOutlined, SafetyCertificateOutlined,
+  PauseOutlined, CaretRightFilled, PlusOutlined, SafetyCertificateOutlined,
   SettingOutlined, StarOutlined, SwapOutlined
 } from "@ant-design/icons";
 
@@ -15,7 +15,7 @@ const iconMap = {
   settings: SettingOutlined, "chevron-down": DownOutlined, sparkle: StarOutlined,
   layers: ClusterOutlined, compare: SwapOutlined, chart: LineChartOutlined,
   clock: ClockCircleOutlined, database: DatabaseOutlined, info: InfoCircleOutlined,
-  "arrow-left": ArrowLeftOutlined, bulb: BulbOutlined, play: PlayCircleOutlined, pause: PauseCircleOutlined,
+  "arrow-left": ArrowLeftOutlined, bulb: BulbOutlined, play: CaretRightFilled, pause: PauseOutlined,
 };
 
 export const Icon = forwardRef(function Icon({ name, size = 16, className = "", style, onClick }, ref) {

@@ -151,6 +151,12 @@ function AppContent() {
     if (paths.length) setForm((prev) => ({ ...prev, folders: mergeFolderInputs(prev.folders, paths) }));
   };
 
+  const handlePickPreferredRoot = async () => {
+    const path = await pickPreferredRoot();
+    if (!path) return;
+    setForm((prev) => ({ ...prev, preferred_root: path }));
+  };
+
   useKeyboardShortcuts({
     appView, status: d.status, clusters: d.clusters, selectedCluster, selectedClusterId: d.selectedClusterId,
     setSelectedClusterId: d.setSelectedClusterId, currentKeeperId, focusedAlbumId, setFocusedAlbumId,
@@ -162,7 +168,14 @@ function AppContent() {
     <Layout className="app-shell">
       <Layout.Content className="window-content">
         {appView === "setup" && (
-          <SetupScreen form={form} setForm={setForm} onSubmit={handleScanSubmit} onPickFolders={handlePickFolders} runtimeInfo={runtimeInfo} />
+          <SetupScreen
+            form={form}
+            setForm={setForm}
+            onSubmit={handleScanSubmit}
+            onPickFolders={handlePickFolders}
+            onPickPreferredRoot={handlePickPreferredRoot}
+            runtimeInfo={runtimeInfo}
+          />
         )}
         {appView === "scanning" && <ScanningScreen progress={d.progress} />}
         {appView === "summary" && d.summary && (

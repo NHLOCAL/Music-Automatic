@@ -116,6 +116,7 @@ describe("DiffWorkspace", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "נגן את 01.mp3" })[0]);
 
     expect(screen.getByTestId("audio-preview-card")).toBeInTheDocument();
+    expect(screen.getByTestId("review-scroll-shell")).toHaveClass("has-audio-preview");
     expect(screen.getByText("השמעת השוואה")).toBeInTheDocument();
     expect(screen.getByText("פתיחה")).toBeInTheDocument();
     expect(screen.getByText("C:/Music/Acoustix/01.mp3")).toBeInTheDocument();
@@ -176,7 +177,8 @@ describe("DiffWorkspace", () => {
       />,
     );
 
-    expect(screen.getByTestId("comparison-scroller")).toHaveStyle({ overflow: "auto" });
+    expect(screen.getByTestId("review-scroll-shell")).toBeInTheDocument();
+    expect(screen.getByTestId("comparison-scroller")).toBeInTheDocument();
     expect(screen.getAllByText(/Acoustix/).length).toBeGreaterThan(0);
   });
 });

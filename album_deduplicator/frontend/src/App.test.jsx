@@ -197,7 +197,7 @@ describe("App", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the compact setup flow with two scan inputs and basic toggles", () => {
+  it("renders the compact setup flow with the restored settings options", () => {
     vi.stubGlobal("fetch", vi.fn());
 
     render(<App />);
@@ -205,6 +205,9 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "הגדרת סריקה - Music Automatic" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "תיקייה מועדפת לשמירה" })).toBeInTheDocument();
+    fireEvent.click(screen.getByText("הגדרות"));
+    expect(screen.getByRole("checkbox", { name: "סריקה מחדש מלאה" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "סריקת תוכן מלאה (Hash - מדויק אך איטי)" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "הפעל אימות AI למקרים גבוליים" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "התחל סריקה" })).toBeDisabled();
@@ -241,6 +244,7 @@ describe("App", () => {
     const folderInputs = getScanFolderInputs();
     fireEvent.change(folderInputs[0], { target: { value: "C:\\Music" } });
     fireEvent.change(folderInputs[1], { target: { value: "D:\\Archive" } });
+    fireEvent.click(screen.getByText("הגדרות"));
     fireEvent.click(screen.getByRole("checkbox", { name: "סריקת תוכן מלאה (Hash - מדויק אך איטי)" }));
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
 
