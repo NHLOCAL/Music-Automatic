@@ -186,12 +186,12 @@ describe("App review layout", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
 
-    await waitFor(() => expect(screen.getByText("פתח את שלב ההעברה")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("עבור לשלב ההעברה")).toBeInTheDocument());
 
     expect(screen.getByTestId("review-workspace")).toBeInTheDocument();
     expect(screen.getByTestId("cluster-scroll")).toBeInTheDocument();
     expect(screen.getByTestId("review-main")).toBeInTheDocument();
     expect(screen.getByTestId("diff-shell")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "פתח את שלב ההעברה" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "עבור לשלב ההעברה" })).toBeInTheDocument();
   }, 10000);
 });

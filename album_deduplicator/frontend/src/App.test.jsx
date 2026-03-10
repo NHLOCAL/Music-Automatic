@@ -406,7 +406,7 @@ describe("App", () => {
     );
     expect(screen.getAllByText("Best vs Archive Copy").length).toBeGreaterThan(0);
     expect(screen.getAllByText("בטוח למחיקה").length).toBeGreaterThan(0);
-    expect(screen.getByText("השמעת השוואה מהירה")).toBeInTheDocument();
+    expect(screen.queryByTestId("audio-preview-card")).not.toBeInTheDocument();
     expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
     expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
     fireEvent.click(screen.getByText("איך המערכת הגיעה להחלטה"));

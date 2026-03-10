@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Card, Empty, Flex, Image, Progress, Segmented, Space, Table, Tag, Tooltip, Typography } from "antd";
 
 import { buildApiUrl } from "../api";
@@ -82,55 +82,130 @@ function AlbumArtPreview({ album }) {
   );
 }
 
-function AudioPreviewCard({ audioPreview }) {
-  if (!audioPreview) {
-    return (
-      <Card className="audio-preview-card cartoon-panel" variant="borderless">
-        <div className="audio-preview-empty">
-          <div>
-            <Typography.Text strong>השמעת השוואה מהירה</Typography.Text>
-            <Typography.Paragraph type="secondary" style={{ margin: "4px 0 0" }}>
-              בחר שיר מכל עותק כדי להשוות ישירות את הצליל, העוצמה והאיכות.
-            </Typography.Paragraph>
-          </div>
-          <StatusTag tone="neutral" icon="music">
-            ממתין לבחירת שיר
-          </StatusTag>
-        </div>
-      </Card>
-    );
-  }
+function AudioPreviewCard({ audioPreview, onDismiss }) {
+  const audioRef = useRef(null);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+
+  useEffect(() => {
+    setDuration(0);
+    setCurrentTime(0);
+    setIsPlaying(Boolean(audioPreview));
+  }, [audioPreview?.key]);
+
+  if (!audioPreview) return null;
 
   const audioSource = buildApiUrl(audioPreview.streamUrl);
+  const handleSeek = (event) => {
+    const nextTime = Number(event.target.value);
+    setCurrentTime(nextTime);
+    if (audioRef.current) audioRef.current.currentTime = nextTime;
+  };
+  const togglePlayback = async () => {
+    if (!audioRef.current) return;
+    if (audioRef.current.paused) {
+      try {
+        await audioRef.current.play();
+      } catch {
+        setIsPlaying(false);
+      }
+      return;
+    }
+    audioRef.current.pause();
+  };
 
   return (
-    <Card className="audio-preview-card cartoon-panel" variant="borderless" data-testid="audio-preview-card">
-      <div className="audio-preview-head">
-        <div>
-          <Typography.Text className="audio-preview-kicker">השמעת השוואה מהירה</Typography.Text>
-          <Typography.Title level={4} className="audio-preview-title">
-            {audioPreview.trackTitle}
-          </Typography.Title>
-          <Typography.Text type="secondary" className="audio-preview-subtitle">
-            {audioPreview.albumName} • {audioPreview.fileName}
-          </Typography.Text>
+    <div className="audio-preview-floating">
+      <Card
+        className="audio-preview-card cartoon-panel"
+        variant="borderless"
+        data-testid="audio-preview-card"
+        role="region"
+        aria-label="נגן השוואת אודיו"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <audio
+          ref={audioRef}
+          className="audio-preview-native"
+          autoPlay
+          key={audioSource}
+          src={audioSource}
+          onLoadedMetadata={(event) => {
+            const nextDuration = event.currentTarget.duration;
+            setDuration(Number.isFinite(nextDuration) ? nextDuration : 0);
+          }}
+          onTimeUpdate={(event) => {
+            const nextCurrentTime = event.currentTarget.currentTime;
+            setCurrentTime(Number.isFinite(nextCurrentTime) ? nextCurrentTime : 0);
+          }}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onEnded={onDismiss}
+          aria-label={`נגן תצוגה מקדימה עבור ${audioPreview.trackTitle}`}
+        >
+          הדפדפן לא תומך בהשמעת אודיו.
+        </audio>
+
+        <div className="audio-preview-mini">
+          <Button
+            className="audio-preview-toggle"
+            type="primary"
+            shape="circle"
+            icon={<Icon name={isPlaying ? "pause" : "play"} size={16} />}
+            onClick={togglePlayback}
+            aria-label={isPlaying ? `השהה את ${audioPreview.trackTitle}` : `נגן את ${audioPreview.trackTitle}`}
+          />
+
+          <div className="audio-preview-main">
+            <div className="audio-preview-topline">
+              <div className="audio-preview-copy">
+                <div className="audio-preview-headline">
+                  <Typography.Text className="audio-preview-kicker">השמעת השוואה מהירה</Typography.Text>
+                  <StatusTag tone={isPlaying ? "primary" : "neutral"} icon={isPlaying ? "play" : "pause"}>
+                    {isPlaying ? "מנגן" : "מושהה"}
+                  </StatusTag>
+                </div>
+                <Typography.Title level={5} className="audio-preview-title">
+                  {audioPreview.trackTitle}
+                </Typography.Title>
+                <Typography.Text type="secondary" className="audio-preview-subtitle">
+                  {audioPreview.albumName} • {audioPreview.fileName}
+                </Typography.Text>
+              </div>
+              <Button
+                type="text"
+                size="small"
+                icon={<Icon name="x" size={12} />}
+                onClick={onDismiss}
+                aria-label="סגור את נגן ההשוואה"
+              />
+            </div>
+
+            <div className="audio-preview-timeline">
+              <Typography.Text className="audio-preview-time">{formatDuration(currentTime)}</Typography.Text>
+              <input
+                className="audio-preview-range"
+                type="range"
+                min={0}
+                max={duration || 0}
+                step={0.1}
+                value={Math.min(currentTime, duration || 0)}
+                onChange={handleSeek}
+                aria-label={`ציר הזמן של ${audioPreview.trackTitle}`}
+              />
+              <Typography.Text className="audio-preview-time">{formatDuration(duration)}</Typography.Text>
+            </div>
+
+            <div className="audio-preview-footnote" title={audioPreview.filePath}>
+              <Icon name="music" size={11} />
+              <span>{audioPreview.filePath}</span>
+            </div>
+          </div>
         </div>
-        <StatusTag tone="primary" icon="play">
-          מנגן מתוך הממשק
-        </StatusTag>
-      </div>
-
-      <audio className="audio-preview-element" controls autoPlay key={audioSource} src={audioSource}>
-        הדפדפן לא תומך בהשמעת אודיו.
-      </audio>
-
-      <Alert
-        type="info"
-        showIcon
-        title="השווה בין עותקים על ידי ניגון אותו שיר מכל כרטיס בטבלה."
-        description={audioPreview.filePath}
-      />
-    </Card>
+      </Card>
+    </div>
   );
 }
 
@@ -482,10 +557,6 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
         </div>
       </section>
 
-      <section className="workspace-section">
-        <AudioPreviewCard audioPreview={audioPreview} />
-      </section>
-
       <section className="workspace-section" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <Card className="comparison-control-card cartoon-panel" variant="borderless" style={{ marginBottom: "10px" }}>
           <Flex align="center" gap={12} wrap>
@@ -529,6 +600,8 @@ export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openEx
           />
         </Card>
       </section>
+
+      <AudioPreviewCard audioPreview={audioPreview} onDismiss={() => setAudioPreview(null)} />
     </div>
   );
 }

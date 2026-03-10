@@ -158,7 +158,7 @@ describe("DiffWorkspace", () => {
     cleanup();
   });
 
-  it("renders album covers, a floating audio preview banner, and the track table", () => {
+  it("renders album covers and the track table without showing the audio banner before playback", () => {
     render(
       <DiffWorkspace
         cluster={cluster}
@@ -171,9 +171,7 @@ describe("DiffWorkspace", () => {
     expect(screen.getAllByText("עותק 1").length).toBeGreaterThan(0);
     expect(screen.getByText("עטיפת אלבום")).toBeInTheDocument();
     expect(screen.getAllByText("אין עטיפה זמינה").length).toBeGreaterThan(0);
-    expect(screen.getByText("השמעת השוואה מהירה")).toBeInTheDocument();
-    expect(screen.getByText("נגן השוואה צף")).toBeInTheDocument();
-    expect(screen.getByText("הטעינה מתחילה מתוך כפתור \"נגן\" בכל שורה.")).toBeInTheDocument();
+    expect(screen.queryByTestId("audio-preview-card")).not.toBeInTheDocument();
     expect(screen.getByText("בסיס השוואה בטבלה:")).toBeInTheDocument();
     expect(screen.getByTestId("track-table-card")).toBeInTheDocument();
     expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
@@ -211,10 +209,12 @@ describe("DiffWorkspace", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "נגן את 01.mp3" })[0]);
 
     expect(screen.getByTestId("audio-preview-card")).toBeInTheDocument();
-    expect(screen.getByText("מנגן מתוך הממשק")).toBeInTheDocument();
+    expect(screen.getByText("השמעת השוואה מהירה")).toBeInTheDocument();
+    expect(screen.getByTestId("audio-preview-card")).toHaveTextContent("מנגן");
     expect(screen.getAllByText("פתיחה").length).toBeGreaterThan(0);
     expect(screen.getByText("C:/Music/Acoustix/01.mp3")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "סגור את נגן ההשוואה" })).toBeInTheDocument();
+    expect(screen.getByLabelText("ציר הזמן של פתיחה")).toBeInTheDocument();
     expect(container.querySelector("audio")).not.toBeNull();
   });
 

@@ -23,6 +23,7 @@ describe("DeletePreview", () => {
     expect(screen.getByText("3 ממתינות")).toBeInTheDocument();
     expect(screen.getByText("1 הועברו")).toBeInTheDocument();
     expect(screen.getByText("2 דורשות טיפול")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "פתח את שלב ההעברה" })).toBeInTheDocument();
+    expect(screen.getByText("המעבר הבא ישלח רק את הפריטים שנבחרו לסל המחזור, בלי מחיקה לצמיתות.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "עבור לשלב ההעברה" })).toBeInTheDocument();
   });
 });

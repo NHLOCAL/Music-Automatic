@@ -17,6 +17,7 @@ import {
   FolderOpenOutlined,
   InfoCircleOutlined,
   LineChartOutlined,
+  PauseOutlined,
   PictureOutlined,
   PlusOutlined,
   SafetyCertificateOutlined,
@@ -49,6 +50,7 @@ const iconMap = {
   "arrow-left": ArrowLeftOutlined,
   bulb: BulbOutlined,
   play: CaretRightOutlined,
+  pause: PauseOutlined,
   image: PictureOutlined,
 };
 
