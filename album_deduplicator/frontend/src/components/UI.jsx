@@ -1,4 +1,4 @@
-import React from "react";
+import React, { forwardRef } from "react";
 import {
   ArrowLeftOutlined, BulbOutlined, CheckCircleOutlined, CheckOutlined,
   ClockCircleOutlined, ClusterOutlined, CloseOutlined, CustomerServiceOutlined,
@@ -17,10 +17,10 @@ const iconMap = {
   "arrow-left": ArrowLeftOutlined, bulb: BulbOutlined,
 };
 
-export function Icon({ name, size = 16, className = "", style, onClick }) {
+export const Icon = forwardRef(function Icon({ name, size = 16, className = "", style, onClick }, ref) {
   const Component = iconMap[name] ?? InfoCircleOutlined;
-  return <Component className={className} style={{ fontSize: size, ...style }} onClick={onClick} aria-hidden="true" />;
-}
+  return <Component ref={ref} className={className} style={{ fontSize: size, ...style }} onClick={onClick} aria-hidden="true" />;
+});
 
 export function StatusTag({ tone = "neutral", icon, children, className = "", style }) {
   return (

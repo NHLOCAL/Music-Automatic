@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FinalizeDeletionScreen } from "./FinalizeDeletionScreen";
@@ -10,7 +10,7 @@ describe("Workflow screens", () => {
     cleanup();
   });
 
-  it("renders the scanning screen with a compact progress summary and stable status panels", () => {
+  it("renders the compact scanning screen with the current minimal progress layout", () => {
     render(
       <ScanningScreen
         progress={{
@@ -24,23 +24,15 @@ describe("Workflow screens", () => {
       />,
     );
 
-    expect(screen.getByText("סריקה חכמה בתהליך")).toBeInTheDocument();
-    expect(screen.getByText("מנועי ההשוואה עובדים")).toBeInTheDocument();
+    expect(screen.getByText("סריקה בתהליך")).toBeInTheDocument();
+    expect(screen.getByText("מנועי ההשוואה מנתחים את הקבצים")).toBeInTheDocument();
     expect(screen.getByText("משווה בין אלבומים")).toBeInTheDocument();
-    expect(screen.getByTestId("scanning-stage-strip")).toBeInTheDocument();
-    expect(screen.getByTestId("scanning-status-grid")).toBeInTheDocument();
-    expect(screen.getByText("התקדמות כוללת")).toBeInTheDocument();
-    expect(screen.getByText("21/50 פריטים עובדו")).toBeInTheDocument();
-    expect(screen.getByText("שלב פעיל")).toBeInTheDocument();
-    expect(screen.getByText("התקדמות")).toBeInTheDocument();
-    expect(screen.getByText("מצב")).toBeInTheDocument();
-    expect(screen.getAllByText("משווה ובונה קבוצות").length).toBeGreaterThan(0);
     expect(screen.getByText("21/50")).toBeInTheDocument();
-    expect(screen.getByText("ניתוח בלבד")).toBeInTheDocument();
-    expect(screen.getByText("4 מתוך 4 שלבי ניתוח פעילים עכשיו.")).toBeInTheDocument();
+    expect(screen.getByText("פריטים שעובדו")).toBeInTheDocument();
+    expect(screen.getByText("סטטוס")).toBeInTheDocument();
   });
 
-  it("renders the summary screen with the refreshed desktop stat grid", () => {
+  it("renders the summary screen with the current actions", () => {
     render(
       <SummaryScreen
         summary={{
@@ -56,19 +48,16 @@ describe("Workflow screens", () => {
       />,
     );
 
-    expect(screen.getByText("הסריקה הושלמה!")).toBeInTheDocument();
-    expect(screen.getByText("מוכן למעבר על התוצאות")).toBeInTheDocument();
-    expect(screen.getByText("כל ההחלטות עדיין הפיכות לפני שלב ההעברה.")).toBeInTheDocument();
-    expect(screen.getByTestId("summary-stats")).toBeInTheDocument();
-    expect(screen.getByText("בטוח למחיקה")).toBeInTheDocument();
-    expect(screen.getByText("דורש בדיקה")).toBeInTheDocument();
-    expect(screen.getByText("זוגות שנבדקו")).toBeInTheDocument();
-    expect(screen.getByText("11 תיקיות השתתפו בניתוח הנוכחי.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "הסריקה הושלמה בהצלחה" })).toBeInTheDocument();
+    expect(screen.getByText("המידע מוכן למעבר")).toBeInTheDocument();
+    expect(screen.getByText("בטוחים למחיקה")).toBeInTheDocument();
+    expect(screen.getByText("דורשים סקירה")).toBeInTheDocument();
+    expect(screen.getByText("זוגות שהושוו")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "סריקה חדשה" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "התחל לעבור על התוצאות" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument();
   });
 
-  it("renders the finalize screen with a compact overview grid before the transfer sections", () => {
+  it("renders the finalize screen and opens a confirmation before delete", async () => {
     render(
       <FinalizeDeletionScreen
         workflow={{
@@ -77,6 +66,7 @@ describe("Workflow screens", () => {
               cluster: {
                 cluster_id: "cluster-1",
                 human_summary: "עותק ארכיון מול עותק ראשי.",
+                confidence_bucket: "review",
                 albums: [
                   { folder_id: "keeper-1", name: "Best", is_deleted: false },
                   { folder_id: "pending-1", name: "Archive Copy", is_deleted: false },
@@ -126,15 +116,14 @@ describe("Workflow screens", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "מרכז ההעברה וההשוואה" })).toBeInTheDocument();
-    expect(screen.getAllByText("מוכן להעברה").length).toBeGreaterThan(0);
-    expect(screen.getByTestId("finalize-summary-grid")).toBeInTheDocument();
-    expect(screen.getByText("ממתינות להעברה")).toBeInTheDocument();
-    expect(screen.getByText("בחירה אוטומטית")).toBeInTheDocument();
-    expect(screen.getByText("עותקים שנשמרו")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "העבר 1 תיקיות לסל המחזור" })).toBeInTheDocument();
-    expect(screen.getByText("תיקיות שממתינות למחיקה")).toBeInTheDocument();
-    expect(screen.getByText("העותק שנשמר")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "אישור העברה לסל המחזור (1 תיקיות)" })).toBeInTheDocument();
+    expect(screen.getByText("הפריטים יסומנו לסל המחזור בלבד, ללא מחיקה לצמיתות.")).toBeInTheDocument();
     expect(screen.getByText("Archive Copy")).toBeInTheDocument();
+    expect(screen.getByText("Best")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "בצע מחיקה למסומנים" }));
+
+    expect(await screen.findByText("להעביר את הפריטים המסומנים לסל המחזור?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "כן, להעביר" })).toBeInTheDocument();
   });
 });

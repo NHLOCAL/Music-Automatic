@@ -37,7 +37,7 @@ function AppContent() {
   const antContext = AntApp.useApp();
   const [appView, setAppView] = useState("setup");
   const [form, setForm] = useState({
-    folders: [{ id: "f1", path: "" }],
+    folders: [{ id: "f1", path: "" }, { id: "f2", path: "" }],
     preferred_root: "",
     force_rescan: false,
     clear_cache: false,
@@ -132,6 +132,13 @@ function AppContent() {
     await d.handleDecision(clusterId, keeperId, null);
   };
 
+  const goToSetup = () => {
+    d.setError("");
+    d.setSuccessSummary(null);
+    setDeleteAttemptResults({});
+    setAppView("setup");
+  };
+
   const openExplorer = async (path) => {
     try {
       const opened = await openDesktopPath(path);
@@ -159,16 +166,46 @@ function AppContent() {
         )}
         {appView === "scanning" && <ScanningScreen progress={d.progress} />}
         {appView === "summary" && d.summary && (
-          <SummaryScreen summary={d.summary} onStartReview={() => setAppView("review")} />
+          <SummaryScreen
+            summary={d.summary}
+            onStartReview={() => setAppView("review")}
+            onBackToSetup={goToSetup}
+          />
         )}
         {appView === "review" && d.status === "completed" && (
-          <div className="ide-workspace">
-            <ClusterList clusters={d.clusters} selectedClusterId={d.selectedClusterId} setSelectedClusterId={d.setSelectedClusterId} decisions={d.decisions} selectedTab={d.selectedTab} setSelectedTab={d.setSelectedTab} />
-            <DiffWorkspace key={`${d.selectedTab}-${d.selectedClusterId ?? "empty"}`} cluster={selectedCluster} currentKeeperId={currentKeeperId} handleDecision={updateClusterDecision} openExplorer={openExplorer} previewCount={d.preview.total_count} onOpenFinalize={() => setAppView("finalize")} onExecuteMassDelete={() => executeDelete()} isExecuting={executingDelete} />
+          <div className="ide-workspace" data-testid="review-workspace">
+            <ClusterList
+              clusters={d.clusters}
+              selectedClusterId={d.selectedClusterId}
+              setSelectedClusterId={d.setSelectedClusterId}
+              decisions={d.decisions}
+              selectedTab={d.selectedTab}
+              setSelectedTab={d.setSelectedTab}
+            />
+            <div className="ide-main" data-testid="review-main">
+              <DiffWorkspace
+                key={`${d.selectedTab}-${d.selectedClusterId ?? "empty"}`}
+                cluster={selectedCluster}
+                currentKeeperId={currentKeeperId}
+                handleDecision={updateClusterDecision}
+                openExplorer={openExplorer}
+                previewCount={d.preview.total_count}
+                onOpenFinalize={() => setAppView("finalize")}
+                onExecuteMassDelete={() => executeDelete()}
+                isExecuting={executingDelete}
+              />
+            </div>
           </div>
         )}
         {appView === "finalize" && d.status === "completed" && (
-          <FinalizeDeletionScreen workflow={deletionWorkflow} onBackToReview={() => setAppView("review")} onExecute={executeDelete} isExecuting={executingDelete} openExplorer={openExplorer} />
+          <FinalizeDeletionScreen
+            workflow={deletionWorkflow}
+            onBackToReview={() => setAppView("review")}
+            onBackToSetup={goToSetup}
+            onExecute={executeDelete}
+            isExecuting={executingDelete}
+            openExplorer={openExplorer}
+          />
         )}
       </Layout.Content>
     </Layout>

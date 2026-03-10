@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ClusterList } from "./ClusterList";
@@ -14,12 +14,7 @@ const clusters = [
         pair_id: "pair-pending",
         folder1_id: "folder-a",
         folder2_id: "folder-b",
-        algorithmic_score: 87,
-        ml_score: 89,
-        base_score: 88.1,
-        gemini_score: null,
         final_score: 88.1,
-        is_identical_by_hash: false,
       },
     ],
     albums: [
@@ -37,12 +32,7 @@ const clusters = [
         pair_id: "pair-ready",
         folder1_id: "folder-c",
         folder2_id: "folder-d",
-        algorithmic_score: 95,
-        ml_score: 96,
-        base_score: 95.6,
-        gemini_score: null,
         final_score: 95.6,
-        is_identical_by_hash: false,
       },
     ],
     albums: [
@@ -53,7 +43,7 @@ const clusters = [
 ];
 
 describe("ClusterList", () => {
-  it("places reviewed-ready clusters before pending review clusters", () => {
+  it("places reviewed-ready clusters before pending review clusters and shows the status tag", () => {
     const { container } = render(
       <ClusterList
         clusters={clusters}
@@ -65,13 +55,14 @@ describe("ClusterList", () => {
       />,
     );
 
-    const cards = Array.from(container.querySelectorAll(".cluster-card"));
+    const items = Array.from(container.querySelectorAll(".ide-cluster-item"));
 
-    expect(cards).toHaveLength(2);
-    expect(cards[0].textContent).toContain("Ready Copy");
-    expect(cards[0].textContent).toContain("נבדק ומוכן");
-    expect(cards[0].textContent).toContain("התאמה: 95.6");
-    expect(cards[0].textContent).toContain("2 עותקים");
-    expect(cards[1].textContent).toContain("Pending Copy");
+    expect(items).toHaveLength(2);
+    expect(items[0].textContent).toContain("Ready Copy");
+    expect(items[0].textContent).toContain("נבדק ומוכן");
+    expect(items[0].textContent).toContain("התאמה: 95.6/100");
+    expect(items[1].textContent).toContain("Pending Copy");
+    expect(items[1].textContent).toContain("ממתין לסקירה");
+    expect(screen.getByTestId("cluster-scroll")).toBeInTheDocument();
   });
 });

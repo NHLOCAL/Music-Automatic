@@ -21,6 +21,12 @@
   font-size: 16px;
 }
 
+.finalize-header-note {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .data-table-wrapper {
   flex: 1;
   background: var(--bg-surface);

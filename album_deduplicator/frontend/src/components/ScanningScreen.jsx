@@ -20,8 +20,8 @@ export function ScanningScreen({ progress }) {
       <div className="native-dialog" style={{ width: 400 }}>
         <div className="native-dialog-header">
           <div className="dialog-banner-strip">
-            <Tag bordered={false} className="dialog-banner-chip">סריקה פעילה</Tag>
-            <Tag bordered={false} className="dialog-banner-chip dialog-banner-chip--accent">{stageLabel}</Tag>
+            <Tag variant="filled" className="dialog-banner-chip">סריקה פעילה</Tag>
+            <Tag variant="filled" className="dialog-banner-chip dialog-banner-chip--accent">{stageLabel}</Tag>
           </div>
           <h1>סריקה בתהליך</h1>
           <p>מנועי ההשוואה מנתחים את הקבצים</p>
@@ -31,7 +31,7 @@ export function ScanningScreen({ progress }) {
           <div className="scan-progress-area scan-progress-area--elevated">
             <div className="scan-progress-header">
               <div style={{ fontWeight: 600, fontSize: 13, textAlign: "right" }}>{progress.message || "ממתין"}</div>
-              <Tag bordered={false} className="dialog-banner-chip">{percent}%</Tag>
+              <Tag variant="filled" className="dialog-banner-chip">{percent}%</Tag>
             </div>
             <Progress percent={percent} showInfo={false} />
             <div className="scan-status-text">{progress.human_message} ({percent}%)</div>

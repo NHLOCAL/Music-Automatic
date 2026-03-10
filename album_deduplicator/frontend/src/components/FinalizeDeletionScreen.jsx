@@ -1,20 +1,33 @@
 import React from "react";
-import { Button, Tooltip } from "antd";
+import { Button, Popconfirm, Tooltip } from "antd";
 import { Icon, StatusTag } from "./UI";
 import { formatSizeMb, getClusterDisplayTitle } from "../utils";
 
-export function FinalizeDeletionScreen({ workflow, onBackToReview, onExecute, isExecuting, openExplorer }) {
+export function FinalizeDeletionScreen({ workflow, onBackToReview, onBackToSetup, onExecute, isExecuting, openExplorer }) {
   const { pendingGroups, summary } = workflow;
 
   return (
     <div className="data-table-container">
       <div className="data-table-header">
-        <h2>אישור העברה לסל המחזור ({summary.pendingCount} תיקיות)</h2>
+        <div>
+          <h2>אישור העברה לסל המחזור ({summary.pendingCount} תיקיות)</h2>
+          <div className="finalize-header-note">הפריטים יסומנו לסל המחזור בלבד, ללא מחיקה לצמיתות.</div>
+        </div>
         <div style={{display:'flex', gap: 12}}>
           <Button onClick={onBackToReview}>חזור לעריכה</Button>
-          <Button type="primary" danger loading={isExecuting} onClick={() => onExecute()} disabled={summary.pendingCount === 0}>
-            בצע מחיקה למסומנים
-          </Button>
+          {onBackToSetup ? <Button onClick={onBackToSetup}>סריקה חדשה</Button> : null}
+          <Popconfirm
+            title="להעביר את הפריטים המסומנים לסל המחזור?"
+            description="אפשר לחזור לעריכה אם צריך לשנות keeper או סימון מחיקה."
+            okText="כן, להעביר"
+            cancelText="ביטול"
+            onConfirm={() => onExecute()}
+            disabled={summary.pendingCount === 0}
+          >
+            <Button type="primary" danger loading={isExecuting} disabled={summary.pendingCount === 0}>
+              בצע מחיקה למסומנים
+            </Button>
+          </Popconfirm>
         </div>
       </div>
 

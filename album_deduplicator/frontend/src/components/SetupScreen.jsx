@@ -26,8 +26,8 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, runtimeInf
       <div className="native-dialog">
         <div className="native-dialog-header">
           <div className="dialog-banner-strip">
-            <Tag bordered={false} className="dialog-banner-chip">{runtimeLabel}</Tag>
-            <Tag bordered={false} className="dialog-banner-chip dialog-banner-chip--accent">סל המחזור בלבד</Tag>
+            <Tag variant="filled" className="dialog-banner-chip">{runtimeLabel}</Tag>
+            <Tag variant="filled" className="dialog-banner-chip dialog-banner-chip--accent">סל המחזור בלבד</Tag>
           </div>
           <h1>הגדרת סריקה - Music Automatic</h1>
           <p>בחר תיקיות לאיתור אלבומים כפולים</p>

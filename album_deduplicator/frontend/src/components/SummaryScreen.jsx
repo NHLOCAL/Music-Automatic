@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "antd";
 
-export function SummaryScreen({ summary, onStartReview }) {
+export function SummaryScreen({ summary, onStartReview, onBackToSetup }) {
   const { safe_clusters, review_clusters, compared_pairs } = summary.counts;
 
   return (
@@ -30,7 +30,16 @@ export function SummaryScreen({ summary, onStartReview }) {
         </div>
 
         <div className="native-dialog-footer">
-          <Button type="primary" onClick={onStartReview} style={{ width: '100%' }}>פתח סביבת עבודה</Button>
+          <div style={{ display: "flex", gap: 10, width: "100%" }}>
+            {onBackToSetup ? (
+              <Button onClick={onBackToSetup} style={{ flex: 1 }}>
+                סריקה חדשה
+              </Button>
+            ) : null}
+            <Button type="primary" onClick={onStartReview} style={{ flex: onBackToSetup ? 1.4 : 1 }}>
+              פתח סביבת עבודה
+            </Button>
+          </div>
         </div>
       </div>
     </div>

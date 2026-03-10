@@ -1,6 +1,13 @@
 import React from "react";
 import { Segmented } from "antd";
-import { getClusterDisplayTitle, getClusterSortPriority, hasClusterDecision, formatPercent } from "../utils";
+import { StatusTag } from "./UI";
+import {
+  getClusterDisplayTitle,
+  getClusterSortPriority,
+  getClusterStatusMeta,
+  hasClusterDecision,
+  formatPercent,
+} from "../utils";
 
 const SEGMENT_OPTIONS = [
   { label: "בטוחים", value: "safe" },
@@ -18,10 +25,11 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
       <div className="ide-sidebar-header">
         <Segmented block size="small" value={selectedTab} options={SEGMENT_OPTIONS} onChange={setSelectedTab} />
       </div>
-      <div className="ide-sidebar-list">
+      <div className="ide-sidebar-list" data-testid="cluster-scroll">
         {filteredClusters.map((cluster) => {
           const isActive = cluster.cluster_id === selectedClusterId;
           const isResolved = hasClusterDecision(decisions, cluster.cluster_id) && decisions[cluster.cluster_id] !== null;
+          const statusMeta = getClusterStatusMeta(cluster, isResolved);
           const score = cluster.pairs?.[0] ? formatPercent(cluster.pairs[0].final_score) : "N/A";
           
           return (
@@ -36,6 +44,9 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
               <div className="ide-cluster-meta">
                 <span>{cluster.albums.filter(a => !a.is_deleted).length} עותקים</span>
                 <span>התאמה: {score}</span>
+              </div>
+              <div className="ide-cluster-status">
+                <StatusTag tone={statusMeta.tone}>{statusMeta.label}</StatusTag>
               </div>
             </div>
           );

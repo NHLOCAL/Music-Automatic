@@ -11,7 +11,7 @@ export function useKeyboardShortcuts({
       const targetTag = event.target?.tagName;
       if (["INPUT", "TEXTAREA", "SELECT"].includes(targetTag)) return;
       if (event.key === "Escape") {
-        setSingleDeleteTarget(null);
+        setSingleDeleteTarget?.(null);
         return;
       }
       if (appView !== "review" || status !== "completed" || !selectedCluster) return;
@@ -46,7 +46,7 @@ export function useKeyboardShortcuts({
       }
       if (event.key === "Enter") {
         event.preventDefault();
-        if (singleDeleteTarget) executeSingleDelete(singleDeleteTarget);
+        if (singleDeleteTarget && executeSingleDelete) executeSingleDelete(singleDeleteTarget);
         else if (preview.total_count > 0) openFinalize();
         return;
       }
@@ -58,7 +58,7 @@ export function useKeyboardShortcuts({
       }
       if (event.key.toLowerCase() === "d") {
         event.preventDefault();
-        if (!currentKeeperId) return;
+        if (!currentKeeperId || !setSingleDeleteTarget) return;
         const candidate = selectedCluster.albums.find(a => !a.is_deleted && a.folder_id !== currentKeeperId);
         if (candidate) {
           setSingleDeleteTarget({ clusterId: selectedCluster.cluster_id, folderId: candidate.folder_id, name: candidate.name });
@@ -67,6 +67,7 @@ export function useKeyboardShortcuts({
       }
       if (event.key.toLowerCase() === "x") {
         event.preventDefault();
+        if (!toggleDeleteSelection) return;
         const candidate = selectedCluster.albums.find((album) => album.folder_id === focusedAlbumId)
           ?? selectedCluster.albums.find((album) => !album.is_deleted && album.folder_id !== currentKeeperId);
         if (candidate && candidate.folder_id !== currentKeeperId) {

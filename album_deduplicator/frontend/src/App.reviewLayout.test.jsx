@@ -48,17 +48,6 @@ const sessionSummary = {
     percent: 100,
     warnings: [],
   },
-  mode_summary: {
-    ml_default_enabled: true,
-    gemini_enabled: false,
-    review_threshold: 85,
-    safe_delete_threshold: 97,
-  },
-  degraded_flags: {
-    ml_unavailable: false,
-    gemini_unavailable: false,
-    warnings: [],
-  },
   counts: {
     folders: 2,
     compared_pairs: 1,
@@ -85,14 +74,19 @@ const clusterResponse = {
           quality_score: 95,
           avg_bitrate: 320,
           file_count: 10,
-          in_preferred_root: true,
-          has_album_art: true,
-          lossless_ratio: 0,
-          lyrics_ratio: 0.4,
           total_size_mb: 50,
           is_deleted: false,
+          album_art_preview_url: "/api/analysis-sessions/session-1/albums/folder-keep/cover",
           tracks: [
-            { filename: "01.mp3", title: "Song A", artist: "Artist", duration: 180, size_mb: 5, bitrate: 320 },
+            {
+              track_index: 0,
+              filename: "01.mp3",
+              filepath: "C:/Music/Best/01.mp3",
+              title: "Song A",
+              duration: 180,
+              bitrate: 320,
+              stream_url: "/api/analysis-sessions/session-1/albums/folder-keep/tracks/0/stream",
+            },
           ],
         },
         {
@@ -102,18 +96,35 @@ const clusterResponse = {
           quality_score: 84,
           avg_bitrate: 192,
           file_count: 10,
-          in_preferred_root: false,
-          has_album_art: false,
-          lossless_ratio: 0,
-          lyrics_ratio: 0,
           total_size_mb: 45,
           is_deleted: false,
+          album_art_preview_url: null,
           tracks: [
-            { filename: "01.mp3", title: "Song A", artist: "Artist", duration: 180, size_mb: 5, bitrate: 192 },
+            {
+              track_index: 0,
+              filename: "01.mp3",
+              filepath: "D:/Archive/Best/01.mp3",
+              title: "Song A",
+              duration: 180,
+              bitrate: 192,
+              stream_url: "/api/analysis-sessions/session-1/albums/folder-drop/tracks/0/stream",
+            },
           ],
         },
       ],
-      pairs: [],
+      pairs: [
+        {
+          pair_id: "pair-1",
+          folder1_id: "folder-keep",
+          folder2_id: "folder-drop",
+          algorithmic_score: 98,
+          ml_score: 99,
+          base_score: 98.5,
+          gemini_score: null,
+          final_score: 98.5,
+          is_identical_by_hash: false,
+        },
+      ],
     },
   ],
 };
@@ -151,7 +162,7 @@ describe("App review layout", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps the delete preview docked inside the review workspace", async () => {
+  it("keeps the review workspace layout stable and exposes the transfer step", async () => {
     const fetchMock = vi.fn(async (url, options = {}) => {
       if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
         return jsonResponse({ session_id: "session-1", status: "queued" });
@@ -174,21 +185,19 @@ describe("App review layout", () => {
 
     fireEvent.change(folderInputs[0], { target: { value: "C:\\Music" } });
     fireEvent.change(folderInputs[1], { target: { value: "D:\\Archive" } });
-    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה חכמה" }));
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
 
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
-    await waitFor(() => expect(MockEventSource.instances[0].listeners.has("completed")).toBe(true));
     MockEventSource.instances[0].emit("completed", { status: "completed" });
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "התחל לעבור על התוצאות" })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
+    fireEvent.click(screen.getByRole("button", { name: "פתח סביבת עבודה" }));
 
-    await waitFor(() => expect(screen.getByText("עבור לשלב ההעברה")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("review-workspace")).toBeInTheDocument());
 
-    expect(screen.getByTestId("review-workspace")).toBeInTheDocument();
     expect(screen.getByTestId("cluster-scroll")).toBeInTheDocument();
     expect(screen.getByTestId("review-main")).toBeInTheDocument();
     expect(screen.getByTestId("diff-shell")).toBeInTheDocument();
