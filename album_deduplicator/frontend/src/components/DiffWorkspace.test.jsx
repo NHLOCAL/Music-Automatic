@@ -165,6 +165,7 @@ describe("DiffWorkspace", () => {
     expect(screen.getAllByRole("button", { name: "שמור עותק זה" })).toHaveLength(2);
     expect(screen.getByText("נשמר: לא נבחר")).toBeInTheDocument();
     expect(screen.getByText("למחיקה: 0")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "בטל הכרעה ושמור את כל העותקים" })).not.toBeInTheDocument();
   });
 
   it("shows a recommended keeper in review without presenting it as a manual selection", () => {
@@ -174,6 +175,7 @@ describe("DiffWorkspace", () => {
         currentKeeperId="folder-1"
         hasExplicitDecision={false}
         handleDecision={vi.fn()}
+        clearDecision={vi.fn()}
         openExplorer={vi.fn()}
         previewCount={0}
       />,
@@ -182,8 +184,32 @@ describe("DiffWorkspace", () => {
     expect(screen.getByText("נשמר: לא נבחר")).toBeInTheDocument();
     expect(screen.getByText("מומלץ לשמירה: Acoustix")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "בחר עותק זה לשמירה" })).toBeInTheDocument();
+    expect(screen.getByTestId("decision-reset-bar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "בטל הכרעה ושמור את כל העותקים" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "נבחר לשמירה" })).not.toBeInTheDocument();
     expect(screen.getByText("למחיקה: 0")).toBeInTheDocument();
+  });
+
+  it("lets the user clear the current keep/delete decision for the cluster", () => {
+    const clearDecision = vi.fn();
+
+    render(
+      <DiffWorkspace
+        cluster={cluster}
+        currentKeeperId="folder-1"
+        hasExplicitDecision
+        handleDecision={vi.fn()}
+        clearDecision={clearDecision}
+        openExplorer={vi.fn()}
+        previewCount={1}
+      />,
+    );
+
+    expect(screen.getByTestId("decision-reset-bar")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "בטל הכרעה ושמור את כל העותקים" }));
+
+    expect(clearDecision).toHaveBeenCalledWith("cluster-1");
   });
 
   it("keeps the album comparison area inside a dedicated scroll container", () => {
@@ -191,6 +217,7 @@ describe("DiffWorkspace", () => {
       <DiffWorkspace
         cluster={cluster}
         currentKeeperId="folder-1"
+        hasExplicitDecision
         handleDecision={vi.fn()}
         openExplorer={vi.fn()}
         previewCount={0}

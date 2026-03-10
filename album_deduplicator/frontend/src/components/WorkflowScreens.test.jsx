@@ -58,6 +58,8 @@ describe("Workflow screens", () => {
   });
 
   it("renders the finalize screen and opens a confirmation before delete", async () => {
+    const onKeepAllCopies = vi.fn();
+
     render(
       <FinalizeDeletionScreen
         workflow={{
@@ -113,6 +115,7 @@ describe("Workflow screens", () => {
         onExecute={vi.fn()}
         isExecuting={false}
         openExplorer={vi.fn()}
+        onKeepAllCopies={onKeepAllCopies}
       />,
     );
 
@@ -120,6 +123,12 @@ describe("Workflow screens", () => {
     expect(screen.getByText("הפריטים יסומנו לסל המחזור בלבד, ללא מחיקה לצמיתות.")).toBeInTheDocument();
     expect(screen.getByText("Archive Copy")).toBeInTheDocument();
     expect(screen.getByText("Best")).toBeInTheDocument();
+    expect(screen.getByText("אפשר לבטל את ההעברה לקבוצה הזו ולהשאיר את כל העותקים.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "בטל העברה ושמור הכל" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "בטל העברה ושמור הכל" }));
+
+    expect(onKeepAllCopies).toHaveBeenCalledWith("cluster-1");
 
     fireEvent.click(screen.getByRole("button", { name: "בצע מחיקה למסומנים" }));
 

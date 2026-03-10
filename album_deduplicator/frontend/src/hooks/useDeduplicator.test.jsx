@@ -54,6 +54,14 @@ const previewResponse = {
   manual_selected_count: 1,
 };
 
+const emptyPreviewResponse = {
+  items: [],
+  total_count: 0,
+  total_size_mb: 0,
+  auto_selected_count: 0,
+  manual_selected_count: 0,
+};
+
 describe("useDeduplicator", () => {
   beforeEach(() => {
     let currentCluster = { ...baseReviewCluster, selected_delete_folder_ids: [] };
@@ -106,6 +114,42 @@ describe("useDeduplicator", () => {
       expect(result.current.preview.total_count).toBe(1);
       expect(result.current.deleteSelections["cluster-review-1"]).toEqual(["folder-2"]);
       expect(result.current.decisions["cluster-review-1"]).toBe("folder-1");
+    });
+  });
+
+  it("clears the keeper and delete selections when the user decides to keep all copies", async () => {
+    api.updateDecisions.mockResolvedValue(emptyPreviewResponse);
+    api.getDeletePreview.mockResolvedValue(emptyPreviewResponse);
+
+    const { result } = renderHook(() => useDeduplicator());
+
+    act(() => {
+      result.current.setSessionId("session-1");
+      result.current.setStatus("completed");
+      result.current.setClusters([{ ...baseReviewCluster, resolution_state: "user_selected", selected_delete_folder_ids: ["folder-2"] }]);
+      result.current.setAllClusters([{ ...baseReviewCluster, resolution_state: "user_selected", selected_delete_folder_ids: ["folder-2"] }]);
+      result.current.setDecisions({ "cluster-review-1": "folder-1" });
+      result.current.setDeleteSelections({ "cluster-review-1": ["folder-2"] });
+    });
+
+    await act(async () => {
+      await result.current.handleDecision("cluster-review-1", null, []);
+    });
+
+    expect(api.updateDecisions).toHaveBeenCalledWith("session-1", {
+      decisions: [
+        {
+          cluster_id: "cluster-review-1",
+          keeper_id: null,
+          delete_folder_ids: [],
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(result.current.preview.total_count).toBe(0);
+      expect(result.current.deleteSelections["cluster-review-1"]).toEqual([]);
+      expect(result.current.decisions["cluster-review-1"]).toBeNull();
     });
   });
 });

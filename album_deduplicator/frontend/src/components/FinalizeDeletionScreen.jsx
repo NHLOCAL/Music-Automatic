@@ -3,7 +3,7 @@ import { Button, Popconfirm, Tooltip } from "antd";
 import { Icon, StatusTag } from "./UI";
 import { formatSizeMb, getClusterDisplayTitle } from "../utils";
 
-export function FinalizeDeletionScreen({ workflow, onBackToReview, onBackToSetup, onExecute, isExecuting, openExplorer }) {
+export function FinalizeDeletionScreen({ workflow, onBackToReview, onBackToSetup, onExecute, isExecuting, openExplorer, onKeepAllCopies }) {
   const { pendingGroups, summary } = workflow;
 
   return (
@@ -35,9 +35,9 @@ export function FinalizeDeletionScreen({ workflow, onBackToReview, onBackToSetup
         <table className="pro-table">
           <thead>
             <tr>
-              <th width="30%">זיהוי קבוצה</th>
+              <th width="32%">זיהוי קבוצה</th>
               <th width="15%">איכות התאמה</th>
-              <th width="25%">העותק שיישמר (Keeper)</th>
+              <th width="23%">העותק שיישמר (Keeper)</th>
               <th width="30%">תיקייה מיועדת למחיקה (Trash)</th>
             </tr>
           </thead>
@@ -53,8 +53,25 @@ export function FinalizeDeletionScreen({ workflow, onBackToReview, onBackToSetup
                     {idx === 0 && (
                       <>
                         <td rowSpan={group.pending.length}>
-                          <div style={{fontWeight: 600}}>{getClusterDisplayTitle(group.cluster)}</div>
-                          <div style={{fontSize: 11, color: '#666', marginTop: 4}}>{group.cluster.human_summary}</div>
+                          <div className="finalize-cluster-cell">
+                            <div className="finalize-cluster-summary">
+                              <div style={{fontWeight: 600}}>{getClusterDisplayTitle(group.cluster)}</div>
+                              <div style={{fontSize: 11, color: '#666', marginTop: 4}}>{group.cluster.human_summary}</div>
+                            </div>
+                            <div className="finalize-cluster-reset">
+                              <div className="finalize-cluster-reset-copy">
+                                <strong>התחרטת?</strong>
+                                <span>אפשר לבטל את ההעברה לקבוצה הזו ולהשאיר את כל העותקים.</span>
+                              </div>
+                              <Button
+                                size="small"
+                                className="finalize-reset-button"
+                                onClick={() => onKeepAllCopies?.(group.cluster.cluster_id)}
+                              >
+                                בטל העברה ושמור הכל
+                              </Button>
+                            </div>
+                          </div>
                         </td>
                         <td rowSpan={group.pending.length}>
                           <StatusTag tone={group.cluster.confidence_bucket === 'safe' ? 'success' : 'warning'}>{score}</StatusTag>

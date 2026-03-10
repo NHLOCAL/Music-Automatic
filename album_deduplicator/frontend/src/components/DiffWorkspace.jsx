@@ -141,6 +141,7 @@ export function DiffWorkspace({
   currentKeeperId,
   hasExplicitDecision = false,
   handleDecision,
+  clearDecision,
   openExplorer,
   previewCount,
   onOpenFinalize,
@@ -233,6 +234,24 @@ export function DiffWorkspace({
           ) : null}
         </div>
       </div>
+
+      {currentKeeperId ? (
+        <div className="ide-decision-reset-bar" data-testid="decision-reset-bar">
+          <div className="ide-decision-reset-copy">
+            <strong>
+              {keeperAlbum ? `${keeperAlbum.name} נשמר כרגע` : "קיימת כרגע הכרעת שמירה לקבוצה זו"}
+            </strong>
+            <span>
+              {deleteCount > 0
+                ? `${deleteCount} עותקים יסומנו למחיקה אם תמשיך לשלב ההעברה.`
+                : "כרגע אין פריטים שמסומנים למחיקה, אבל עדיין קיימת הכרעה פעילה לקבוצה."}
+            </span>
+          </div>
+          <Button onClick={() => clearDecision?.(cluster.cluster_id)}>
+            בטל הכרעה ושמור את כל העותקים
+          </Button>
+        </div>
+      ) : null}
 
       <div className={`ide-review-scroll-shell ${audioPreview ? "has-audio-preview" : ""}`} data-testid="review-scroll-shell">
         <div className="ide-diff-container" data-testid="comparison-scroller">

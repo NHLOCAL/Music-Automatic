@@ -82,6 +82,33 @@
   position: relative;
 }
 
+.ide-decision-reset-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: #fff7e8;
+  border-bottom: 1px solid #f3d19c;
+}
+
+.ide-decision-reset-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ide-decision-reset-copy strong {
+  font-size: 12px;
+  color: #7a4300;
+}
+
+.ide-decision-reset-copy span {
+  font-size: 11px;
+  color: #8c5b18;
+}
+
 .ide-review-scroll-shell.has-audio-preview {
   padding-bottom: 112px;
 }
@@ -421,12 +448,18 @@
 
   .ide-toolbar-main,
   .ide-toolbar-actions,
-  .ide-audio-preview-controls {
+  .ide-audio-preview-controls,
+  .ide-decision-reset-bar {
     width: 100%;
   }
 
   .ide-audio-preview-controls {
     min-width: 0;
+  }
+
+  .ide-decision-reset-bar {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .ide-audio-preview {

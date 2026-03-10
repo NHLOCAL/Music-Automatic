@@ -133,6 +133,10 @@ function AppContent() {
     await d.handleDecision(clusterId, keeperId, null);
   };
 
+  const clearClusterDecision = async (clusterId) => {
+    await d.handleDecision(clusterId, null, []);
+  };
+
   const goToSetup = () => {
     d.setError("");
     d.setSuccessSummary(null);
@@ -203,6 +207,7 @@ function AppContent() {
                 currentKeeperId={currentKeeperId}
                 hasExplicitDecision={hasExplicitDecision}
                 handleDecision={updateClusterDecision}
+                clearDecision={clearClusterDecision}
                 openExplorer={openExplorer}
                 previewCount={d.preview.total_count}
                 onOpenFinalize={() => setAppView("finalize")}
@@ -220,6 +225,7 @@ function AppContent() {
             onExecute={executeDelete}
             isExecuting={executingDelete}
             openExplorer={openExplorer}
+            onKeepAllCopies={clearClusterDecision}
           />
         )}
       </Layout.Content>
