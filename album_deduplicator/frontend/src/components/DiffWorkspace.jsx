@@ -1,607 +1,92 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Card, Empty, Flex, Image, Progress, Segmented, Space, Table, Tag, Tooltip, Typography } from "antd";
-
-import { buildApiUrl } from "../api";
-import {
-  buildTrackComparisonRows,
-  findClusterPair,
-  formatBitrate,
-  formatDuration,
-  formatPercent,
-  formatSizeMb,
-  getMetricWinners,
-  getTrackRowTone,
-} from "../utils";
-import { StatusTag, Icon } from "./UI";
+import React, { useMemo } from "react";
+import { Button, Tooltip } from "antd";
+import { Icon } from "./UI";
 import { ScoreTransparencyPanel } from "./ScoreTransparencyPanel";
+import { buildTrackComparisonRows, formatBitrate, formatDuration, formatSizeMb, getTrackRowTone } from "../utils";
 
-function MetricTile({ label, value, percent, isWinner = false, color = "#2572ff" }) {
-  const normalizedPercent = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
-  return (
-    <Card className="metric-tile cartoon-panel" variant="borderless">
-      <Typography.Text type="secondary" style={{ fontSize: "10px" }}>
-        {label}
-      </Typography.Text>
-      <Typography.Text className="metric-value">{value}</Typography.Text>
-      {percent > 0 && (
-        <Progress
-          percent={Math.round(normalizedPercent)}
-          showInfo={false}
-          strokeColor={isWinner ? "#1d9f5f" : color}
-          railColor="rgba(37, 114, 255, 0.08)"
-          size={["100%", 3]}
-          style={{ margin: "2px 0 0" }}
-        />
-      )}
-    </Card>
-  );
-}
-
-function CompactDecisionItem({ label, value, tone, icon }) {
-  return (
-    <div className={`compact-decision-item tone-${tone}`}>
-      <Icon name={icon} size={12} />
-      <span className="decision-label">{label}:</span>
-      <span className="decision-value" title={value}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function AlbumArtPreview({ album }) {
-  if (!album.album_art_preview_url) {
-    return (
-      <div className="album-cover-panel is-empty">
-        <div className="album-cover-fallback">
-          <Icon name="image" size={24} />
-        </div>
-        <div className="album-cover-copy">
-          <Typography.Text strong>אין עטיפה זמינה</Typography.Text>
-          <Typography.Text type="secondary">
-            אפשר להיעזר בשם התיקייה ובנגן השירים להשוואה ידנית.
-          </Typography.Text>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="album-cover-panel">
-      <Image
-        className="album-cover-image"
-        src={buildApiUrl(album.album_art_preview_url)}
-        alt={`עטיפת ${album.name}`}
-        preview={{ mask: "הגדל עטיפה" }}
-      />
-      <div className="album-cover-copy">
-        <Typography.Text strong>עטיפת אלבום</Typography.Text>
-        <Typography.Text type="secondary">זמינה להגדלה ולבדיקה חזותית מהירה.</Typography.Text>
-      </div>
-    </div>
-  );
-}
-
-function AudioPreviewCard({ audioPreview, onDismiss }) {
-  const audioRef = useRef(null);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
-
-  useEffect(() => {
-    setDuration(0);
-    setCurrentTime(0);
-    setIsPlaying(Boolean(audioPreview));
-  }, [audioPreview?.key]);
-
-  if (!audioPreview) return null;
-
-  const audioSource = buildApiUrl(audioPreview.streamUrl);
-  const handleSeek = (event) => {
-    const nextTime = Number(event.target.value);
-    setCurrentTime(nextTime);
-    if (audioRef.current) audioRef.current.currentTime = nextTime;
-  };
-  const togglePlayback = async () => {
-    if (!audioRef.current) return;
-    if (audioRef.current.paused) {
-      try {
-        await audioRef.current.play();
-      } catch {
-        setIsPlaying(false);
-      }
-      return;
-    }
-    audioRef.current.pause();
-  };
-
-  return (
-    <div className="audio-preview-floating">
-      <Card
-        className="audio-preview-card cartoon-panel"
-        variant="borderless"
-        data-testid="audio-preview-card"
-        role="region"
-        aria-label="נגן השוואת אודיו"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        <audio
-          ref={audioRef}
-          className="audio-preview-native"
-          autoPlay
-          key={audioSource}
-          src={audioSource}
-          onLoadedMetadata={(event) => {
-            const nextDuration = event.currentTarget.duration;
-            setDuration(Number.isFinite(nextDuration) ? nextDuration : 0);
-          }}
-          onTimeUpdate={(event) => {
-            const nextCurrentTime = event.currentTarget.currentTime;
-            setCurrentTime(Number.isFinite(nextCurrentTime) ? nextCurrentTime : 0);
-          }}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          onEnded={onDismiss}
-          aria-label={`נגן תצוגה מקדימה עבור ${audioPreview.trackTitle}`}
-        >
-          הדפדפן לא תומך בהשמעת אודיו.
-        </audio>
-
-        <div className="audio-preview-mini">
-          <Button
-            className="audio-preview-toggle"
-            type="primary"
-            shape="circle"
-            icon={<Icon name={isPlaying ? "pause" : "play"} size={16} />}
-            onClick={togglePlayback}
-            aria-label={isPlaying ? `השהה את ${audioPreview.trackTitle}` : `נגן את ${audioPreview.trackTitle}`}
-          />
-
-          <div className="audio-preview-main">
-            <div className="audio-preview-topline">
-              <div className="audio-preview-copy">
-                <div className="audio-preview-headline">
-                  <Typography.Text className="audio-preview-kicker">השמעת השוואה מהירה</Typography.Text>
-                  <StatusTag tone={isPlaying ? "primary" : "neutral"} icon={isPlaying ? "play" : "pause"}>
-                    {isPlaying ? "מנגן" : "מושהה"}
-                  </StatusTag>
-                </div>
-                <Typography.Title level={5} className="audio-preview-title">
-                  {audioPreview.trackTitle}
-                </Typography.Title>
-                <Typography.Text type="secondary" className="audio-preview-subtitle">
-                  {audioPreview.albumName} • {audioPreview.fileName}
-                </Typography.Text>
-              </div>
-              <Button
-                type="text"
-                size="small"
-                icon={<Icon name="x" size={12} />}
-                onClick={onDismiss}
-                aria-label="סגור את נגן ההשוואה"
-              />
-            </div>
-
-            <div className="audio-preview-timeline">
-              <Typography.Text className="audio-preview-time">{formatDuration(currentTime)}</Typography.Text>
-              <input
-                className="audio-preview-range"
-                type="range"
-                min={0}
-                max={duration || 0}
-                step={0.1}
-                value={Math.min(currentTime, duration || 0)}
-                onChange={handleSeek}
-                aria-label={`ציר הזמן של ${audioPreview.trackTitle}`}
-              />
-              <Typography.Text className="audio-preview-time">{formatDuration(duration)}</Typography.Text>
-            </div>
-
-            <div className="audio-preview-footnote" title={audioPreview.filePath}>
-              <Icon name="music" size={11} />
-              <span>{audioPreview.filePath}</span>
-            </div>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function getAlbumRibbon(album, currentKeeperId, recommendedKeeperId) {
-  if (currentKeeperId === album.folder_id) return { color: "#1d9f5f", text: "נשמר" };
-  if (currentKeeperId && currentKeeperId !== album.folder_id) return { color: "#ef5350", text: "למחיקה" };
-  if (recommendedKeeperId === album.folder_id) return { color: "#2572ff", text: "המלצה" };
-  return null;
-}
-
-export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openExplorer }) {
-  const [comparisonTarget, setComparisonTarget] = useState("auto");
-  const [audioPreview, setAudioPreview] = useState(null);
-
-  useEffect(() => {
-    setComparisonTarget("auto");
-    setAudioPreview(null);
-  }, [cluster?.cluster_id, currentKeeperId]);
-
-  const visibleAlbums = useMemo(
-    () => cluster?.albums?.filter((album) => !album.is_deleted) ?? [],
-    [cluster],
-  );
-  const visibleAlbumIds = useMemo(() => visibleAlbums.map((album) => album.folder_id), [visibleAlbums]);
-  const metricWinners = useMemo(() => getMetricWinners(visibleAlbums), [visibleAlbums]);
-  const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
-
-  const defaultComparisonId = currentKeeperId ?? cluster?.recommended_keeper_id ?? visibleAlbums[0]?.folder_id ?? null;
-  const activeComparisonId = comparisonTarget === "auto" ? defaultComparisonId : comparisonTarget;
-  const selectedDeleteCount = currentKeeperId ? Math.max(visibleAlbums.length - 1, 0) : 0;
-
-  const activeComparisonAlbum = useMemo(
-    () => visibleAlbums.find((album) => album.folder_id === activeComparisonId) ?? null,
-    [activeComparisonId, visibleAlbums],
-  );
-  const activeComparisonIndex = useMemo(
-    () => visibleAlbums.findIndex((album) => album.folder_id === activeComparisonId),
-    [activeComparisonId, visibleAlbums],
-  );
-  const explicitKeeperAlbum = useMemo(
-    () => visibleAlbums.find((album) => album.folder_id === currentKeeperId) ?? null,
-    [currentKeeperId, visibleAlbums],
-  );
-  const recommendedAlbum = useMemo(
-    () => visibleAlbums.find((album) => album.folder_id === cluster?.recommended_keeper_id) ?? null,
-    [cluster?.recommended_keeper_id, visibleAlbums],
-  );
-
-  const comparisonOptions = useMemo(
-    () => [
-      { label: "אוטומטי", value: "auto" },
-      ...visibleAlbums.map((album, index) => ({ label: `עותק ${index + 1}`, value: album.folder_id })),
-    ],
-    [visibleAlbums],
-  );
-
-  const maxValues = useMemo(() => {
-    const maxes = { avg_bitrate: 0, total_size_mb: 0, file_count: 0, quality_score: 0 };
-    visibleAlbums.forEach((album) => {
-      maxes.avg_bitrate = Math.max(maxes.avg_bitrate, album.avg_bitrate || 0);
-      maxes.total_size_mb = Math.max(maxes.total_size_mb, album.total_size_mb || 0);
-      maxes.file_count = Math.max(maxes.file_count, album.file_count || 0);
-      maxes.quality_score = Math.max(maxes.quality_score, album.quality_score || 0);
-    });
-    return maxes;
-  }, [visibleAlbums]);
-
-  const trackSummary = useMemo(() => {
-    let differentRows = 0;
-    trackRows.forEach((row) => {
-      if (getTrackRowTone(row, visibleAlbumIds) === "different") differentRows += 1;
-    });
-    return { differentRows };
-  }, [trackRows, visibleAlbumIds]);
-
-  const overviewMetrics = useMemo(
-    () => [
-      { key: "albums", title: "עותקים", value: visibleAlbums.length },
-      { key: "tracks", title: "שירים להשוואה", value: trackRows.length },
-      { key: "different", title: "שורות שונות", value: trackSummary.differentRows },
-    ],
-    [trackRows.length, trackSummary.differentRows, visibleAlbums.length],
-  );
-
-  const handleTrackPreview = (album, entry) => {
-    if (!entry?.stream_url) return;
-    setAudioPreview({
-      key: `${album.folder_id}:${entry.track_index ?? entry.filename}`,
-      albumId: album.folder_id,
-      albumName: album.name,
-      fileName: entry.filename,
-      filePath: entry.filepath,
-      streamUrl: entry.stream_url,
-      trackTitle: entry.title || entry.filename,
-    });
-  };
-
-  const trackColumns = useMemo(
-    () => [
-      {
-        title: "שיר מקורי",
-        key: "reference",
-        fixed: "left",
-        width: 220,
-        render: (_, row) => (
-          <div className="track-main-cell">
-            <Typography.Text strong ellipsis={{ tooltip: row.title }}>
-              <Icon name="music" size={10} style={{ marginInlineEnd: 4 }} />
-              {row.title}
-            </Typography.Text>
-            <div style={{ display: "flex", gap: "6px", fontSize: "10px", color: "var(--text-secondary)" }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.artist}</span>
-              <span>•</span>
-              <span>{formatDuration(row.duration)}</span>
-            </div>
-          </div>
-        ),
-      },
-      ...visibleAlbums.map((album) => {
-        const pairToActive = activeComparisonId && album.folder_id !== activeComparisonId
-          ? findClusterPair(cluster, activeComparisonId, album.folder_id)
-          : null;
-        return {
-          title: (
-            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-              <Typography.Text strong ellipsis={{ tooltip: album.name }}>
-                {album.name}
-              </Typography.Text>
-              <Typography.Text type="secondary" style={{ fontSize: "10px", fontWeight: "normal" }}>
-                {album.folder_id === activeComparisonId
-                  ? "בסיס השוואה"
-                  : pairToActive?.is_identical_by_hash
-                    ? "Hash זהה"
-                    : pairToActive
-                      ? formatPercent(pairToActive.final_score)
-                      : "ללא התאמה"}
-              </Typography.Text>
-            </div>
-          ),
-          key: album.folder_id,
-          width: 220,
-          render: (_, row) => {
-            const entry = row.entries[album.folder_id];
-            const referenceEntry = activeComparisonId ? row.entries[activeComparisonId] : null;
-            if (!entry) {
-              return (
-                <div style={{ color: "var(--colorError)", fontSize: "11px", fontWeight: "600" }}>
-                  <Icon name="alert" size={10} style={{ marginInlineEnd: 4 }} />
-                  חסר
-                </div>
-              );
-            }
-
-            const bitrateDifferent = referenceEntry && entry.bitrate !== referenceEntry.bitrate;
-            const durationDifferent = referenceEntry && Math.round(entry.duration || 0) !== Math.round(referenceEntry.duration || 0);
-            const sizeDifferent = referenceEntry
-              && Number(entry.size_mb || 0).toFixed(2) !== Number(referenceEntry.size_mb || 0).toFixed(2);
-            const isActivePreview = audioPreview?.key === `${album.folder_id}:${entry.track_index ?? entry.filename}`;
-
-            return (
-              <div className="track-entry">
-                <div className="track-entry-head">
-                  <Typography.Text ellipsis={{ tooltip: entry.filename }} style={{ fontWeight: 500, fontSize: "11px" }}>
-                    {entry.filename}
-                  </Typography.Text>
-                  <Button
-                    size="small"
-                    type={isActivePreview ? "primary" : "default"}
-                    icon={<Icon name="play" size={11} />}
-                    onClick={() => handleTrackPreview(album, entry)}
-                    disabled={!entry.stream_url}
-                    aria-label={`נגן את ${entry.filename}`}
-                  >
-                    {isActivePreview ? "מנגן" : "נגן"}
-                  </Button>
-                </div>
-                <div className="track-entry-meta">
-                  <span className={`track-chip ${bitrateDifferent ? "is-different" : ""}`}>{formatBitrate(entry.bitrate)}</span>
-                  <span className={`track-chip ${durationDifferent ? "is-different" : ""}`}>{formatDuration(entry.duration)}</span>
-                  <span className={`track-chip ${sizeDifferent ? "is-different" : ""}`}>{formatSizeMb(entry.size_mb)}</span>
-                </div>
-              </div>
-            );
-          },
-        };
-      }),
-    ],
-    [activeComparisonId, audioPreview?.key, cluster, visibleAlbums],
-  );
-
+export function DiffWorkspace({ cluster, currentKeeperId, handleDecision, openExplorer, previewCount, onOpenFinalize, onExecuteMassDelete, isExecuting }) {
   if (!cluster) {
-    return (
-      <Card className="workspace-empty cartoon-card" variant="borderless">
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="בחר קבוצה מהרשימה להתחיל" />
-      </Card>
-    );
+    return <div className="ide-main" style={{alignItems:'center', justifyContent:'center', color:'#888'}}>בחר קבוצה מהרשימה</div>;
   }
 
+  const visibleAlbums = useMemo(() => cluster.albums.filter((a) => !a.is_deleted), [cluster]);
+  const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
+  const visibleAlbumIds = visibleAlbums.map(a => a.folder_id);
+
   return (
-    <div className="diff-shell" data-testid="diff-shell">
-      <div className="diff-compact-header">
-        <div className="diff-header-top">
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <Space align="center" size={8}>
-              <StatusTag
-                tone={cluster.confidence_bucket === "safe" ? "success" : "warning"}
-                icon={cluster.confidence_bucket === "safe" ? "shield" : "alert"}
-                style={{ minHeight: "22px", fontSize: "11px" }}
-              >
-                {cluster.confidence_bucket === "safe" ? "בטוח למחיקה" : "דורש סקירה"}
-              </StatusTag>
-              {currentKeeperId && (
-                <StatusTag tone="success" icon="check-circle" style={{ minHeight: "22px", fontSize: "11px" }}>
-                  נבחר keeper
-                </StatusTag>
-              )}
-            </Space>
-            <Typography.Title level={2} className="diff-header-title">
-              {cluster.human_summary}
-            </Typography.Title>
-          </div>
-          <div className="diff-kpi-row">
-            {overviewMetrics.map((metric) => (
-              <div key={metric.key} className="diff-kpi-item">
-                <span className="diff-kpi-label">{metric.title}</span>
-                <span className="diff-kpi-value">{metric.value}</span>
-              </div>
-            ))}
-            <div className="diff-kpi-item diff-kpi-item-danger">
-              <span className="diff-kpi-label">לסל המחזור</span>
-              <span className="diff-kpi-value">{selectedDeleteCount}</span>
-            </div>
-          </div>
+    <div className="ide-main">
+      <div className="ide-toolbar">
+        <div style={{display:'flex', gap: 12, alignItems:'center'}}>
+          <span className={`badge ${cluster.confidence_bucket === 'safe' ? 'success' : 'warning'}`}>
+            {cluster.confidence_bucket === 'safe' ? 'בטוח' : 'לסקירה'}
+          </span>
+          <span style={{fontSize: 12, fontWeight: 600}}>{cluster.human_summary}</span>
+          <ScoreTransparencyPanel cluster={cluster} currentKeeperId={currentKeeperId} />
         </div>
-        <div className="decision-strip">
-          <CompactDecisionItem
-            icon="shield"
-            label="נשמר כעת"
-            tone={explicitKeeperAlbum ? "success" : "neutral"}
-            value={explicitKeeperAlbum ? explicitKeeperAlbum.path : "לא נבחר"}
-          />
-          <CompactDecisionItem
-            icon="sparkle"
-            label="המלצה"
-            tone={recommendedAlbum ? "primary" : "neutral"}
-            value={recommendedAlbum ? recommendedAlbum.path : "אין"}
-          />
-          <CompactDecisionItem
-            icon="compare"
-            label="בסיס השוואה"
-            tone={comparisonTarget === "auto" ? "primary" : "warning"}
-            value={activeComparisonAlbum ? `עותק ${activeComparisonIndex + 1}` : "אין"}
-          />
+        <div style={{display:'flex', gap: 8}}>
+          {previewCount > 0 && (
+            <>
+              <Button size="small" onClick={onOpenFinalize}>תצוגה מקדימה ({previewCount})</Button>
+              <Button size="small" type="primary" danger loading={isExecuting} onClick={onExecuteMassDelete}>
+                העבר למחזור ({previewCount})
+              </Button>
+            </>
+          )}
         </div>
-        <ScoreTransparencyPanel cluster={cluster} currentKeeperId={currentKeeperId} />
       </div>
 
-      <section className="workspace-section">
-        <div className="comparison-scroller" data-testid="comparison-scroller">
-          {visibleAlbums.map((album, index) => {
-            const isKeeper = currentKeeperId === album.folder_id;
-            const isTrash = Boolean(currentKeeperId) && !isKeeper;
-            const ribbon = getAlbumRibbon(album, currentKeeperId, cluster.recommended_keeper_id);
-            const card = (
-              <Card
-                className={`album-card cartoon-panel ${isKeeper ? "is-keeper" : ""} ${isTrash ? "is-deleted" : ""}`}
-                variant="borderless"
-              >
-                <Flex justify="space-between" align="center">
-                  <StatusTag
-                    tone={isKeeper ? "success" : isTrash ? "danger" : "neutral"}
-                    style={{ margin: 0, fontSize: "11px", minHeight: "20px" }}
-                  >
-                    עותק {index + 1}
-                  </StatusTag>
-                  {album.in_preferred_root && (
-                    <Icon
-                      name="sparkle"
-                      size={12}
-                      style={{ color: "var(--colorPrimary)" }}
-                      title="בתיקייה מועדפת"
-                    />
-                  )}
-                </Flex>
+      <div className="ide-diff-container">
+        {visibleAlbums.map((album, idx) => {
+          const isKeeper = currentKeeperId === album.folder_id;
+          const isTrash = Boolean(currentKeeperId) && !isKeeper;
+          const isRec = cluster.recommended_keeper_id === album.folder_id;
 
-                <div>
-                  <Typography.Title level={4} className="album-card-title" ellipsis={{ tooltip: album.name }}>
-                    {album.name}
-                  </Typography.Title>
-                  <div className="album-path-inline" style={{ marginTop: "4px" }}>
-                    <Icon name="folder" size={10} style={{ color: "var(--text-tertiary)" }} />
-                    <Typography.Text className="album-inline-path" ellipsis={{ tooltip: album.path }}>
-                      {album.path}
-                    </Typography.Text>
-                  </div>
+          return (
+            <div key={album.folder_id} className={`ide-pane ${isKeeper ? 'is-keeper' : isTrash ? 'is-trash' : ''}`}>
+              <div className="ide-pane-header">
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <strong style={{fontSize: 13}}>עותק {idx + 1} {isRec && <span style={{color: '#0060df', fontSize:11}}>★ מומלץ</span>}</strong>
+                  <Tooltip title="פתח בתיקייה"><Icon name="folder" size={14} style={{cursor:'pointer'}} onClick={() => openExplorer(album.path)}/></Tooltip>
                 </div>
-
-                <AlbumArtPreview album={album} />
-
-                <div className="album-actions">
-                  <Button
-                    type={isKeeper ? "primary" : "default"}
-                    danger={isTrash}
-                    icon={<Icon name={isKeeper ? "check-circle" : isTrash ? "trash" : "shield"} size={12} />}
-                    onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}
-                  >
-                    {isKeeper ? "נבחר לשמירה" : isTrash ? "למחיקה" : "שמור עותק זה"}
-                  </Button>
-                  <Tooltip title="פתח בתיקייה">
-                    <Button icon={<Icon name="folder" size={12} />} onClick={() => openExplorer(album.path)} />
-                  </Tooltip>
+                <div className="ide-pane-path" title={album.path}>{album.path}</div>
+                <div className="ide-pane-metrics">
+                  <span>ביטרייט: <strong>{formatBitrate(album.avg_bitrate)}</strong></span>
+                  <span>גודל: <strong>{formatSizeMb(album.total_size_mb)}</strong></span>
+                  <span>איכות: <strong>{album.quality_score ? `${album.quality_score.toFixed(1)}/100` : '-'}</strong></span>
                 </div>
-
-                <div className="album-metrics">
-                  <MetricTile
-                    label="איכות"
-                    value={album.quality_score ? formatPercent(album.quality_score) : "-"}
-                    percent={maxValues.quality_score ? ((album.quality_score || 0) / maxValues.quality_score) * 100 : 0}
-                    isWinner={metricWinners.quality_score === album.folder_id}
-                  />
-                  <MetricTile
-                    label="איכות שמע"
-                    value={formatBitrate(album.avg_bitrate)}
-                    percent={maxValues.avg_bitrate ? ((album.avg_bitrate || 0) / maxValues.avg_bitrate) * 100 : 0}
-                    isWinner={metricWinners.avg_bitrate === album.folder_id}
-                  />
-                  <MetricTile label="נפח כולל" value={formatSizeMb(album.total_size_mb)} percent={0} color="transparent" />
-                  <MetricTile label="מספר קבצים" value={album.file_count} percent={0} color="transparent" />
-                </div>
-              </Card>
-            );
-            return (
-              <div key={album.folder_id} className="album-card-shell">
-                {ribbon ? (
-                  <Badge.Ribbon
-                    text={ribbon.text}
-                    color={ribbon.color}
-                    placement="end"
-                    style={{ fontSize: "10px", padding: "0 6px", height: "18px", lineHeight: "18px" }}
-                  >
-                    {card}
-                  </Badge.Ribbon>
-                ) : (
-                  card
-                )}
               </div>
-            );
-          })}
-        </div>
-      </section>
+              
+              <div className="ide-pane-body">
+                {trackRows.map(row => {
+                  const entry = row.entries[album.folder_id];
+                  const tone = getTrackRowTone(row, visibleAlbumIds);
+                  const isDiff = tone === 'different';
+                  
+                  if (!entry) return <div key={row.key} className="ide-track-row diff-err">חסר בעותק זה</div>;
+                  
+                  return (
+                    <div key={row.key} className={`ide-track-row ${isDiff ? 'diff-warn' : ''}`}>
+                      <span style={{whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}} title={entry.filename}>{entry.filename}</span>
+                      <span style={{color:'#666', flexShrink:0}}>{formatDuration(entry.duration)}</span>
+                    </div>
+                  );
+                })}
+              </div>
 
-      <section className="workspace-section" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        <Card className="comparison-control-card cartoon-panel" variant="borderless" style={{ marginBottom: "10px" }}>
-          <Flex align="center" gap={12} wrap>
-            <Typography.Text strong style={{ fontSize: "12px" }}>
-              בסיס השוואה בטבלה:
-            </Typography.Text>
-            <Segmented size="small" options={comparisonOptions} value={comparisonTarget} onChange={setComparisonTarget} />
-          </Flex>
-          <Flex align="center" gap={8} wrap>
-            <Tag color="success" style={{ margin: 0, fontSize: "10px", border: "none" }}>
-              תואם
-            </Tag>
-            <Tag color="warning" style={{ margin: 0, fontSize: "10px", border: "none" }}>
-              שונה
-            </Tag>
-            <Tag color="error" style={{ margin: 0, fontSize: "10px", border: "none" }}>
-              חסר
-            </Tag>
-          </Flex>
-          <Alert
-            className="comparison-mode-alert"
-            type={comparisonTarget === "auto" ? "success" : "warning"}
-            showIcon
-            title={
-              comparisonTarget === "auto"
-                ? "הטבלה מוצגת כרגע מול בסיס ההחלטה הפעיל."
-                : `הטבלה מקובעת כעת לעותק ${activeComparisonIndex + 1} כדי לאפשר השוואה ידנית.`
-            }
-          />
-        </Card>
-        <Card className="track-table-card cartoon-panel" variant="borderless" data-testid="track-table-card">
-          <Table
-            className="tracks-table"
-            columns={trackColumns}
-            dataSource={trackRows}
-            pagination={false}
-            rowKey="key"
-            size="small"
-            scroll={{ x: "max-content", y: 400 }}
-            sticky
-          />
-        </Card>
-      </section>
-
-      <AudioPreviewCard audioPreview={audioPreview} onDismiss={() => setAudioPreview(null)} />
+              <div className="ide-pane-footer">
+                <Button 
+                  type={isKeeper ? "primary" : "default"} 
+                  danger={isTrash}
+                  style={{width: '100%'}}
+                  onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}
+                >
+                  {isKeeper ? "נבחר לשמירה (Keeper)" : isTrash ? "יסומן למחיקה (Trash)" : "שמור עותק זה"}
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

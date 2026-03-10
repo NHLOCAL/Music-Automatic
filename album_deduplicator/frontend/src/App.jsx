@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { App as AntApp, ConfigProvider, Layout, notification } from "antd";
+import { App as AntApp, ConfigProvider, Layout } from "antd";
 import heIL from "antd/locale/he_IL";
-import { HappyProvider } from "@ant-design/happy-work-theme";
-
 import { useDeduplicator } from "./hooks/useDeduplicator";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import * as api from "./api";
@@ -12,7 +10,6 @@ import { ScanningScreen } from "./components/ScanningScreen";
 import { SummaryScreen } from "./components/SummaryScreen";
 import { ClusterList } from "./components/ClusterList";
 import { DiffWorkspace } from "./components/DiffWorkspace";
-import { DeletePreview } from "./components/DeletePreview";
 import { FinalizeDeletionScreen } from "./components/FinalizeDeletionScreen";
 import { buildDeletionWorkflowModel, getActiveKeeperId, mergeDeleteAttemptResults } from "./utils";
 import { antTheme } from "./theme/antdTheme";
@@ -26,7 +23,6 @@ function mergeFolderInputs(currentEntries, nextPaths) {
   if (!uniqueNextPaths.length) return currentEntries;
   const nextEntries = currentEntries.map((entry) => ({ ...entry }));
   const existingPaths = new Set(nextEntries.map((entry) => entry.path.trim()).filter(Boolean));
-
   uniqueNextPaths.forEach((path) => {
     if (existingPaths.has(path)) return;
     const emptyEntry = nextEntries.find((entry) => !entry.path.trim());
@@ -34,7 +30,6 @@ function mergeFolderInputs(currentEntries, nextPaths) {
     else nextEntries.push({ id: `folder-${Date.now()}-${Math.random()}`, path });
     existingPaths.add(path);
   });
-
   return nextEntries;
 }
 
@@ -42,7 +37,7 @@ function AppContent() {
   const antContext = AntApp.useApp();
   const [appView, setAppView] = useState("setup");
   const [form, setForm] = useState({
-    folders: [{ id: "f1", path: "" }, { id: "f2", path: "" }],
+    folders: [{ id: "f1", path: "" }],
     preferred_root: "",
     force_rescan: false,
     clear_cache: false,
@@ -65,9 +60,7 @@ function AppContent() {
     getRuntimeInfo().then((info) => {
       if (active) setRuntimeInfo(info);
     }).catch(() => {});
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -81,28 +74,18 @@ function AppContent() {
 
   useEffect(() => {
     if (!d.error) return;
-    antContext.notification.error({
-      message: "שגיאה",
-      description: d.error,
-      placement: "topLeft",
-      duration: 5,
-    });
+    antContext.notification.error({ message: "שגיאה", description: d.error, placement: "topLeft" });
     d.setError("");
   }, [antContext.notification, d]);
 
   useEffect(() => {
     if (!d.successSummary) return;
-    antContext.notification.success({
-      message: "העברה הושלמה",
-      description: `הועברו ${d.successSummary.moved_count} תיקיות לסל המחזור.`,
-      placement: "topLeft",
-      duration: 4,
-    });
+    antContext.notification.success({ message: "העברה הושלמה", description: `הועברו ${d.successSummary.moved_count} תיקיות.`, placement: "topLeft" });
     d.setSuccessSummary(null);
   }, [antContext.notification, d]);
 
   const handleScanSubmit = async (event) => {
-    event.preventDefault();
+    if(event) event.preventDefault();
     d.setError("");
     d.setSuccessSummary(null);
     try {
@@ -127,13 +110,17 @@ function AppContent() {
     }
   };
 
-  const executeDelete = async () => {
-    if (!d.sessionId || d.preview.total_count === 0) return;
+  const executeDelete = async (folderIdsToExecute = null) => {
+    if (!d.sessionId) return;
+    const targetIds = folderIdsToExecute || d.preview.items.map(item => item.folder_id);
+    if(targetIds.length === 0) return;
+    
     setExecutingDelete(true);
     try {
-      const execution = await api.executeDelete(d.sessionId, d.preview.items.map((item) => item.folder_id));
+      const execution = await api.executeDelete(d.sessionId, targetIds);
       setDeleteAttemptResults((prev) => mergeDeleteAttemptResults(prev, execution.results));
       await d.refreshData(d.sessionId, d.selectedTab);
+      if(appView === "finalize") setAppView("review"); // Return to IDE mode after mass delete
     } catch (err) {
       d.setError(err.message);
     } finally {
@@ -145,54 +132,22 @@ function AppContent() {
     await d.handleDecision(clusterId, keeperId, null);
   };
 
-  const goToSetup = () => {
-    d.setError("");
-    d.setSuccessSummary(null);
-    setDeleteAttemptResults({});
-    setAppView("setup");
-  };
-
   const openExplorer = async (path) => {
     try {
       const opened = await openDesktopPath(path);
       if (!opened) await api.openInExplorer(path);
-    } catch (err) {
-      d.setError(err.message);
-    }
+    } catch (err) { d.setError(err.message); }
   };
 
   const handlePickFolders = async () => {
-    const [defaultPath] = normalizeFolderPaths(form.folders);
-    const paths = await pickScanFolders({ defaultPath });
-    if (paths.length) {
-      setForm((prev) => ({ ...prev, folders: mergeFolderInputs(prev.folders, paths) }));
-    }
-  };
-
-  const handlePickPreferredRoot = async () => {
-    const path = await pickPreferredRoot();
-    if (path) {
-      setForm((prev) => ({
-        ...prev,
-        folders: mergeFolderInputs(prev.folders, [path]),
-        preferred_root: path,
-      }));
-    }
+    const paths = await pickScanFolders();
+    if (paths.length) setForm((prev) => ({ ...prev, folders: mergeFolderInputs(prev.folders, paths) }));
   };
 
   useKeyboardShortcuts({
-    appView,
-    status: d.status,
-    clusters: d.clusters,
-    selectedCluster,
-    selectedClusterId: d.selectedClusterId,
-    setSelectedClusterId: d.setSelectedClusterId,
-    currentKeeperId,
-    focusedAlbumId,
-    setFocusedAlbumId,
-    handleDecision: updateClusterDecision,
-    preview: d.preview,
-    openFinalize: () => setAppView("finalize"),
+    appView, status: d.status, clusters: d.clusters, selectedCluster, selectedClusterId: d.selectedClusterId,
+    setSelectedClusterId: d.setSelectedClusterId, currentKeeperId, focusedAlbumId, setFocusedAlbumId,
+    handleDecision: updateClusterDecision, preview: d.preview, openFinalize: () => setAppView("finalize"),
     openExplorer,
   });
 
@@ -200,66 +155,20 @@ function AppContent() {
     <Layout className="app-shell">
       <Layout.Content className="window-content">
         {appView === "setup" && (
-          <SetupScreen
-            form={form}
-            setForm={setForm}
-            onSubmit={handleScanSubmit}
-            onPickFolders={handlePickFolders}
-            onPickPreferredRoot={handlePickPreferredRoot}
-            runtimeInfo={runtimeInfo}
-          />
+          <SetupScreen form={form} setForm={setForm} onSubmit={handleScanSubmit} onPickFolders={handlePickFolders} runtimeInfo={runtimeInfo} />
         )}
-
         {appView === "scanning" && <ScanningScreen progress={d.progress} />}
-
         {appView === "summary" && d.summary && (
-          <SummaryScreen
-            summary={d.summary}
-            onStartReview={() => setAppView("review")}
-            onBackToSetup={goToSetup}
-          />
+          <SummaryScreen summary={d.summary} onStartReview={() => setAppView("review")} />
         )}
-
         {appView === "review" && d.status === "completed" && (
-          <div className="review-workspace" data-testid="review-workspace">
-            <ClusterList
-              clusters={d.clusters}
-              selectedClusterId={d.selectedClusterId}
-              setSelectedClusterId={d.setSelectedClusterId}
-              decisions={d.decisions}
-              selectedTab={d.selectedTab}
-              setSelectedTab={d.setSelectedTab}
-            />
-            <div className="review-main" data-testid="review-main">
-              <DiffWorkspace
-                key={`${d.selectedTab}-${d.selectedClusterId ?? "empty"}`}
-                cluster={selectedCluster}
-                currentKeeperId={currentKeeperId}
-                handleDecision={updateClusterDecision}
-                openExplorer={openExplorer}
-              />
-              {(deletionWorkflow.summary.pendingCount > 0
-                || deletionWorkflow.summary.deletedCount > 0
-                || deletionWorkflow.summary.failedCount > 0) && (
-                <DeletePreview
-                  workflowSummary={deletionWorkflow.summary}
-                  onOpenFinalize={() => setAppView("finalize")}
-                  isExecuting={executingDelete}
-                />
-              )}
-            </div>
+          <div className="ide-workspace">
+            <ClusterList clusters={d.clusters} selectedClusterId={d.selectedClusterId} setSelectedClusterId={d.setSelectedClusterId} decisions={d.decisions} selectedTab={d.selectedTab} setSelectedTab={d.setSelectedTab} />
+            <DiffWorkspace key={`${d.selectedTab}-${d.selectedClusterId ?? "empty"}`} cluster={selectedCluster} currentKeeperId={currentKeeperId} handleDecision={updateClusterDecision} openExplorer={openExplorer} previewCount={d.preview.total_count} onOpenFinalize={() => setAppView("finalize")} onExecuteMassDelete={() => executeDelete()} isExecuting={executingDelete} />
           </div>
         )}
-
         {appView === "finalize" && d.status === "completed" && (
-          <FinalizeDeletionScreen
-            workflow={deletionWorkflow}
-            onBackToReview={() => setAppView("review")}
-            onBackToSetup={goToSetup}
-            onExecute={executeDelete}
-            isExecuting={executingDelete}
-            openExplorer={openExplorer}
-          />
+          <FinalizeDeletionScreen workflow={deletionWorkflow} onBackToReview={() => setAppView("review")} onExecute={executeDelete} isExecuting={executingDelete} openExplorer={openExplorer} />
         )}
       </Layout.Content>
     </Layout>
@@ -268,12 +177,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <HappyProvider>
-      <ConfigProvider direction="rtl" locale={heIL} theme={antTheme}>
-        <AntApp notification={{ placement: "topLeft" }}>
-          <AppContent />
-        </AntApp>
-      </ConfigProvider>
-    </HappyProvider>
+    <ConfigProvider direction="rtl" locale={heIL} theme={antTheme}>
+      <AntApp>
+        <AppContent />
+      </AntApp>
+    </ConfigProvider>
   );
 }
