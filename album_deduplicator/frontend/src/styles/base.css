@@ -1,21 +1,34 @@
 :root {
-  --color-primary: #0060df;
-  --color-primary-hover: #004bb5;
-  --color-success: #1a7f37;
-  --color-success-bg: #dafbe1;
-  --color-warning: #b56d00;
-  --color-warning-bg: #fff8c5;
-  --color-danger: #cf222e;
-  --color-danger-bg: #ffebe9;
-  --bg-app: #f3f3f3;
-  --bg-surface: #ffffff;
-  --bg-panel: #fafafa;
-  --bg-hover: #f0f4f8;
-  --border-main: #d1d1d1;
-  --text-main: #202020;
-  --text-muted: #595959;
-  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-primary: #225555;
+  --color-primary-hover: #163d3d;
+  --color-primary-soft: rgba(156, 211, 211, 0.28);
+  --color-primary-subtle: rgba(34, 85, 85, 0.16);
+  --color-info: #9cd3d3;
+  --color-success: #6b8a5d;
+  --color-success-bg: #eef4e8;
+  --color-success-text: #48623d;
+  --color-warning: #a06b2a;
+  --color-warning-bg: #f7ead1;
+  --color-warning-text: #7a5321;
+  --color-danger: #da8787;
+  --color-danger-bg: #f8e8e5;
+  --color-danger-text: #925454;
+  --bg-app: #faf7ee;
+  --bg-surface: #fffdf6;
+  --bg-panel: #efe6d8;
+  --bg-panel-strong: #dbcbb8;
+  --bg-hover: #f5efe2;
+  --border-main: #225555;
+  --border-subtle: rgba(34, 85, 85, 0.18);
+  --text-main: #51463b;
+  --text-secondary: #6f6153;
+  --text-muted: #7f7264;
+  --text-tertiary: #9a8c7d;
+  --font-ui: "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-brand: "Rubik", system-ui, sans-serif;
   --font-mono: "Cascadia Code", Consolas, Menlo, monospace;
+  --shadow-lg: 0 18px 42px rgba(81, 70, 59, 0.14);
+  --shadow-panel: 0 10px 28px rgba(81, 70, 59, 0.1);
 }
 
 * {
@@ -80,14 +93,14 @@ button {
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;
-  border-radius: 2px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
   border: 1px solid transparent;
 }
-.badge.success { background: var(--color-success-bg); color: var(--color-success); border-color: #4ac26b; }
-.badge.warning { background: var(--color-warning-bg); color: var(--color-warning); border-color: #e6b219; }
-.badge.danger { background: var(--color-danger-bg); color: var(--color-danger); border-color: #ff8182; }
-.badge.primary { background: #e0ebfd; color: var(--color-primary); border-color: #8cb4ff; }
-.badge.neutral { background: #f0f0f0; color: var(--text-muted); border-color: var(--border-main); }
+.badge.success { background: var(--color-success-bg); color: var(--color-success-text); border-color: rgba(72, 98, 61, 0.28); }
+.badge.warning { background: var(--color-warning-bg); color: var(--color-warning-text); border-color: rgba(160, 107, 42, 0.28); }
+.badge.danger { background: var(--color-danger-bg); color: var(--color-danger-text); border-color: rgba(218, 135, 135, 0.32); }
+.badge.primary { background: rgba(156, 211, 211, 0.28); color: var(--color-primary); border-color: rgba(34, 85, 85, 0.22); }
+.badge.neutral { background: rgba(239, 230, 216, 0.72); color: var(--text-muted); border-color: var(--border-subtle); }

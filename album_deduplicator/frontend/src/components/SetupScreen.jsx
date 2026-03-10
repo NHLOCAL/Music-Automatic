@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, Input, Checkbox } from "antd";
+import { Button, Checkbox, Input, Tag } from "antd";
 import { Icon } from "./UI";
 
 export function SetupScreen({ form, setForm, onSubmit, onPickFolders, runtimeInfo }) {
@@ -19,11 +19,16 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, runtimeInf
   };
 
   const hasValidPath = form.folders.some(f => f.path.trim().length > 0);
+  const runtimeLabel = runtimeInfo?.isElectron ? "Desktop" : "Browser";
 
   return (
     <div className="modal-backdrop">
       <div className="native-dialog">
         <div className="native-dialog-header">
+          <div className="dialog-banner-strip">
+            <Tag bordered={false} className="dialog-banner-chip">{runtimeLabel}</Tag>
+            <Tag bordered={false} className="dialog-banner-chip dialog-banner-chip--accent">סל המחזור בלבד</Tag>
+          </div>
           <h1>הגדרת סריקה - Music Automatic</h1>
           <p>בחר תיקיות לאיתור אלבומים כפולים</p>
         </div>
@@ -32,9 +37,10 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, runtimeInf
           <div className="setup-form-group">
             <label>תיקיות מקור:</label>
             <div className="folder-list-box">
-              {form.folders.map((folder) => (
+              {form.folders.map((folder, index) => (
                 <div key={folder.id} className="folder-list-item">
                   <Input 
+                    aria-label={`תיקייה לסריקה ${index + 1}`}
                     variant="borderless" 
                     size="small" 
                     className="mono-text"
