@@ -190,12 +190,15 @@ export function buildTrackComparisonRows(albums) {
         });
       }
       rows.get(key).entries[album.folder_id] = {
+        track_index: track.track_index,
         filename: track.filename,
+        filepath: track.filepath,
         title: track.title || track.filename,
         artist: track.artist || "אמן לא ידוע",
         duration: track.duration,
         size_mb: track.size_mb,
         bitrate: track.bitrate,
+        stream_url: track.stream_url,
       };
     });
   });

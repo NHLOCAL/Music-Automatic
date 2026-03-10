@@ -10,8 +10,11 @@
 - מסך הסריקה מציג roots בשדות נפרדים עם הוספה/הסרה ברורה, במקום שדה טקסט יחיד.
 - בדו-שיח בחירת התיקיות של ה-Desktop אפשר לבחור כמה roots יחד ולהוסיף אותם בבת אחת למסך הסריקה.
 - מסך הסריקה ב-Desktop שומר גם על fallback ידני של הוספת שורות, למקרים שבהם דו-שיח Windows native נכשל על תיקיות מסוימות.
+- מסך הסריקה מציג כעת strip של שלבי ניתוח, אנימציית progress חיה יותר, ו-copy דינמי שמסביר מה המערכת עושה בכל שלב.
 - בהגדרות המתקדמות אפשר להפעיל `Full Hash Scan` להשוואה מדויקת יותר; ברירת המחדל נשארת כבויה כדי לשמור על סריקה מהירה יותר.
 - סביבת ה-review מאפשרת לפתוח כל תיקייה מיידית, לסמן עותקים ספציפיים למחיקה, או לבצע מחיקה בודדת מיידית מתוך ה-cluster.
+- סביבת ה-review מאפשרת כעת גם להשמיע שירים ישירות מטבלת ההשוואה, עם נגן docked להשוואה מהירה בין עותקים.
+- כל כרטיס אלבום ב-review מציג preview של עטיפת האלבום כאשר זמינה עטיפה חיצונית או embedded art.
 - מסך ה-review מציג כעת שקיפות scoring ברורה:
   - בכל cluster אפשר לראות בצורה גלויה את ציון המודל המתמטי, ציון ה-AI המקומי, הציון המשולב, ו-הציון הסופי
   - בכל כרטיס עותק לא-keeper מוצג score ממוקד מול העותק שנשמר כרגע
@@ -168,6 +171,8 @@ python main.py "C:/Music" "D:/Archive" -p "C:/Music"
 - `GET /api/analysis-sessions/{session_id}/delete-preview`
 - `POST /api/analysis-sessions/{session_id}/delete-executions`
 - `POST /api/analysis-sessions/{session_id}/delete-single`
+- `GET /api/analysis-sessions/{session_id}/albums/{folder_id}/cover`
+- `GET /api/analysis-sessions/{session_id}/albums/{folder_id}/tracks/{track_index}/stream`
 - `POST /api/system/open-explorer`
 
 ## בדיקות

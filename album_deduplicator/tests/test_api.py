@@ -127,6 +127,65 @@ def build_snapshot():
     )
 
 
+def build_media_snapshot(tmp_path: Path):
+    album_path = tmp_path / "album"
+    album_path.mkdir()
+    track_path = album_path / "track.mp3"
+    cover_path = album_path / "cover.jpg"
+    track_path.write_bytes(b"stub-audio")
+    cover_path.write_bytes(b"stub-cover")
+
+    folder_info = FolderInfo(
+        path=album_path,
+        folder_name=album_path.name,
+        parent_folder_name=album_path.parent.name,
+        files=[
+            FileInfo(
+                filename=track_path.name,
+                filepath=track_path,
+                extension=".mp3",
+                size_mb=5.0,
+                duration=180.0,
+                bitrate=320,
+                title="Track",
+                artist="Artist",
+                album="Album",
+                albumartist="Artist",
+                all_tags={"title": "Track"},
+                metadata_complete=True,
+            )
+        ],
+        quality_score=96.0,
+        avg_bitrate=320.0,
+        unique_artists={"Artist"},
+        unique_albums={"Album"},
+        album_art_hash="art",
+        lossless_ratio=0.0,
+        lyrics_ratio=0.0,
+    )
+    folder_id = stable_id("folder", str(album_path))
+    snapshot = AnalysisSnapshot(
+        folders={album_path: folder_info},
+        albums={
+            folder_id: AlbumSummary(
+                folder_id=folder_id,
+                path=album_path,
+                name=album_path.name,
+                quality_score=96.0,
+                avg_bitrate=320.0,
+                file_count=1,
+                in_preferred_root=True,
+                has_album_art=True,
+                lossless_ratio=0.0,
+                lyrics_ratio=0.0,
+                total_size_mb=5.0,
+            )
+        },
+        counts=AnalysisCounts(folders=1, compared_pairs=0, safe_clusters=0, review_clusters=0),
+    )
+    return snapshot, folder_id, track_path, cover_path
+
+
 def test_api_session_flow(monkeypatch, tmp_path):
     def fake_start_analysis(session_id: str):
         session = store.get_session(session_id)
@@ -270,6 +329,9 @@ def test_api_cluster_decisions_and_delete_execution(monkeypatch):
     assert len(clusters_response.json()["clusters"]) == 1
     assert clusters_response.json()["clusters"][0]["human_summary"]
     assert clusters_response.json()["clusters"][0]["selected_delete_folder_ids"] == [cluster.deletable_folder_ids[0]]
+    assert clusters_response.json()["clusters"][0]["albums"][0]["album_art_preview_url"].endswith("/cover")
+    assert clusters_response.json()["clusters"][0]["albums"][0]["tracks"][0]["stream_url"].endswith("/stream")
+    assert clusters_response.json()["clusters"][0]["albums"][0]["tracks"][0]["filepath"].endswith("track.mp3")
 
     preview_response = client.get(f"/api/analysis-sessions/{session.session_id}/delete-preview")
     assert preview_response.status_code == 200
@@ -349,3 +411,26 @@ def test_api_open_explorer(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert response.json()["status"] == "opened"
     assert opened["path"] == str(tmp_path.resolve())
+
+
+def test_api_album_cover_and_track_stream_endpoints(tmp_path):
+    snapshot, folder_id, track_path, cover_path = build_media_snapshot(tmp_path)
+    session = store.create_session(
+        AnalysisOptions(
+            folders=[tmp_path],
+            preferred_root=tmp_path,
+            bitrate_mode="128",
+        )
+    )
+    session.snapshot = snapshot
+    session.status = "completed"
+
+    client = TestClient(app)
+
+    cover_response = client.get(f"/api/analysis-sessions/{session.session_id}/albums/{folder_id}/cover")
+    assert cover_response.status_code == 200
+    assert cover_response.content == cover_path.read_bytes()
+
+    stream_response = client.get(f"/api/analysis-sessions/{session.session_id}/albums/{folder_id}/tracks/0/stream")
+    assert stream_response.status_code == 200
+    assert stream_response.content == track_path.read_bytes()

@@ -67,13 +67,16 @@ class RecommendationReasonModel(BaseModel):
 
 
 class TrackInfoModel(BaseModel):
+    track_index: int
     filename: str
+    filepath: str
     title: Optional[str] = None
     artist: Optional[str] = None
     album: Optional[str] = None
     duration: Optional[float] = None
     size_mb: float
     bitrate: Optional[int] = None
+    stream_url: Optional[str] = None
 
 
 class FolderSummaryModel(BaseModel):
@@ -89,6 +92,7 @@ class FolderSummaryModel(BaseModel):
     lyrics_ratio: float
     total_size_mb: float
     is_deleted: bool = False
+    album_art_preview_url: Optional[str] = None
     tracks: List[TrackInfoModel] = Field(default_factory=list)
 
 

@@ -9,8 +9,12 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from mutagen._util import MutagenError
+from mutagen.flac import FLAC
+from mutagen.id3 import ID3, ID3NoHeaderError
+from mutagen.mp3 import MP3, HeaderNotFoundError as MP3HeaderNotFoundError
 
 from music_dup_lib import config
 from music_dup_lib.services import AnalysisOptions
@@ -228,6 +232,33 @@ def create_app() -> FastAPI:
         os.startfile(str(path))
         return {"status": "opened", "path": str(path)}
 
+    @app.get("/api/analysis-sessions/{session_id}/albums/{folder_id}/cover")
+    def get_album_cover(session_id: str, folder_id: str):
+        session = _get_session_or_404(session_id)
+        album, folder_info = _get_album_context_or_404(session, folder_id)
+        cover_file = _find_cover_file(album.path)
+        if cover_file:
+            return FileResponse(cover_file)
+
+        embedded_art = _read_embedded_album_art(folder_info)
+        if embedded_art is None:
+            raise HTTPException(status_code=404, detail="Album cover is not available.")
+
+        content, media_type = embedded_art
+        return Response(content=content, media_type=media_type)
+
+    @app.get("/api/analysis-sessions/{session_id}/albums/{folder_id}/tracks/{track_index}/stream")
+    def stream_track(session_id: str, folder_id: str, track_index: int):
+        session = _get_session_or_404(session_id)
+        _album, folder_info = _get_album_context_or_404(session, folder_id)
+        if track_index < 0 or track_index >= len(folder_info.files):
+            raise HTTPException(status_code=404, detail="Track not found.")
+
+        track_path = folder_info.files[track_index].filepath.resolve()
+        if not track_path.is_file():
+            raise HTTPException(status_code=404, detail="Track file is missing.")
+        return FileResponse(track_path)
+
     return app
 
 
@@ -258,17 +289,27 @@ def _cluster_model(session, cluster_id: str) -> ClusterSummaryModel:
             lyrics_ratio=album.lyrics_ratio,
             total_size_mb=album.total_size_mb,
             is_deleted=album.folder_id in session.deleted_folder_ids,
+            album_art_preview_url=(
+                f"/api/analysis-sessions/{session.session_id}/albums/{album.folder_id}/cover"
+                if album.has_album_art
+                else None
+            ),
             tracks=[
                 TrackInfoModel(
+                    track_index=index,
                     filename=file_info.filename,
+                    filepath=str(file_info.filepath),
                     title=file_info.title,
                     artist=file_info.artist,
                     album=file_info.album,
                     duration=file_info.duration,
                     size_mb=file_info.size_mb,
                     bitrate=file_info.bitrate,
+                    stream_url=(
+                        f"/api/analysis-sessions/{session.session_id}/albums/{album.folder_id}/tracks/{index}/stream"
+                    ),
                 )
-                for file_info in session.snapshot.folders[album.path].files
+                for index, file_info in enumerate(session.snapshot.folders[album.path].files)
             ],
         )
         for album in (session.snapshot.albums[folder_id] for folder_id in cluster.folder_ids)
@@ -343,6 +384,53 @@ def _preview_model(preview) -> DeletePreviewResponse:
         auto_selected_count=preview.auto_selected_count,
         manual_selected_count=preview.manual_selected_count,
     )
+
+
+def _get_album_context_or_404(session, folder_id: str):
+    album = session.snapshot.albums.get(folder_id)
+    if album is None:
+        raise HTTPException(status_code=404, detail=f"Unknown album id: {folder_id}")
+
+    folder_info = session.snapshot.folders.get(album.path)
+    if folder_info is None:
+        raise HTTPException(status_code=404, detail="Album content is unavailable.")
+    return album, folder_info
+
+
+def _find_cover_file(folder_path: Path) -> Path | None:
+    for filename in sorted(config.ALBUM_ART_FILES):
+        cover_file = folder_path / filename
+        if cover_file.is_file():
+            return cover_file.resolve()
+    return None
+
+
+def _read_embedded_album_art(folder_info) -> tuple[bytes, str] | None:
+    for file_info in folder_info.files[:5]:
+        art_payload = _read_embedded_art_from_track(file_info.filepath)
+        if art_payload is not None:
+            return art_payload
+    return None
+
+
+def _read_embedded_art_from_track(track_path: Path) -> tuple[bytes, str] | None:
+    try:
+        ext = track_path.suffix.lower()
+        if ext == ".mp3":
+            audio = MP3(track_path, ID3=ID3)
+            if audio.tags:
+                pictures = audio.tags.getall("APIC")
+                if pictures:
+                    picture = pictures[0]
+                    return picture.data, picture.mime or "image/jpeg"
+        if ext == ".flac":
+            audio = FLAC(track_path)
+            if audio.pictures:
+                picture = audio.pictures[0]
+                return picture.data, picture.mime or "image/jpeg"
+    except (ID3NoHeaderError, MP3HeaderNotFoundError, MutagenError, OSError):
+        return None
+    return None
 
 
 app = create_app()

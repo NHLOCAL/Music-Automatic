@@ -402,15 +402,15 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
 
     await waitFor(() =>
-      expect(screen.getByText("עותקי האלבום זה לצד זה")).toBeInTheDocument(),
+      expect(screen.getByTestId("diff-shell")).toBeInTheDocument(),
     );
     expect(screen.getAllByText("Best vs Archive Copy").length).toBeGreaterThan(0);
     expect(screen.getAllByText("בטוח למחיקה").length).toBeGreaterThan(0);
-    expect(screen.getByText("רשימת השוואה מפורטת")).toBeInTheDocument();
+    expect(screen.getByText("השמעת השוואה מהירה")).toBeInTheDocument();
     expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
     expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "נבחר לשמירה" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "מיועד למחיקה" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "למחיקה" })).toBeInTheDocument();
   });
 
   it("opens the standalone finalize screen and shows partial execution status after delete", async () => {
@@ -613,7 +613,7 @@ describe("App", () => {
     fireEvent.click(screen.getByText("לסקירה"));
 
     await waitFor(() => expect(screen.getAllByText("Best vs Archive Copy").length).toBeGreaterThan(0));
-    fireEvent.click(screen.getByRole("button", { name: "מיועד למחיקה" }));
+    fireEvent.click(screen.getByRole("button", { name: "למחיקה" }));
 
     await waitFor(() => {
       const decisionRequest = fetchMock.mock.calls.find(([url]) =>

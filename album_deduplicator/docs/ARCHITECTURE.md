@@ -165,6 +165,8 @@
   - פתיחה מיידית של נתיבים ב-Explorer.
   - מחיקה בודדת מיידית מתוך ה-cluster.
   - delete confirmation.
+  - playback ישיר של שירים מתוך טבלת ההשוואה דרך stream URLs של ה-API.
+  - preview של עטיפות אלבום בכל כרטיס עותק, כולל fallback ל-embedded art כאשר אין קובץ עטיפה חיצוני.
 - `src/theme/antdTheme.js`
   - seed tokens ו-component tokens של `Ant Design 6`.
   - קובע palette, typography, radius, shadows ו-motion עבור שפת `Cartoon Desktop` מעודנת יותר, עם density רגועה ו-border hierarchy מתונה.
@@ -173,7 +175,9 @@
   - מייבא partials קטנים תחת `src/styles/` עבור shell כללי, מסכי setup/scan/summary, סביבת review, ומסך finalize.
   - מגדיר גם `scroll containers` ברורים ברמת ה-shell, review workspace, ו-finalize כדי למנוע clipping כאשר תצוגות ארוכות או רחבות.
   - מסכי `scan` ו-`summary` משתמשים ב-grid ייעודי ל-KPI-ים במקום overrides על `Row/Col`, כדי לשמור על layout יציב גם בחלונות צרים או צפופים.
+  - מסך `scan` כולל גם strip של שלבי ניתוח, אנימציית orbit/equalizer קלה, ו-copy דינמי לפי `stage` פעיל.
   - סביבת `review` משתמשת כעת ב-overview דו-עמודי: hero החלטה ראשי + side rail למצב הקבוצה ולשקיפות scoring, כדי לצמצם עומס ויזואלי ולהפריד בין summary, החלטות ותוכן השוואה.
+  - באזור ה-`review` יש גם audio preview docked ו-preview ויזואלי של עטיפות אלבום, כדי לאפשר אימות ידני מהיר בלי לצאת מהיישום.
 - `src/desktop.js`
   - abstraction ליכולות desktop ול-runtime metadata.
 - `src/App.test.jsx`
@@ -417,6 +421,21 @@ final_score = base_score
 - מה יימחק
 - מה יישמר
 - לאיזה cluster כל item שייך
+
+### `GET /api/analysis-sessions/{session_id}/albums/{folder_id}/cover`
+
+מחזיר preview של עטיפת אלבום עבור העותק המבוקש:
+
+- קודם מנסה קובץ עטיפה ידוע מתוך התיקייה
+- אם אין קובץ כזה אבל יש embedded art באחד השירים, מחזיר את התמונה המוטמעת
+- משמש את ה-frontend ל-preview ולהגדלה מתוך כרטיסי האלבום
+
+### `GET /api/analysis-sessions/{session_id}/albums/{folder_id}/tracks/{track_index}/stream`
+
+מחזיר stream של קובץ השיר לפי מיקומו בתוך העותק:
+
+- ה-frontend משתמש בנתיב הזה לניגון ישיר מתוך טבלת ההשוואה
+- הגישה נשארת session-scoped ולא חושפת filesystem paths כ-endpoint ציבורי גנרי
 
 ### `POST /api/analysis-sessions/{session_id}/delete-executions`
 

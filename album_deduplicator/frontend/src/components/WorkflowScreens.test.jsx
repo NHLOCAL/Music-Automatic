@@ -9,7 +9,7 @@ describe("Workflow screens", () => {
     cleanup();
   });
 
-  it("renders the scanning screen with a stable progress hero and three status cards", () => {
+  it("renders the scanning screen with animated stage cards and stable status panels", () => {
     render(
       <ScanningScreen
         progress={{
@@ -26,13 +26,15 @@ describe("Workflow screens", () => {
     expect(screen.getByText("סריקה חכמה בתהליך")).toBeInTheDocument();
     expect(screen.getByText("מנועי ההשוואה עובדים")).toBeInTheDocument();
     expect(screen.getByText("משווה בין אלבומים")).toBeInTheDocument();
+    expect(screen.getByTestId("scanning-stage-strip")).toBeInTheDocument();
     expect(screen.getByTestId("scanning-status-grid")).toBeInTheDocument();
     expect(screen.getByText("שלב פעיל")).toBeInTheDocument();
     expect(screen.getByText("התקדמות")).toBeInTheDocument();
     expect(screen.getByText("מצב")).toBeInTheDocument();
-    expect(screen.getByText("compare")).toBeInTheDocument();
+    expect(screen.getAllByText("משווה ובונה קבוצות").length).toBeGreaterThan(0);
     expect(screen.getByText("21/50")).toBeInTheDocument();
-    expect(screen.getByText("מריץ ניתוח")).toBeInTheDocument();
+    expect(screen.getByText("ניתוח בלבד")).toBeInTheDocument();
+    expect(screen.getByText("מזהה אלבומים, קורא metadata ובודק עטיפות וקבצי שמע.")).toBeInTheDocument();
   });
 
   it("renders the summary screen with the refreshed desktop stat grid", () => {

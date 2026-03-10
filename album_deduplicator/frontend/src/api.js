@@ -1,8 +1,15 @@
 import { getRuntimeSnapshot } from "./desktop";
 
 const API_BASE = getRuntimeSnapshot().backendBaseUrl;
+
+export function buildApiUrl(path) {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE}${path}`;
+}
+
 export async function requestJson(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     headers: {
       "Content-Type": "application/json",
       ...(options.headers ?? {}),
@@ -17,7 +24,7 @@ export async function requestJson(path, options = {}) {
   return response.json();
 }
 export function getEventSource(sessionId) {
-  return new EventSource(`${API_BASE}/api/analysis-sessions/${sessionId}/events`);
+  return new EventSource(buildApiUrl(`/api/analysis-sessions/${sessionId}/events`));
 }
 export function createAnalysisSession(payload) {
   return requestJson("/api/analysis-sessions", {

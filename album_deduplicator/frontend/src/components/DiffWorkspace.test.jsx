@@ -17,12 +17,33 @@ const cluster = {
       avg_bitrate: 320,
       file_count: 2,
       has_album_art: true,
+      album_art_preview_url: "/api/analysis-sessions/session-1/albums/folder-1/cover",
       in_preferred_root: true,
       total_size_mb: 120,
       is_deleted: false,
       tracks: [
-        { filename: "01.mp3", title: "פתיחה", artist: "ארי", duration: 180, size_mb: 6.2, bitrate: 320 },
-        { filename: "02.mp3", title: "סיום", artist: "ארי", duration: 200, size_mb: 7.1, bitrate: 320 },
+        {
+          track_index: 0,
+          filename: "01.mp3",
+          filepath: "C:/Music/Acoustix/01.mp3",
+          title: "פתיחה",
+          artist: "ארי",
+          duration: 180,
+          size_mb: 6.2,
+          bitrate: 320,
+          stream_url: "/api/analysis-sessions/session-1/albums/folder-1/tracks/0/stream",
+        },
+        {
+          track_index: 1,
+          filename: "02.mp3",
+          filepath: "C:/Music/Acoustix/02.mp3",
+          title: "סיום",
+          artist: "ארי",
+          duration: 200,
+          size_mb: 7.1,
+          bitrate: 320,
+          stream_url: "/api/analysis-sessions/session-1/albums/folder-1/tracks/1/stream",
+        },
       ],
     },
     {
@@ -33,12 +54,33 @@ const cluster = {
       avg_bitrate: 256,
       file_count: 2,
       has_album_art: false,
+      album_art_preview_url: null,
       in_preferred_root: false,
       total_size_mb: 110,
       is_deleted: false,
       tracks: [
-        { filename: "01.mp3", title: "פתיחה", artist: "ארי", duration: 180, size_mb: 5.8, bitrate: 256 },
-        { filename: "02.mp3", title: "סיום", artist: "ארי", duration: 200, size_mb: 6.4, bitrate: 256 },
+        {
+          track_index: 0,
+          filename: "01.mp3",
+          filepath: "D:/Archive/Acoustix/01.mp3",
+          title: "פתיחה",
+          artist: "ארי",
+          duration: 180,
+          size_mb: 5.8,
+          bitrate: 256,
+          stream_url: "/api/analysis-sessions/session-1/albums/folder-2/tracks/0/stream",
+        },
+        {
+          track_index: 1,
+          filename: "02.mp3",
+          filepath: "D:/Archive/Acoustix/02.mp3",
+          title: "סיום",
+          artist: "ארי",
+          duration: 200,
+          size_mb: 6.4,
+          bitrate: 256,
+          stream_url: "/api/analysis-sessions/session-1/albums/folder-2/tracks/1/stream",
+        },
       ],
     },
     {
@@ -49,12 +91,33 @@ const cluster = {
       avg_bitrate: 192,
       file_count: 2,
       has_album_art: false,
+      album_art_preview_url: null,
       in_preferred_root: false,
       total_size_mb: 95,
       is_deleted: false,
       tracks: [
-        { filename: "01.mp3", title: "פתיחה", artist: "ארי", duration: 180, size_mb: 4.9, bitrate: 192 },
-        { filename: "02.mp3", title: "סיום", artist: "ארי", duration: 200, size_mb: 5.5, bitrate: 192 },
+        {
+          track_index: 0,
+          filename: "01.mp3",
+          filepath: "E:/Backup/Acoustix/01.mp3",
+          title: "פתיחה",
+          artist: "ארי",
+          duration: 180,
+          size_mb: 4.9,
+          bitrate: 192,
+          stream_url: "/api/analysis-sessions/session-1/albums/folder-3/tracks/0/stream",
+        },
+        {
+          track_index: 1,
+          filename: "02.mp3",
+          filepath: "E:/Backup/Acoustix/02.mp3",
+          title: "סיום",
+          artist: "ארי",
+          duration: 200,
+          size_mb: 5.5,
+          bitrate: 192,
+          stream_url: "/api/analysis-sessions/session-1/albums/folder-3/tracks/1/stream",
+        },
       ],
     },
   ],
@@ -95,7 +158,7 @@ describe("DiffWorkspace", () => {
     cleanup();
   });
 
-  it("renders the redesigned comparison workspace with a decision strip and a track summary", () => {
+  it("renders album covers, a docked audio preview area, and the track table", () => {
     render(
       <DiffWorkspace
         cluster={cluster}
@@ -106,40 +169,17 @@ describe("DiffWorkspace", () => {
     );
 
     expect(screen.getAllByText("עותק 1").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("עותק 2").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("עותק 3").length).toBeGreaterThan(0);
-    expect(screen.getByText("העותק שיישמר כעת")).toBeInTheDocument();
-    expect(screen.getByText("המלצת המערכת")).toBeInTheDocument();
-    expect(screen.getByText("בסיס ההשוואה בטבלת השירים")).toBeInTheDocument();
-    expect(screen.getByText("מה יועבר לסל המחזור")).toBeInTheDocument();
-    expect(screen.getByTestId("diff-shell")).toBeInTheDocument();
-    expect(screen.getByTestId("comparison-scroller")).toBeInTheDocument();
+    expect(screen.getByText("עטיפת אלבום")).toBeInTheDocument();
+    expect(screen.getAllByText("אין עטיפה זמינה").length).toBeGreaterThan(0);
+    expect(screen.getByText("השמעת השוואה מהירה")).toBeInTheDocument();
+    expect(screen.getByText("בחר שיר מכל עותק כדי להשוות ישירות את הצליל, העוצמה והאיכות.")).toBeInTheDocument();
+    expect(screen.getByText("בסיס השוואה בטבלה:")).toBeInTheDocument();
     expect(screen.getByTestId("track-table-card")).toBeInTheDocument();
-    expect(screen.getByText("מצב הקבוצה")).toBeInTheDocument();
-    expect(screen.getByText("תמונת מצב מהירה")).toBeInTheDocument();
     expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
-    expect(screen.getByText("עותקי האלבום זה לצד זה")).toBeInTheDocument();
-    expect(screen.getByText("רשימת השוואה מפורטת")).toBeInTheDocument();
-    expect(screen.getByText("בחר מול איזה עותק מוצגים ההבדלים")).toBeInTheDocument();
-    expect(screen.getByText("הטבלה עוקבת אוטומטית אחרי בסיס ההחלטה")).toBeInTheDocument();
-    expect(screen.getByText("תואם לעותק הבסיס")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("איך המערכת הגיעה להחלטה"));
-    expect(screen.getByText("ציון סופי")).toBeInTheDocument();
-    expect(screen.getByText("השוואה מתמטית")).toBeInTheDocument();
-    expect(screen.getByText("למידת מכונה")).toBeInTheDocument();
-    expect(screen.getByText("Score בסיס")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "נבחר לשמירה" })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "מיועד למחיקה" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "פתח בתיקייה" })).toHaveLength(3);
-    expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("02.mp3").length).toBeGreaterThan(0);
-    expect(screen.getByText("סיכום זמינות")).toBeInTheDocument();
-    expect(screen.getAllByText("2 שירים זמינים").length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("table").length).toBeGreaterThan(0);
-  }, 10000);
+  });
 
-  it("shows system insight text and toggles the details panel open", () => {
-    render(
+  it("starts an in-app preview player when the user plays a track", () => {
+    const { container } = render(
       <DiffWorkspace
         cluster={cluster}
         currentKeeperId="folder-1"
@@ -148,10 +188,13 @@ describe("DiffWorkspace", () => {
       />,
     );
 
-    expect(screen.getByText("פירוט score, הסבר אנושי, ושכבת השקיפות האלגוריתמית.")).toBeInTheDocument();
-    expect(screen.queryByText("ציון סופי")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("איך המערכת הגיעה להחלטה"));
-    expect(screen.getAllByText("89.7/100").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "נגן את 01.mp3" })[0]);
+
+    expect(screen.getByTestId("audio-preview-card")).toBeInTheDocument();
+    expect(screen.getByText("מנגן מתוך הממשק")).toBeInTheDocument();
+    expect(screen.getAllByText("פתיחה").length).toBeGreaterThan(0);
+    expect(screen.getByText("C:/Music/Acoustix/01.mp3")).toBeInTheDocument();
+    expect(container.querySelector("audio")).not.toBeNull();
   });
 
   it("lets the user pin the track comparison to a specific album copy", () => {
@@ -166,12 +209,10 @@ describe("DiffWorkspace", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: "עותק 2" }));
 
-    expect(screen.getByText("הטבלה מקובעת כרגע לבסיס השוואה ידני")).toBeInTheDocument();
-    expect(screen.getAllByText("הטבלה מציגה כעת את כל ההבדלים מול עותק 2.").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("בסיס ידני").length).toBeGreaterThan(0);
+    expect(screen.getByText("הטבלה מקובעת כעת לעותק 2 כדי לאפשר השוואה ידנית.")).toBeInTheDocument();
   });
 
-  it("keeps all copy actions selectable when no keeper has been chosen yet", () => {
+  it("keeps copy actions selectable when no keeper has been chosen yet", () => {
     render(
       <DiffWorkspace
         cluster={cluster}
@@ -182,8 +223,7 @@ describe("DiffWorkspace", () => {
     );
 
     expect(screen.getAllByRole("button", { name: "שמור עותק זה" })).toHaveLength(3);
-    expect(screen.getByText("עדיין לא נבחר keeper ידני")).toBeInTheDocument();
-    expect(screen.getByText("0 עותקים")).toBeInTheDocument();
-    expect(screen.queryAllByRole("button", { name: "מיועד למחיקה" })).toHaveLength(0);
+    expect(screen.getByText("לא נבחר")).toBeInTheDocument();
+    expect(screen.getByText("לסל המחזור")).toBeInTheDocument();
   });
 });

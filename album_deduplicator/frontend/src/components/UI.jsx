@@ -2,6 +2,7 @@ import React from "react";
 import {
   ArrowLeftOutlined,
   BulbOutlined,
+  CaretRightOutlined,
   CheckCircleOutlined,
   CheckOutlined,
   ClockCircleOutlined,
@@ -16,6 +17,7 @@ import {
   FolderOpenOutlined,
   InfoCircleOutlined,
   LineChartOutlined,
+  PictureOutlined,
   PlusOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
@@ -46,6 +48,8 @@ const iconMap = {
   info: InfoCircleOutlined,
   "arrow-left": ArrowLeftOutlined,
   bulb: BulbOutlined,
+  play: CaretRightOutlined,
+  image: PictureOutlined,
 };
 
 const toneColorMap = {
