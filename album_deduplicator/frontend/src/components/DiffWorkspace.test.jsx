@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DiffWorkspace } from "./DiffWorkspace";
 
@@ -70,8 +70,19 @@ const cluster = {
 };
 
 describe("DiffWorkspace", () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(function mockPlay() {
+      this.dispatchEvent(new Event("play"));
+      return Promise.resolve();
+    });
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(function mockPause() {
+      this.dispatchEvent(new Event("pause"));
+    });
+  });
+
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it("renders album art and fallback cover states in the compact review panes", () => {
@@ -91,7 +102,7 @@ describe("DiffWorkspace", () => {
     expect(screen.getByText("למחיקה: 1")).toBeInTheDocument();
   });
 
-  it("starts an in-app audio preview when the user plays a track", () => {
+  it("starts an in-app audio preview and allows pausing from the same track button", () => {
     const { container } = render(
       <DiffWorkspace
         cluster={cluster}
@@ -111,6 +122,11 @@ describe("DiffWorkspace", () => {
     expect(screen.getByRole("button", { name: "סגור את נגן ההשוואה" })).toBeInTheDocument();
     expect(screen.getByLabelText("ציר הזמן של פתיחה")).toBeInTheDocument();
     expect(container.querySelector("audio")).not.toBeNull();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "השהה את 01.mp3" })[0]);
+
+    expect(screen.getAllByRole("button", { name: "נגן את 01.mp3" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "השהה את 01.mp3" })).not.toBeInTheDocument();
   });
 
   it("opens a confirmation before mass delete from the review toolbar", async () => {
@@ -147,5 +163,20 @@ describe("DiffWorkspace", () => {
     expect(screen.getAllByRole("button", { name: "שמור עותק זה" })).toHaveLength(2);
     expect(screen.getByText("נשמר: לא נבחר")).toBeInTheDocument();
     expect(screen.getByText("למחיקה: 0")).toBeInTheDocument();
+  });
+
+  it("keeps the album comparison area inside a dedicated scroll container", () => {
+    render(
+      <DiffWorkspace
+        cluster={cluster}
+        currentKeeperId="folder-1"
+        handleDecision={vi.fn()}
+        openExplorer={vi.fn()}
+        previewCount={0}
+      />,
+    );
+
+    expect(screen.getByTestId("comparison-scroller")).toHaveStyle({ overflow: "auto" });
+    expect(screen.getAllByText(/Acoustix/).length).toBeGreaterThan(0);
   });
 });

@@ -27,25 +27,29 @@ function AlbumArtPreview({ album }) {
   );
 }
 
-function AudioPreviewCard({ audioPreview, onDismiss }) {
+function AudioPreviewCard({ audioPreview, onDismiss, onPlaybackStateChange }) {
   const audioRef = useRef(null);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
+  const handledToggleRef = useRef(0);
 
   useEffect(() => {
     setDuration(0);
     setCurrentTime(0);
     setIsPlaying(Boolean(audioPreview));
+    handledToggleRef.current = audioPreview?.toggleRequest ?? 0;
   }, [audioPreview?.key]);
 
-  if (!audioPreview) return null;
+  useEffect(() => {
+    onPlaybackStateChange?.(isPlaying);
+  }, [isPlaying, onPlaybackStateChange]);
 
-  const audioSource = buildApiUrl(audioPreview.streamUrl);
+  const audioSource = buildApiUrl(audioPreview?.streamUrl);
 
   const togglePlayback = async () => {
     if (!audioRef.current) return;
-    if (audioRef.current.paused) {
+    if (!isPlaying) {
       try {
         await audioRef.current.play();
       } catch {
@@ -61,6 +65,16 @@ function AudioPreviewCard({ audioPreview, onDismiss }) {
     setCurrentTime(nextTime);
     if (audioRef.current) audioRef.current.currentTime = nextTime;
   };
+
+  useEffect(() => {
+    if (!audioRef.current) return;
+    const nextToggleRequest = audioPreview?.toggleRequest ?? 0;
+    if (nextToggleRequest === 0 || nextToggleRequest === handledToggleRef.current) return;
+    handledToggleRef.current = nextToggleRequest;
+    togglePlayback();
+  }, [audioPreview?.toggleRequest]);
+
+  if (!audioPreview) return null;
 
   return (
     <div className="ide-audio-preview" data-testid="audio-preview-card">
@@ -79,6 +93,10 @@ function AudioPreviewCard({ audioPreview, onDismiss }) {
         }}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
+        onEnded={() => {
+          setIsPlaying(false);
+          onDismiss();
+        }}
       />
       <div className="ide-audio-preview-copy">
         <div className="ide-audio-preview-head">
@@ -129,9 +147,11 @@ export function DiffWorkspace({
   isExecuting,
 }) {
   const [audioPreview, setAudioPreview] = useState(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
 
   useEffect(() => {
     setAudioPreview(null);
+    setIsAudioPlaying(false);
   }, [cluster?.cluster_id, currentKeeperId]);
 
   if (!cluster) {
@@ -150,11 +170,21 @@ export function DiffWorkspace({
 
   const handleTrackPreview = (album, entry) => {
     if (!entry?.stream_url) return;
-    setAudioPreview({
-      key: `${album.folder_id}:${entry.track_index ?? entry.filename}`,
-      trackTitle: entry.title || entry.filename,
-      filePath: entry.filepath || album.path,
-      streamUrl: entry.stream_url,
+    const nextKey = `${album.folder_id}:${entry.track_index ?? entry.filename}`;
+    setAudioPreview((current) => {
+      if (current?.key === nextKey) {
+        return {
+          ...current,
+          toggleRequest: (current.toggleRequest ?? 0) + 1,
+        };
+      }
+      return {
+        key: nextKey,
+        trackTitle: entry.title || entry.filename,
+        filePath: entry.filepath || album.path,
+        streamUrl: entry.stream_url,
+        toggleRequest: 0,
+      };
     });
   };
 
@@ -192,7 +222,7 @@ export function DiffWorkspace({
         </div>
       </div>
 
-      <div className="ide-diff-container">
+      <div className="ide-diff-container" data-testid="comparison-scroller" style={{ overflow: "auto" }}>
         {visibleAlbums.map((album, index) => {
           const isKeeper = currentKeeperId === album.folder_id;
           const isTrash = Boolean(currentKeeperId) && !isKeeper;
@@ -242,7 +272,8 @@ export function DiffWorkspace({
                     return <div key={row.key} className="ide-track-row diff-err">חסר בעותק זה</div>;
                   }
 
-                  const isPlaying = audioPreview?.key === `${album.folder_id}:${entry.track_index ?? entry.filename}`;
+                  const isActivePreview = audioPreview?.key === `${album.folder_id}:${entry.track_index ?? entry.filename}`;
+                  const isPlaying = isActivePreview && isAudioPlaying;
 
                   return (
                     <div key={row.key} className={`ide-track-row ${isDiff ? "diff-warn" : ""}`}>
@@ -253,12 +284,12 @@ export function DiffWorkspace({
                       <Button
                         size="small"
                         type={isPlaying ? "primary" : "default"}
+                        shape="circle"
+                        icon={<Icon name={isPlaying ? "pause" : "play"} size={15} />}
                         onClick={() => handleTrackPreview(album, entry)}
                         disabled={!entry.stream_url}
-                        aria-label={`נגן את ${entry.filename}`}
-                      >
-                        {isPlaying ? "מנגן" : "נגן"}
-                      </Button>
+                        aria-label={`${isPlaying ? "השהה" : "נגן"} את ${entry.filename}`}
+                      />
                     </div>
                   );
                 })}
@@ -279,7 +310,14 @@ export function DiffWorkspace({
         })}
       </div>
 
-      <AudioPreviewCard audioPreview={audioPreview} onDismiss={() => setAudioPreview(null)} />
+      <AudioPreviewCard
+        audioPreview={audioPreview}
+        onDismiss={() => {
+          setAudioPreview(null);
+          setIsAudioPlaying(false);
+        }}
+        onPlaybackStateChange={setIsAudioPlaying}
+      />
     </div>
   );
 }

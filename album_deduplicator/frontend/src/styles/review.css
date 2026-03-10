@@ -105,14 +105,15 @@
 .ide-diff-container {
   flex: 1;
   display: flex;
-  overflow: hidden;
+  overflow: auto;
   background: var(--bg-app);
   padding: 12px;
   gap: 12px;
+  align-items: stretch;
 }
 
 .ide-pane {
-  flex: 1;
+  flex: 1 0 320px;
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
@@ -120,6 +121,8 @@
   border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  min-width: 320px;
+  min-height: 0;
 }
 
 .ide-pane.is-keeper {
