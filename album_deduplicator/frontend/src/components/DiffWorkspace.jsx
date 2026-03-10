@@ -139,6 +139,7 @@ function AudioPreviewCard({ audioPreview, onDismiss, onPlaybackStateChange }) {
 export function DiffWorkspace({
   cluster,
   currentKeeperId,
+  hasExplicitDecision = false,
   handleDecision,
   openExplorer,
   previewCount,
@@ -165,8 +166,14 @@ export function DiffWorkspace({
   const visibleAlbums = useMemo(() => cluster.albums.filter((album) => !album.is_deleted), [cluster]);
   const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
   const visibleAlbumIds = useMemo(() => visibleAlbums.map((album) => album.folder_id), [visibleAlbums]);
-  const keeperAlbum = visibleAlbums.find((album) => album.folder_id === currentKeeperId) ?? null;
-  const deleteCount = currentKeeperId ? Math.max(visibleAlbums.length - 1, 0) : 0;
+  const hasSuggestedKeeper = Boolean(currentKeeperId);
+  const keeperAlbum = hasExplicitDecision
+    ? visibleAlbums.find((album) => album.folder_id === currentKeeperId) ?? null
+    : null;
+  const suggestedKeeperAlbum = hasSuggestedKeeper
+    ? visibleAlbums.find((album) => album.folder_id === currentKeeperId) ?? null
+    : null;
+  const deleteCount = hasExplicitDecision && currentKeeperId ? Math.max(visibleAlbums.length - 1, 0) : 0;
 
   const handleTrackPreview = (album, entry) => {
     if (!entry?.stream_url) return;
@@ -202,6 +209,11 @@ export function DiffWorkspace({
           <StatusTag tone={keeperAlbum ? "success" : "neutral"}>
             נשמר: {keeperAlbum ? keeperAlbum.name : "לא נבחר"}
           </StatusTag>
+          {!hasExplicitDecision && suggestedKeeperAlbum ? (
+            <StatusTag tone="primary">
+              מומלץ לשמירה: {suggestedKeeperAlbum.name}
+            </StatusTag>
+          ) : null}
           <StatusTag tone={deleteCount > 0 ? "warning" : "neutral"}>למחיקה: {deleteCount}</StatusTag>
           {previewCount > 0 ? (
             <>
@@ -225,8 +237,9 @@ export function DiffWorkspace({
       <div className={`ide-review-scroll-shell ${audioPreview ? "has-audio-preview" : ""}`} data-testid="review-scroll-shell">
         <div className="ide-diff-container" data-testid="comparison-scroller">
         {visibleAlbums.map((album, index) => {
-          const isKeeper = currentKeeperId === album.folder_id;
-          const isTrash = Boolean(currentKeeperId) && !isKeeper;
+          const isSuggestedKeeper = currentKeeperId === album.folder_id;
+          const isKeeper = hasExplicitDecision && isSuggestedKeeper;
+          const isTrash = hasExplicitDecision && Boolean(currentKeeperId) && !isKeeper;
 
           return (
             <div key={album.folder_id} className={`ide-pane ${isKeeper ? "is-keeper" : isTrash ? "is-trash" : ""}`}>
@@ -303,7 +316,7 @@ export function DiffWorkspace({
                   style={{ width: "100%" }}
                   onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}
                 >
-                  {isKeeper ? "נבחר לשמירה (Keeper)" : isTrash ? "יסומן למחיקה (Trash)" : "שמור עותק זה"}
+                  {isKeeper ? "נבחר לשמירה" : isTrash ? "יסומן למחיקה" : isSuggestedKeeper ? "בחר עותק זה לשמירה" : "שמור עותק זה"}
                 </Button>
               </div>
             </div>

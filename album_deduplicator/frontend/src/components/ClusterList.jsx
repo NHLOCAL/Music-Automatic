@@ -5,7 +5,7 @@ import {
   getClusterDisplayTitle,
   getClusterSortPriority,
   getClusterStatusMeta,
-  hasClusterDecision,
+  hasExplicitKeeperDecision,
   formatPercent,
 } from "../utils";
 
@@ -28,7 +28,7 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
       <div className="ide-sidebar-list" data-testid="cluster-scroll">
         {filteredClusters.map((cluster) => {
           const isActive = cluster.cluster_id === selectedClusterId;
-          const isResolved = hasClusterDecision(decisions, cluster.cluster_id) && decisions[cluster.cluster_id] !== null;
+          const isResolved = hasExplicitKeeperDecision(cluster, decisions);
           const statusMeta = getClusterStatusMeta(cluster, isResolved);
           const score = cluster.pairs?.[0] ? formatPercent(cluster.pairs[0].final_score) : "N/A";
           

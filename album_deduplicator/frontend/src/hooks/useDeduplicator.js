@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, startTransition } from "react";
 import * as api from "../api";
-import { getActiveKeeperId } from "../utils";
+import { getActiveKeeperId, hasExplicitKeeperDecision } from "../utils";
 export function useDeduplicator() {
   const [sessionId, setSessionId] = useState(null);
   const [status, setStatus] = useState("idle");
@@ -89,6 +89,7 @@ export function useDeduplicator() {
     if (!sessionId) return;
     const cluster = clusters.find((item) => item.cluster_id === clusterId);
     const currentKeeperId = getActiveKeeperId(cluster, decisions);
+    const hadExplicitDecision = hasExplicitKeeperDecision(cluster, decisions);
     const visibleFolderIds = cluster
       ? cluster.albums.filter((album) => !album.is_deleted).map((album) => album.folder_id)
       : [];
@@ -97,7 +98,11 @@ export function useDeduplicator() {
     if (keeperId) {
       if (deleteFolderIds !== null) {
         nextDeleteFolderIds = deleteFolderIds.filter((folderId) => folderId !== keeperId);
-      } else if (currentKeeperId === keeperId && Object.prototype.hasOwnProperty.call(deleteSelections, clusterId)) {
+      } else if (
+        hadExplicitDecision
+        && currentKeeperId === keeperId
+        && Object.prototype.hasOwnProperty.call(deleteSelections, clusterId)
+      ) {
         nextDeleteFolderIds = (deleteSelections[clusterId] ?? []).filter((folderId) => folderId !== keeperId);
       } else {
         nextDeleteFolderIds = visibleFolderIds.filter((folderId) => folderId !== keeperId);

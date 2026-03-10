@@ -55,6 +55,11 @@ export function hasClusterDecision(decisions, clusterId) {
   return Object.prototype.hasOwnProperty.call(decisions, clusterId);
 }
 
+export function hasExplicitKeeperDecision(cluster, decisions = {}) {
+  if (!cluster) return false;
+  return hasClusterDecision(decisions, cluster.cluster_id) && decisions[cluster.cluster_id] !== null;
+}
+
 export function getActiveKeeperId(cluster, decisions = {}) {
   if (!cluster) return null;
   if (hasClusterDecision(decisions, cluster.cluster_id)) {
@@ -150,7 +155,7 @@ export function getClusterStatusMeta(cluster, hasDecision) {
 
 export function getClusterSortPriority(cluster, decisions = {}) {
   if (!cluster) return 99;
-  const hasDecision = hasClusterDecision(decisions, cluster.cluster_id) && decisions[cluster.cluster_id] !== null;
+  const hasDecision = hasExplicitKeeperDecision(cluster, decisions);
   const statusMeta = getClusterStatusMeta(cluster, hasDecision);
   if (statusMeta.label === "נבדק ומוכן") return 0;
   return 1;

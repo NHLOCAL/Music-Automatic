@@ -11,7 +11,7 @@ import { SummaryScreen } from "./components/SummaryScreen";
 import { ClusterList } from "./components/ClusterList";
 import { DiffWorkspace } from "./components/DiffWorkspace";
 import { FinalizeDeletionScreen } from "./components/FinalizeDeletionScreen";
-import { buildDeletionWorkflowModel, getActiveKeeperId, mergeDeleteAttemptResults } from "./utils";
+import { buildDeletionWorkflowModel, getActiveKeeperId, hasExplicitKeeperDecision, mergeDeleteAttemptResults } from "./utils";
 import { antTheme } from "./theme/antdTheme";
 
 function normalizeFolderPaths(entries) {
@@ -53,6 +53,7 @@ function AppContent() {
 
   const selectedCluster = d.clusters.find((cluster) => cluster.cluster_id === d.selectedClusterId) || null;
   const currentKeeperId = getActiveKeeperId(selectedCluster, d.decisions);
+  const hasExplicitDecision = hasExplicitKeeperDecision(selectedCluster, d.decisions);
   const deletionWorkflow = buildDeletionWorkflowModel(d.allClusters, d.preview, d.decisions, deleteAttemptResults);
 
   useEffect(() => {
@@ -200,6 +201,7 @@ function AppContent() {
                 key={`${d.selectedTab}-${d.selectedClusterId ?? "empty"}`}
                 cluster={selectedCluster}
                 currentKeeperId={currentKeeperId}
+                hasExplicitDecision={hasExplicitDecision}
                 handleDecision={updateClusterDecision}
                 openExplorer={openExplorer}
                 previewCount={d.preview.total_count}
