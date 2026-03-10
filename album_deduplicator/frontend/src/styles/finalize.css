@@ -1,37 +1,48 @@
 .finalize-shell {
-  height: 100%;
-  min-height: 0;
-  padding: 18px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable both-edges;
-}
-
-.finalize-layout {
-  min-height: 100%;
+  width: min(1120px, 100%);
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
   gap: 18px;
-  align-items: start;
 }
 
-.finalize-sidebar {
+.finalize-overview-card.ant-card .ant-card-body {
   display: grid;
-  gap: 16px;
-  position: sticky;
-  top: 18px;
+  gap: 18px;
 }
 
-.finalize-kpi-grid {
-  display: grid;
-  gap: 12px;
-}
-
-.finalize-kpi-card.ant-card .ant-card-body {
+.finalize-hero {
   display: flex;
   justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.finalize-hero-actions {
+  align-items: flex-start;
+}
+
+.finalize-topline {
+  justify-content: flex-start;
+}
+
+.finalize-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  align-items: center;
+}
+
+.finalize-summary-card.ant-card {
+  min-height: 154px;
+}
+
+.finalize-summary-card.ant-card .ant-card-body {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.finalize-note.ant-alert {
+  margin-top: 4px;
 }
 
 .finalize-content {
@@ -42,11 +53,11 @@
 
 .finalize-section-card.ant-card .ant-card-body {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .finalize-group-card.ant-card {
-  border-width: 2px;
+  border-width: 1px;
 }
 
 .finalize-group-head {
@@ -55,6 +66,33 @@
   gap: 16px;
   align-items: flex-start;
   flex-wrap: wrap;
+}
+
+.finalize-group-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr);
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.finalize-group-banner {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--surface-border);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.finalize-group-banner.is-warning {
+  background: linear-gradient(180deg, rgba(214, 144, 31, 0.10), rgba(255, 255, 255, 0.92));
+  border-color: rgba(214, 144, 31, 0.18);
+}
+
+.finalize-group-banner.is-success {
+  background: linear-gradient(180deg, rgba(29, 159, 95, 0.10), rgba(255, 255, 255, 0.92));
+  border-color: rgba(29, 159, 95, 0.18);
 }
 
 .finalize-keeper-card.ant-card {
@@ -67,6 +105,10 @@
 
 .finalize-item-card.is-history.ant-card {
   background: linear-gradient(180deg, rgba(29, 159, 95, 0.08), rgba(255, 255, 255, 0.92));
+}
+
+.finalize-item-card.is-failed.ant-card {
+  background: linear-gradient(180deg, rgba(217, 91, 83, 0.08), rgba(255, 255, 255, 0.94));
 }
 
 .finalize-item-meta {
@@ -84,11 +126,17 @@
 }
 
 @media (max-width: 1100px) {
-  .finalize-layout {
-    grid-template-columns: 1fr;
+  .finalize-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .finalize-sidebar {
-    position: static;
+  .finalize-group-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .finalize-summary-grid {
+    grid-template-columns: 1fr;
   }
 }

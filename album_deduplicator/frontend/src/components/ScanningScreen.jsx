@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, Progress, Typography } from "antd";
+import { Card, Progress, Statistic, Typography } from "antd";
 
 import { Icon, StatusTag } from "./UI";
 
@@ -55,12 +55,13 @@ function getStageMeta(progress, percent) {
 }
 
 function buildProgressDetails(progress, percent, stageMeta) {
+  const visibleStageIndex = Math.min(getStageIndex(progress.stage), STAGE_FLOW.length - 1) + 1;
   return [
     {
       icon: "folder",
       label: "שלב פעיל",
       value: stageMeta.title,
-      hint: stageMeta.description,
+      hint: `${visibleStageIndex} מתוך ${STAGE_FLOW.length} שלבי ניתוח פעילים עכשיו.`,
     },
     {
       icon: "clock",
@@ -82,6 +83,9 @@ export function ScanningScreen({ progress }) {
   const stageIndex = getStageIndex(progress.stage);
   const stageMeta = getStageMeta(progress, percent);
   const progressDetails = buildProgressDetails(progress, percent, stageMeta);
+  const progressCaption = progress.total
+    ? `${progress.current || 0}/${progress.total} פריטים עובדו`
+    : `${percent}% הושלמו`;
 
   return (
     <div className="screen-center screen-center--compact">
@@ -98,29 +102,6 @@ export function ScanningScreen({ progress }) {
           </div>
 
           <div className="scanning-hero">
-            <div className="scanning-progress-ring">
-              <div className="scanning-orbit">
-                <span className="scanning-orbit-dot dot-1" />
-                <span className="scanning-orbit-dot dot-2" />
-                <span className="scanning-orbit-dot dot-3" />
-                <Progress
-                  type="circle"
-                  percent={percent}
-                  strokeWidth={10}
-                  size={220}
-                  percentPosition={{ align: "center", type: "inner" }}
-                />
-              </div>
-              <Typography.Text className="scanning-progress-caption">התקדמות כוללת</Typography.Text>
-              <div className="scanning-equalizer" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-              </div>
-            </div>
-
             <div className="scanning-copy-block">
               <Typography.Title level={1} className="page-title scanning-title">
                 {progress.message || stageMeta.title}
@@ -133,6 +114,20 @@ export function ScanningScreen({ progress }) {
                 רק ניתוח והשוואה. שום תיקייה לא נמחקת או מועברת בשלב הזה.
               </div>
             </div>
+
+            <Card className="scanning-progress-card cartoon-panel" variant="borderless">
+              <Progress
+                type="circle"
+                percent={percent}
+                strokeWidth={9}
+                size={170}
+                percentPosition={{ align: "center", type: "inner" }}
+              />
+              <div className="scanning-progress-meta">
+                <Typography.Text strong>התקדמות כוללת</Typography.Text>
+                <Typography.Text type="secondary">{progressCaption}</Typography.Text>
+              </div>
+            </Card>
           </div>
 
           <div className="scanning-stage-strip" data-testid="scanning-stage-strip">
@@ -159,16 +154,8 @@ export function ScanningScreen({ progress }) {
           <div className="scanning-status-grid" data-testid="scanning-status-grid">
             {progressDetails.map((item) => (
               <Card key={item.label} className="scanning-status-card cartoon-panel" variant="borderless">
-                <div className="scanning-status-icon">
-                  <Icon name={item.icon} size={18} />
-                </div>
                 <div className="scanning-status-copy">
-                  <Typography.Text className="scanning-status-label" type="secondary">
-                    {item.label}
-                  </Typography.Text>
-                  <Typography.Title level={4} className="scanning-status-value">
-                    {item.value}
-                  </Typography.Title>
+                  <Statistic title={item.label} value={item.value} prefix={<Icon name={item.icon} size={16} />} />
                   <Typography.Text className="scanning-status-hint" type="secondary">
                     {item.hint}
                   </Typography.Text>
