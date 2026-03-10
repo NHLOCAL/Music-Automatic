@@ -158,7 +158,7 @@ describe("DiffWorkspace", () => {
     cleanup();
   });
 
-  it("renders album covers, a docked audio preview area, and the track table", () => {
+  it("renders album covers, a floating audio preview banner, and the track table", () => {
     render(
       <DiffWorkspace
         cluster={cluster}
@@ -172,10 +172,30 @@ describe("DiffWorkspace", () => {
     expect(screen.getByText("עטיפת אלבום")).toBeInTheDocument();
     expect(screen.getAllByText("אין עטיפה זמינה").length).toBeGreaterThan(0);
     expect(screen.getByText("השמעת השוואה מהירה")).toBeInTheDocument();
-    expect(screen.getByText("בחר שיר מכל עותק כדי להשוות ישירות את הצליל, העוצמה והאיכות.")).toBeInTheDocument();
+    expect(screen.getByText("נגן השוואה צף")).toBeInTheDocument();
+    expect(screen.getByText("הטעינה מתחילה מתוך כפתור \"נגן\" בכל שורה.")).toBeInTheDocument();
     expect(screen.getByText("בסיס השוואה בטבלה:")).toBeInTheDocument();
     expect(screen.getByTestId("track-table-card")).toBeInTheDocument();
     expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("איך המערכת הגיעה להחלטה"));
+    expect(screen.getByText("מודל AI")).toBeInTheDocument();
+    expect(screen.queryByText((_, node) => node?.textContent?.includes("Score בסיס") ?? false)).not.toBeInTheDocument();
+  });
+
+  it("shows the base score only when it differs from the final score", () => {
+    render(
+      <DiffWorkspace
+        cluster={cluster}
+        currentKeeperId="folder-2"
+        handleDecision={vi.fn()}
+        openExplorer={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("איך המערכת הגיעה להחלטה"));
+
+    expect(screen.getByText("מודל AI")).toBeInTheDocument();
+    expect(screen.getAllByText((_, node) => node?.textContent?.includes("Score בסיס") ?? false).length).toBeGreaterThan(0);
   });
 
   it("starts an in-app preview player when the user plays a track", () => {
@@ -194,6 +214,7 @@ describe("DiffWorkspace", () => {
     expect(screen.getByText("מנגן מתוך הממשק")).toBeInTheDocument();
     expect(screen.getAllByText("פתיחה").length).toBeGreaterThan(0);
     expect(screen.getByText("C:/Music/Acoustix/01.mp3")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "סגור את נגן ההשוואה" })).toBeInTheDocument();
     expect(container.querySelector("audio")).not.toBeNull();
   });
 

@@ -16,6 +16,8 @@ export function ScoreTransparencyPanel({ cluster, currentKeeperId }) {
     ? "רמת התאמה גבוהה. ההבדלים בין הקבצים מינוריים או לא קיימים כלל."
     : "התאמה גבולית. נמצא דמיון רב אך ייתכנו שינויים באיכות השמע או באורך הקבצים. נדרשת החלטה אנושית.";
   const geminiText = representativePair.gemini_reason || representativePair.gemini_verdict;
+  const baseScore = representativePair.base_score ?? representativePair.final_score;
+  const shouldShowBaseScore = Math.abs((baseScore ?? 0) - (representativePair.final_score ?? 0)) >= 0.05;
 
   const metrics = [
     {
@@ -29,16 +31,19 @@ export function ScoreTransparencyPanel({ cluster, currentKeeperId }) {
       icon: "chart",
     },
     {
-      label: "למידת מכונה",
+      label: "מודל AI",
       value: representativePair.is_identical_by_hash ? "Hash זהה" : formatPercent(representativePair.ml_score),
       icon: "database",
     },
-    {
-      label: "Score בסיס",
-      value: formatPercent(representativePair.base_score ?? representativePair.final_score),
-      icon: "compare",
-    },
   ];
+
+  if (shouldShowBaseScore) {
+    metrics.push({
+      label: "Score בסיס",
+      value: formatPercent(baseScore),
+      icon: "compare",
+    });
+  }
 
   if (representativePair.gemini_score != null) {
     metrics.push({

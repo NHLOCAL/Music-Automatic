@@ -409,6 +409,9 @@ describe("App", () => {
     expect(screen.getByText("השמעת השוואה מהירה")).toBeInTheDocument();
     expect(screen.getAllByText("01.mp3").length).toBeGreaterThan(0);
     expect(screen.getByText("איך המערכת הגיעה להחלטה")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("איך המערכת הגיעה להחלטה"));
+    expect(screen.getByText("מודל AI")).toBeInTheDocument();
+    expect(screen.queryByText("Score בסיס")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "נבחר לשמירה" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "למחיקה" })).toBeInTheDocument();
   });
@@ -470,8 +473,10 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "התחל לעבור על התוצאות" }));
 
-    await waitFor(() => expect(screen.getByText("פתח את שלב ההעברה")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "פתח את שלב ההעברה" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "עבור לשלב ההעברה" })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "עבור לשלב ההעברה" }));
 
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: "מרכז ההעברה וההשוואה" })).toBeInTheDocument(),
