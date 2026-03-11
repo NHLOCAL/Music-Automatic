@@ -208,7 +208,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "בחר תיקייה עבור שורה 1" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "תיקייה לסריקה 2" })).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "תיקייה מועדפת לשמירה" })).toBeInTheDocument();
-    expect(screen.getByText("מתוך התיקיות שנבחרו")).toBeInTheDocument();
+    expect(screen.getByText("הבחירה כאן עוזרת למערכת להעדיף איזו תיקייה לשמור כאשר נמצאות תיקיות כפולות או כמעט זהות.")).toBeInTheDocument();
     fireEvent.click(screen.getByText("הגדרות מתקדמות"));
     expect(screen.getByRole("checkbox", { name: "רענון מלא מהדיסק" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "בדיקת Hash מלאה" })).toBeInTheDocument();

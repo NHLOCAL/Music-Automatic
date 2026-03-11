@@ -132,9 +132,8 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
                 optionFilterProp="label"
                 onChange={(value) => setForm((prev) => ({ ...prev, preferred_folder_id: value ?? "" }))}
               />
-              <Tag className="setup-preferred-chip" variant="filled">מתוך התיקיות שנבחרו</Tag>
             </div>
-            <div className="setup-helper-text">בחירה כאן משמשת כהעדפה בלבד כאשר כמה עותקים דומים באיכותם. אין צורך לבחור תיקייה נפרדת מחוץ לרשימה.</div>
+            <div className="setup-helper-text">הבחירה כאן עוזרת למערכת להעדיף איזו תיקייה לשמור כאשר נמצאות תיקיות כפולות או כמעט זהות.</div>
           </div>
 
           <div className="setup-form-group">
