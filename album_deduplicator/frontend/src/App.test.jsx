@@ -429,6 +429,54 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "כן, להעביר" })).toBeInTheDocument();
   }, 15000);
 
+  it("keeps the finalize screen stable when canceling a pending transfer for a cluster", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse(clusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/decisions") && options.method === "POST") {
+        return jsonResponse(emptyPreviewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(previewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1") && (!options.method || options.method === "GET")) {
+        return jsonResponse(sessionSummary);
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("workflow-step-finalize"));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "בטל העברה ושמור הכל" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "בטל העברה ושמור הכל" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("אין פריטים להעברה.")).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("heading", { name: "אישור העברה לסל המחזור (0 תיקיות)" })).toBeInTheDocument();
+  }, 15000);
+
   it("shows the scan step as active while a session is running and keeps future steps disabled", async () => {
     window.albumDeduplicator = createDesktopBridge();
     const fetchMock = vi.fn(async (url, options = {}) => {

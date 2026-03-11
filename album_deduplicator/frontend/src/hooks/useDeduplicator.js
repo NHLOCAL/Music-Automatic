@@ -21,6 +21,29 @@ const INITIAL_PREVIEW = {
   manual_selected_count: 0,
 };
 
+function buildOptimisticPreviewAfterKeepAll(currentPreview, clusterId) {
+  const safePreview = currentPreview ?? INITIAL_PREVIEW;
+  const currentItems = Array.isArray(safePreview.items) ? safePreview.items : [];
+  const nextItems = currentItems.filter((item) => item.cluster_id !== clusterId);
+
+  if (nextItems.length === currentItems.length) {
+    return safePreview;
+  }
+
+  const totalSizeMb = nextItems.reduce((sum, item) => sum + Number(item.estimated_size_mb ?? 0), 0);
+  const autoSelectedCount = nextItems.filter((item) => item.selection_source === "auto").length;
+  const manualSelectedCount = nextItems.filter((item) => item.selection_source === "user_selected").length;
+
+  return {
+    ...safePreview,
+    items: nextItems,
+    total_count: nextItems.length,
+    total_size_mb: Number(totalSizeMb.toFixed(2)),
+    auto_selected_count: autoSelectedCount,
+    manual_selected_count: manualSelectedCount,
+  };
+}
+
 export function useDeduplicator() {
   const [sessionId, setSessionId] = useState(null);
   const [status, setStatus] = useState("idle");
@@ -146,6 +169,9 @@ export function useDeduplicator() {
     const nextDeleteSelections = { ...deleteSelections, [clusterId]: nextDeleteFolderIds };
     setDecisions(nextDecisions);
     setDeleteSelections(nextDeleteSelections);
+    if (!keeperId) {
+      setPreview((currentPreview) => buildOptimisticPreviewAfterKeepAll(currentPreview, clusterId));
+    }
     try {
       const payload = {
         decisions: Object.entries(nextDecisions).map(([cid, kid]) => ({

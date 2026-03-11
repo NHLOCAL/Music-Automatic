@@ -76,9 +76,11 @@ export function FinalizeDeletionScreen({ workflow, onExecute, isExecuting, openE
                         </td>
                         <td rowSpan={group.pending.length}>
                           <div style={{display:'flex', flexDirection:'column', gap:4}}>
-                            <strong>{group.keeper.name}</strong>
-                            <div className="path-cell">{group.keeper.path}</div>
-                            <Tooltip title="פתח בתיקייה"><Icon name="folder" size={14} style={{cursor:'pointer', color:'#0060df'}} onClick={() => openExplorer(group.keeper.path)}/></Tooltip>
+                            <strong>{group.keeper?.name ?? "ללא Keeper נבחר"}</strong>
+                            <div className="path-cell">{group.keeper?.path ?? "הקבוצה נמצאת בעדכון, אפשר להמתין לרענון."}</div>
+                            {group.keeper?.path ? (
+                              <Tooltip title="פתח בתיקייה"><Icon name="folder" size={14} style={{cursor:'pointer', color:'#0060df'}} onClick={() => openExplorer(group.keeper.path)}/></Tooltip>
+                            ) : null}
                           </div>
                         </td>
                       </>
