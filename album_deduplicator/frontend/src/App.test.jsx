@@ -202,14 +202,14 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "הגדרת סריקה - Music Automatic" })).toBeInTheDocument();
+    expect(screen.getByText("מיוזיק אוטומטיק")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "תיקייה לסריקה 2" })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "תיקייה מועדפת לשמירה" })).toBeInTheDocument();
-    fireEvent.click(screen.getByText("הגדרות"));
-    expect(screen.getByRole("checkbox", { name: "סריקה מחדש מלאה" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "סריקת תוכן מלאה (Hash - מדויק אך איטי)" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "הפעל אימות AI למקרים גבוליים" })).toBeInTheDocument();
+    fireEvent.click(screen.getByText("הגדרות מתקדמות"));
+    expect(screen.getByRole("checkbox", { name: "רענון מלא מהדיסק" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "בדיקת Hash מלאה" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "אימות AI למקרים גבוליים" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "התחל סריקה" })).toBeDisabled();
   });
 
@@ -243,9 +243,10 @@ describe("App", () => {
 
     const folderInputs = getScanFolderInputs();
     fireEvent.change(folderInputs[0], { target: { value: "C:\\Music" } });
-    fireEvent.change(folderInputs[1], { target: { value: "D:\\Archive" } });
-    fireEvent.click(screen.getByText("הגדרות"));
-    fireEvent.click(screen.getByRole("checkbox", { name: "סריקת תוכן מלאה (Hash - מדויק אך איטי)" }));
+    fireEvent.click(screen.getByRole("button", { name: "הוסף תיקייה נוספת" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" }), { target: { value: "D:\\Archive" } });
+    fireEvent.click(screen.getByText("הגדרות מתקדמות"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "בדיקת Hash מלאה" }));
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
 
     await waitFor(() => {
@@ -272,7 +273,12 @@ describe("App", () => {
       target: { value: "C:\\Music" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "+ עיון..." }));
+    fireEvent.click(screen.getByRole("button", { name: "בחירת תיקיות..." }));
+    
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" })).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 3" })).toBeInTheDocument();
+    });
 
     await waitFor(() => {
       const pathInputs = getScanFolderInputs();
@@ -313,7 +319,8 @@ describe("App", () => {
 
     const folderInputs = getScanFolderInputs();
     fireEvent.change(folderInputs[0], { target: { value: "C:\\Music" } });
-    fireEvent.change(folderInputs[1], { target: { value: "D:\\Archive" } });
+    fireEvent.click(screen.getByRole("button", { name: "הוסף תיקייה נוספת" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" }), { target: { value: "D:\\Archive" } });
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
 
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));

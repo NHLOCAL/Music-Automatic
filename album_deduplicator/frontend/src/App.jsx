@@ -37,7 +37,7 @@ function AppContent() {
   const antContext = AntApp.useApp();
   const [appView, setAppView] = useState("setup");
   const [form, setForm] = useState({
-    folders: [{ id: "f1", path: "" }, { id: "f2", path: "" }],
+    folders: [{ id: "f1", path: "" }],
     preferred_root: "",
     force_rescan: false,
     clear_cache: false,

@@ -410,6 +410,7 @@
 
 .setup-inline-row {
   gap: 8px;
+  min-height: 42px;
 }
 
 .setup-option-copy {

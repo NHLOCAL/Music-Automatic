@@ -160,7 +160,7 @@
     - `בטוח למחיקה`
     - `דורש סקירה`
     - `כל התוצאות`
-  - מסך `setup` נשאר קומפקטי עם שתי שורות roots פתוחות כברירת מחדל, בחירה native מרובת תיקיות ב-Desktop, שדה `preferred_root` גלוי, ו-section מתקדם קצר עבור `force_rescan`, `Full Hash Scan` ו-`Gemini`.
+  - מסך `setup` נשאר קומפקטי עם שורת root אחת פתוחה כברירת מחדל, בחירה native מרובת תיקיות ב-Desktop, שדה `preferred_root` גלוי, ו-section מתקדם קצר עבור `force_rescan`, `Full Hash Scan` ו-`Gemini`.
   - שינוי keeper ידני.
   - סימון פרטני של עותקים למחיקה.
   - פתיחה מיידית של נתיבים ב-Explorer.

@@ -4,18 +4,18 @@ import { Button, Checkbox, Collapse, Input, Tag } from "antd";
 const ADVANCED_OPTIONS = [
   {
     key: "force_rescan",
-    label: "סריקה מחדש מלאה",
-    description: "התעלם מה־cache וסרוק את התיקיות מחדש.",
+    label: "רענון מלא מהדיסק",
+    description: "מתעלם מהמידע השמור ומחשב מחדש את כל התיקיות שנבחרו.",
   },
   {
     key: "full_hash_scan",
-    label: "סריקת תוכן מלאה (Hash - מדויק אך איטי)",
-    description: "משפר דיוק על חשבון זמן הסריקה.",
+    label: "בדיקת Hash מלאה",
+    description: "משפרת דיוק בהשוואה בין עותקים, אך מאריכה את זמן הסריקה.",
   },
   {
     key: "gemini_enabled",
-    label: "הפעל אימות AI למקרים גבוליים",
-    description: "מפעיל הכרעה נוספת רק למקרים לא חד-משמעיים.",
+    label: "אימות AI למקרים גבוליים",
+    description: "מוסיף בדיקת AI רק כשאין הכרעה ברורה בין העותקים.",
   },
 ];
 
@@ -41,7 +41,7 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
     () => form.folders.some((folder) => folder.path.trim().length > 0),
     [form.folders],
   );
-  const runtimeLabel = runtimeInfo?.isElectron ? "Desktop" : "Browser";
+  const runtimeLabel = runtimeInfo?.isElectron ? "אפליקציית Windows" : "גרסת דפדפן";
 
   return (
     <div className="modal-backdrop">
@@ -51,13 +51,16 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
             <Tag variant="filled" className="dialog-banner-chip">{runtimeLabel}</Tag>
             <Tag variant="filled" className="dialog-banner-chip dialog-banner-chip--accent">סל המחזור בלבד</Tag>
           </div>
-          <h1>הגדרת סריקה - Music Automatic</h1>
-          <p>בחר תיקיות לאיתור אלבומים כפולים</p>
+          <p className="setup-eyebrow">הגדרת סריקה בטוחה</p>
+          <h1>
+            <span className="setup-brand-title">מיוזיק אוטומטיק</span>
+            <span className="setup-title-subline">בחרו תיקיות לבדיקה ואאתר עבורכם אלבומים כפולים או כמעט זהים.</span>
+          </h1>
         </div>
 
         <div className="native-dialog-body">
           <div className="setup-form-group">
-            <label>תיקיות מקור:</label>
+            <label>תיקיות לסריקה</label>
             <div className="folder-list-box">
               {form.folders.map((folder, index) => (
                 <div key={folder.id} className="folder-list-item">
@@ -66,42 +69,44 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
                     variant="borderless"
                     size="small"
                     className="mono-text"
-                    placeholder="נתיב לתיקייה..."
+                    placeholder="למשל: C:\\Music\\Albums"
                     value={folder.path}
                     onChange={(event) => handlePathChange(folder.id, event.target.value)}
                   />
                   {form.folders.length > 1 ? (
                     <Button type="text" size="small" onClick={() => removeFolder(folder.id)} aria-label={`הסר תיקייה ${index + 1}`}>
-                      הסר
+                      הסר שורה
                     </Button>
                   ) : null}
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <div className="setup-helper-text">התחילו עם תיקייה אחת, והוסיפו עוד שורות רק אם יש עוד מקורות שחשוב להשוות.</div>
+            <div className="setup-inline-actions">
               {runtimeInfo?.isElectron ? (
-                <Button size="small" onClick={onPickFolders}>+ עיון...</Button>
+                <Button size="small" onClick={onPickFolders}>בחירת תיקיות...</Button>
               ) : null}
-              <Button size="small" onClick={addFolder}>+ הוסף שורה</Button>
+              <Button size="small" onClick={addFolder}>הוסף תיקייה נוספת</Button>
             </div>
           </div>
 
           <div className="setup-form-group">
-            <label>תיקייה מועדפת לשמירה:</label>
+            <label>תיקייה מועדפת לשמירה</label>
             <div className="folder-list-item setup-inline-row">
               <Input
                 aria-label="תיקייה מועדפת לשמירה"
                 variant="borderless"
                 size="small"
                 className="mono-text"
-                placeholder="למשל: C:\\Music\\Best"
+                placeholder="למשל: D:\\Music\\Keep"
                 value={form.preferred_root}
                 onChange={(event) => setForm((prev) => ({ ...prev, preferred_root: event.target.value }))}
               />
               {runtimeInfo?.isElectron ? (
-                <Button size="small" onClick={onPickPreferredRoot}>עיון...</Button>
+                <Button size="small" onClick={onPickPreferredRoot}>בחירה...</Button>
               ) : null}
             </div>
+            <div className="setup-helper-text">אם תגדירו תיקייה מועדפת, המערכת תעדיף לשמור עותקים שנמצאים בה כאשר איכותם דומה.</div>
           </div>
 
           <div className="setup-form-group">
@@ -112,7 +117,7 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
               items={[
                 {
                   key: "advanced",
-                  label: "הגדרות",
+                  label: "הגדרות מתקדמות",
                   children: (
                     <div className="advanced-options">
                       {ADVANCED_OPTIONS.map((option) => (
