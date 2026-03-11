@@ -244,7 +244,6 @@ function AppContent() {
               <SummaryScreen
                 summary={d.summary}
                 onStartReview={() => setAppView("review")}
-                onBackToSetup={resetForNewScan}
               />
             )}
             {appView === "review" && d.status === "completed" && (
@@ -277,8 +276,6 @@ function AppContent() {
             {appView === "finalize" && d.status === "completed" && (
               <FinalizeDeletionScreen
                 workflow={deletionWorkflow}
-                onBackToReview={() => setAppView("review")}
-                onBackToSetup={resetForNewScan}
                 onExecute={executeDelete}
                 isExecuting={executingDelete}
                 openExplorer={openExplorer}

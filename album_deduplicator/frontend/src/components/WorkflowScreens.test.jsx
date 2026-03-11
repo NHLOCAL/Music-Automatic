@@ -44,7 +44,6 @@ describe("Workflow screens", () => {
           },
         }}
         onStartReview={vi.fn()}
-        onBackToSetup={vi.fn()}
       />,
     );
 
@@ -53,7 +52,6 @@ describe("Workflow screens", () => {
     expect(screen.getByText("בטוחים למחיקה")).toBeInTheDocument();
     expect(screen.getByText("דורשים סקירה")).toBeInTheDocument();
     expect(screen.getByText("זוגות שהושוו")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "סריקה חדשה" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument();
   });
 
@@ -110,8 +108,6 @@ describe("Workflow screens", () => {
             historyGroupCount: 0,
           },
         }}
-        onBackToReview={vi.fn()}
-        onBackToSetup={vi.fn()}
         onExecute={vi.fn()}
         isExecuting={false}
         openExplorer={vi.fn()}

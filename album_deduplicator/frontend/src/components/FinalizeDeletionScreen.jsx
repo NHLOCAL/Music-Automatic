@@ -3,7 +3,7 @@ import { Button, Popconfirm, Tooltip } from "antd";
 import { Icon, StatusTag } from "./UI";
 import { formatSizeMb, getClusterDisplayTitle } from "../utils";
 
-export function FinalizeDeletionScreen({ workflow, onBackToReview, onBackToSetup, onExecute, isExecuting, openExplorer, onKeepAllCopies }) {
+export function FinalizeDeletionScreen({ workflow, onExecute, isExecuting, openExplorer, onKeepAllCopies }) {
   const { pendingGroups, summary } = workflow;
 
   return (
@@ -14,11 +14,9 @@ export function FinalizeDeletionScreen({ workflow, onBackToReview, onBackToSetup
           <div className="finalize-header-note">הפריטים יסומנו לסל המחזור בלבד, ללא מחיקה לצמיתות.</div>
         </div>
         <div style={{display:'flex', gap: 12}}>
-          <Button onClick={onBackToReview}>חזור לעריכה</Button>
-          {onBackToSetup ? <Button onClick={onBackToSetup}>סריקה חדשה</Button> : null}
           <Popconfirm
             title="להעביר את הפריטים המסומנים לסל המחזור?"
-            description="אפשר לחזור לעריכה אם צריך לשנות keeper או סימון מחיקה."
+            description="אפשר לחזור דרך ה-workflow rail אם צריך לשנות keeper או סימון מחיקה."
             okText="כן, להעביר"
             cancelText="ביטול"
             onConfirm={() => onExecute()}
