@@ -1,6 +1,6 @@
 import React from "react";
 import { Segmented } from "antd";
-import { StatusTag } from "./UI";
+import { Icon, StatusTag } from "./UI";
 import {
   getClusterDisplayTitle,
   getClusterSortPriority,
@@ -10,9 +10,18 @@ import {
 } from "../utils";
 
 const SEGMENT_OPTIONS = [
-  { label: "בטוחים", value: "safe" },
-  { label: "לסקירה", value: "review" },
-  { label: "הכל", value: "all" },
+  {
+    label: <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="check-circle" size={13} />בטוחים</span>,
+    value: "safe",
+  },
+  {
+    label: <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="alert" size={13} />לסקירה</span>,
+    value: "review",
+  },
+  {
+    label: <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="layers" size={13} />הכל</span>,
+    value: "all",
+  },
 ];
 
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {

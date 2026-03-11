@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "antd";
+import { Icon } from "./UI";
 
 export function SummaryScreen({ summary, onStartReview }) {
   const { safe_clusters, review_clusters, compared_pairs } = summary.counts;
@@ -31,7 +32,7 @@ export function SummaryScreen({ summary, onStartReview }) {
 
         <div className="native-dialog-footer">
           <div style={{ display: "flex", gap: 10, width: "100%" }}>
-            <Button type="primary" onClick={onStartReview} style={{ flex: 1 }}>
+            <Button type="primary" icon={<Icon name="eye" size={14} />} onClick={onStartReview} style={{ flex: 1 }}>
               פתח סביבת עבודה
             </Button>
           </div>

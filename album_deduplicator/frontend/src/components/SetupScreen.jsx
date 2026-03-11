@@ -1,6 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { Button, Checkbox, Collapse, Input, Select, Tag } from "antd";
-import { CloseOutlined, FolderOpenOutlined, PlusOutlined, StarOutlined } from "@ant-design/icons";
+import {
+  CloseOutlined,
+  FolderOpenOutlined,
+  PlayCircleOutlined,
+  PlusOutlined,
+  SettingOutlined,
+  StarOutlined,
+} from "@ant-design/icons";
 
 const ADVANCED_OPTIONS = [
   {
@@ -110,9 +117,13 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
             <div className="setup-helper-text">התחילו עם תיקייה אחת, והוסיפו עוד שורות רק אם יש עוד מקורות שחשוב להשוות.</div>
             <div className="setup-inline-actions">
               {runtimeInfo?.isElectron ? (
-                <Button size="small" icon={<FolderOpenOutlined />} onClick={onPickFolders}>הוספת כמה תיקיות</Button>
+                <Button size="small" icon={<FolderOpenOutlined />} onClick={onPickFolders} aria-label="הוספת כמה תיקיות">
+                  הוספת כמה תיקיות
+                </Button>
               ) : null}
-              <Button size="small" icon={<PlusOutlined />} onClick={addFolder}>הוסף תיקייה נוספת</Button>
+              <Button size="small" icon={<PlusOutlined />} onClick={addFolder} aria-label="הוסף תיקייה נוספת">
+                הוסף תיקייה נוספת
+              </Button>
             </div>
           </div>
 
@@ -144,7 +155,12 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
               items={[
                 {
                   key: "advanced",
-                  label: "הגדרות מתקדמות",
+                  label: (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <SettingOutlined />
+                      <span>הגדרות מתקדמות</span>
+                    </span>
+                  ),
                   children: (
                     <div className="advanced-options">
                       {ADVANCED_OPTIONS.map((option) => (
@@ -169,7 +185,15 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
         </div>
 
         <div className="native-dialog-footer">
-          <Button type="primary" onClick={onSubmit} disabled={!hasValidPath}>התחל סריקה</Button>
+          <Button
+            type="primary"
+            icon={<PlayCircleOutlined />}
+            onClick={onSubmit}
+            disabled={!hasValidPath}
+            aria-label="התחל סריקה"
+          >
+            התחל סריקה
+          </Button>
         </div>
       </div>
     </div>

@@ -128,9 +128,15 @@ function AudioPreviewCard({ audioPreview, onDismiss, onPlaybackStateChange }) {
           aria-label={`ציר הזמן של ${audioPreview.trackTitle}`}
         />
         <span className="ide-audio-time">{formatDuration(duration)}</span>
-        <Button size="small" type="text" onClick={onDismiss} aria-label="סגור את נגן ההשוואה">
-          סגור
-        </Button>
+        <Tooltip title="סגור">
+          <Button
+            size="small"
+            type="text"
+            icon={<Icon name="x" size={14} />}
+            onClick={onDismiss}
+            aria-label="סגור את נגן ההשוואה"
+          />
+        </Tooltip>
       </div>
     </div>
   );
@@ -207,18 +213,20 @@ export function DiffWorkspace({
           <ScoreTransparencyPanel cluster={cluster} currentKeeperId={currentKeeperId} />
         </div>
         <div className="ide-toolbar-actions">
-          <StatusTag tone={keeperAlbum ? "success" : "neutral"}>
+          <StatusTag tone={keeperAlbum ? "success" : "neutral"} icon={keeperAlbum ? "check-circle" : "info"}>
             נשמר: {keeperAlbum ? keeperAlbum.name : "לא נבחר"}
           </StatusTag>
           {!hasExplicitDecision && suggestedKeeperAlbum ? (
-            <StatusTag tone="primary">
+            <StatusTag tone="primary" icon="sparkle">
               מומלץ לשמירה: {suggestedKeeperAlbum.name}
             </StatusTag>
           ) : null}
-          <StatusTag tone={deleteCount > 0 ? "warning" : "neutral"}>למחיקה: {deleteCount}</StatusTag>
+          <StatusTag tone={deleteCount > 0 ? "warning" : "neutral"} icon="trash">למחיקה: {deleteCount}</StatusTag>
           {previewCount > 0 ? (
             <>
-              <Button size="small" onClick={onOpenFinalize}>עבור לשלב ההעברה</Button>
+              <Button size="small" icon={<Icon name="arrow-left" size={14} />} onClick={onOpenFinalize}>
+                עבור לשלב ההעברה
+              </Button>
               <Popconfirm
                 title="להעביר את כל הפריטים המסומנים לסל המחזור?"
                 description="אפשר עדיין לעבור למסך ההעברה לפני ביצוע."
@@ -226,7 +234,7 @@ export function DiffWorkspace({
                 cancelText="ביטול"
                 onConfirm={onExecuteMassDelete}
               >
-                <Button size="small" type="primary" danger loading={isExecuting}>
+                <Button size="small" type="primary" danger loading={isExecuting} icon={<Icon name="trash" size={14} />}>
                   העבר למחזור ({previewCount})
                 </Button>
               </Popconfirm>
@@ -247,7 +255,7 @@ export function DiffWorkspace({
                 : "כרגע אין פריטים שמסומנים למחיקה, אבל עדיין קיימת הכרעה פעילה לקבוצה."}
             </span>
           </div>
-          <Button onClick={() => clearDecision?.(cluster.cluster_id)}>
+          <Button icon={<Icon name="undo" size={14} />} onClick={() => clearDecision?.(cluster.cluster_id)}>
             בטל הכרעה ושמור את כל העותקים
           </Button>
         </div>
@@ -332,6 +340,7 @@ export function DiffWorkspace({
                 <Button
                   type={isKeeper ? "primary" : "default"}
                   danger={isTrash}
+                  icon={<Icon name={isTrash ? "trash" : isKeeper ? "check-circle" : "check"} size={14} />}
                   style={{ width: "100%" }}
                   onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}
                 >

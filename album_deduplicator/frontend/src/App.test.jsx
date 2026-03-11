@@ -431,6 +431,7 @@ describe("App", () => {
 
   it("keeps the finalize screen stable when canceling a pending transfer for a cluster", async () => {
     window.albumDeduplicator = createDesktopBridge();
+    let previewAfterDecision = previewResponse;
     const fetchMock = vi.fn(async (url, options = {}) => {
       if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
         return jsonResponse({ session_id: "session-1", status: "queued" });
@@ -439,10 +440,11 @@ describe("App", () => {
         return jsonResponse(clusterResponse);
       }
       if (String(url).includes("/api/analysis-sessions/session-1/decisions") && options.method === "POST") {
+        previewAfterDecision = emptyPreviewResponse;
         return jsonResponse(emptyPreviewResponse);
       }
       if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
-        return jsonResponse(previewResponse);
+        return jsonResponse(previewAfterDecision);
       }
       if (String(url).includes("/api/analysis-sessions/session-1") && (!options.method || options.method === "GET")) {
         return jsonResponse(sessionSummary);
@@ -625,6 +627,8 @@ describe("App", () => {
     fireEvent.click(screen.getByTestId("workflow-step-setup"));
     await waitFor(() => expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toHaveValue("E:\\Fresh Scan"));
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+    expect((await screen.findAllByText("להתחיל סריקה חדשה במקום התוצאות הקיימות?")).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "כן, התחל מחדש" }));
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "סריקה בתהליך" })).toBeInTheDocument());
 
@@ -632,5 +636,67 @@ describe("App", () => {
     expect(getWorkflowStep("summary")).toHaveClass("ant-steps-item-disabled");
     expect(getWorkflowStep("review")).toHaveClass("ant-steps-item-disabled");
     expect(getWorkflowStep("finalize")).toHaveClass("ant-steps-item-disabled");
+  });
+
+  it("warns before replacing an existing completed scan and only restarts after confirmation", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        const body = JSON.parse(options.body);
+        if (body.folders[0] === "E:\\Fresh Scan") {
+          return jsonResponse({ session_id: "session-2", status: "queued" });
+        }
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse(clusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(previewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse(sessionSummary);
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("workflow-step-setup"));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toBeInTheDocument());
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "E:\\Fresh Scan" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    expect((await screen.findAllByText("להתחיל סריקה חדשה במקום התוצאות הקיימות?")).length).toBeGreaterThan(0);
+    expect(screen.getByText("סריקה חדשה תאפס 1 קבוצות שנמצאו ואת כל סימוני השמירה או ההעברה שביצעת עד כה.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "ביטול" }));
+
+    expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toHaveValue("E:\\Fresh Scan");
+    expect(fetchMock.mock.calls.filter(([url, options]) =>
+      String(url).endsWith("/api/analysis-sessions") && options?.method === "POST",
+    )).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+    expect((await screen.findAllByText("להתחיל סריקה חדשה במקום התוצאות הקיימות?")).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "כן, התחל מחדש" }));
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "סריקה בתהליך" })).toBeInTheDocument());
+    expect(fetchMock.mock.calls.filter(([url, options]) =>
+      String(url).endsWith("/api/analysis-sessions") && options?.method === "POST",
+    )).toHaveLength(2);
   });
 });

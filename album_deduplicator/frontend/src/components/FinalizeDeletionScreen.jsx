@@ -22,7 +22,13 @@ export function FinalizeDeletionScreen({ workflow, onExecute, isExecuting, openE
             onConfirm={() => onExecute()}
             disabled={summary.pendingCount === 0}
           >
-            <Button type="primary" danger loading={isExecuting} disabled={summary.pendingCount === 0}>
+            <Button
+              type="primary"
+              danger
+              loading={isExecuting}
+              disabled={summary.pendingCount === 0}
+              icon={<Icon name="trash" size={14} />}
+            >
               בצע מחיקה למסומנים
             </Button>
           </Popconfirm>
@@ -64,6 +70,7 @@ export function FinalizeDeletionScreen({ workflow, onExecute, isExecuting, openE
                               <Button
                                 size="small"
                                 className="finalize-reset-button"
+                                icon={<Icon name="undo" size={14} />}
                                 onClick={() => onKeepAllCopies?.(group.cluster.cluster_id)}
                               >
                                 בטל העברה ושמור הכל

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { App as AntApp, ConfigProvider, Layout } from "antd";
+import { ExclamationCircleOutlined } from "@ant-design/icons";
 import heIL from "antd/locale/he_IL";
 import { useDeduplicator } from "./hooks/useDeduplicator";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -106,8 +107,7 @@ function AppContent() {
     d.setSuccessSummary(null);
   }, [antContext.notification, d]);
 
-  const handleScanSubmit = async (event) => {
-    if(event) event.preventDefault();
+  const submitScan = async () => {
     d.setError("");
     d.setSuccessSummary(null);
     try {
@@ -142,6 +142,42 @@ function AppContent() {
     } catch (err) {
       d.setError(err.message);
     }
+  };
+
+  const handleScanSubmit = async (event) => {
+    if (event) event.preventDefault();
+
+    const existingClusterCount = (d.summary?.counts?.safe_clusters ?? 0) + (d.summary?.counts?.review_clusters ?? 0);
+    const hasExistingResults = d.status === "completed" && (
+      Boolean(d.summary)
+      || d.allClusters.length > 0
+      || d.preview.total_count > 0
+    );
+
+    if (!hasExistingResults) {
+      await submitScan();
+      return;
+    }
+
+    antContext.modal.confirm({
+      centered: true,
+      title: "להתחיל סריקה חדשה במקום התוצאות הקיימות?",
+      icon: <ExclamationCircleOutlined style={{ color: "#d48806" }} />,
+      okText: "כן, התחל מחדש",
+      cancelText: "ביטול",
+      content: (
+        <div style={{ display: "grid", gap: 8 }}>
+          <span>יש כבר תוצאות סריקה שמוכנות לעבודה בחלון הזה.</span>
+          <span>
+            {existingClusterCount > 0
+              ? `סריקה חדשה תאפס ${existingClusterCount} קבוצות שנמצאו ואת כל סימוני השמירה או ההעברה שביצעת עד כה.`
+              : "סריקה חדשה תאפס את הממצאים והסימונים הקיימים בסשן הנוכחי."}
+          </span>
+          <span>התהליך עשוי לארוך זמן בהתאם לגודל הספרייה ולבדיקות שסימנת.</span>
+        </div>
+      ),
+      onOk: () => submitScan(),
+    });
   };
 
   const executeDelete = async (folderIdsToExecute = null) => {
