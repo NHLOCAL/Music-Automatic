@@ -135,6 +135,17 @@
   color: var(--text-muted);
 }
 
+.scan-progress-note {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  text-align: right;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 253, 246, 0.72);
+  border: 1px solid rgba(34, 85, 85, 0.1);
+}
+
 .scan-progress-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

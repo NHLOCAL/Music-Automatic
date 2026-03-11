@@ -1,14 +1,8 @@
 import React from "react";
 
-export const WORKFLOW_STEP_KEYS = ["setup", "scanning", "summary", "review", "finalize"];
+import { getScanProgressModel } from "./scanProgress";
 
-export const SCAN_STAGE_LABELS = {
-  queued: "ממתין",
-  scanning: "סורק תיקיות",
-  compare: "משווה אלבומים",
-  clustering: "בונה קבוצות",
-  complete: "הושלם",
-};
+export const WORKFLOW_STEP_KEYS = ["setup", "scanning", "summary", "review", "finalize"];
 
 function buildCountBadge(text, tone = "neutral", stepKey) {
   if (!text) return null;
@@ -36,8 +30,7 @@ export function getWorkflowStepState({ appView, status, summary, preview, progre
   const safeCount = summary?.counts?.safe_clusters ?? 0;
   const reviewCount = summary?.counts?.review_clusters ?? 0;
   const pendingCount = preview?.total_count ?? 0;
-  const scanPercent = Math.round(progress?.percent ?? 0);
-  const stageLabel = SCAN_STAGE_LABELS[progress?.stage] ?? "סריקה פעילה";
+  const scanProgress = getScanProgressModel(progress);
 
   return [
     {
@@ -57,8 +50,8 @@ export function getWorkflowStepState({ appView, status, summary, preview, progre
       title: "סריקה",
       enabled: isRunning,
       active: appView === "scanning",
-      description: isRunning ? stageLabel : "יהפוך לזמין בזמן ניתוח פעיל",
-      badges: [buildCountBadge(isRunning ? `${scanPercent}%` : null, "primary", "scanning")].filter(Boolean),
+      description: isRunning ? scanProgress.stageLabel : "יהפוך לזמין בזמן ניתוח פעיל",
+      badges: [buildCountBadge(isRunning ? `${scanProgress.overallPercent}%` : null, "primary", "scanning")].filter(Boolean),
     },
     {
       key: "summary",

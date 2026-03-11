@@ -1,19 +1,12 @@
 import React from "react";
 import { Progress, Tag } from "antd";
 
-const stageLabels = {
-  queued: "ממתין",
-  scanning: "סורק תיקיות",
-  compare: "משווה אלבומים",
-  clustering: "בונה קבוצות",
-  complete: "הושלם",
-};
+import { getScanProgressModel } from "../scanProgress";
 
 export function ScanningScreen({ progress }) {
-  const percent = Math.round(progress.percent || 0);
+  const { overallPercent, stageLabel, strokeColor, railColor, chipColor, isComplete } = getScanProgressModel(progress);
   const current = progress.current ?? 0;
   const total = progress.total ?? 0;
-  const stageLabel = stageLabels[progress.stage] ?? "ניתוח פעיל";
 
   return (
     <div className="modal-backdrop">
@@ -21,7 +14,13 @@ export function ScanningScreen({ progress }) {
         <div className="native-dialog-header">
           <div className="dialog-banner-strip">
             <Tag variant="filled" className="dialog-banner-chip">סריקה פעילה</Tag>
-            <Tag variant="filled" className="dialog-banner-chip dialog-banner-chip--accent">{stageLabel}</Tag>
+            <Tag
+              variant="filled"
+              className="dialog-banner-chip"
+              style={{ backgroundColor: chipColor, borderColor: chipColor, color: "#fff" }}
+            >
+              {stageLabel}
+            </Tag>
           </div>
           <h1>סריקה בתהליך</h1>
           <p>מנועי ההשוואה מנתחים את הקבצים</p>
@@ -31,10 +30,13 @@ export function ScanningScreen({ progress }) {
           <div className="scan-progress-area scan-progress-area--elevated">
             <div className="scan-progress-header">
               <div style={{ fontWeight: 600, fontSize: 13, textAlign: "right" }}>{progress.message || "ממתין"}</div>
-              <Tag variant="filled" className="dialog-banner-chip">{percent}%</Tag>
+              <Tag variant="filled" className="dialog-banner-chip">{overallPercent}%</Tag>
             </div>
-            <Progress percent={percent} showInfo={false} />
-            <div className="scan-status-text">{progress.human_message} ({percent}%)</div>
+            <Progress percent={overallPercent} showInfo={false} strokeColor={strokeColor} railColor={railColor} />
+            <div className="scan-status-text">{progress.human_message}</div>
+            <div className="scan-progress-note">
+              האחוז הכולל משלב את כל שלבי הניתוח יחד: סריקה, חישוב איכות והשוואה.
+            </div>
             <div className="scan-progress-summary">
               <div className="scan-progress-stat">
                 <span>פריטים שעובדו</span>
@@ -42,7 +44,7 @@ export function ScanningScreen({ progress }) {
               </div>
               <div className="scan-progress-stat">
                 <span>סטטוס</span>
-                <strong>{percent >= 100 ? "הסריקה הושלמה" : stageLabel}</strong>
+                <strong>{isComplete ? "הסריקה הושלמה" : stageLabel}</strong>
               </div>
             </div>
           </div>
