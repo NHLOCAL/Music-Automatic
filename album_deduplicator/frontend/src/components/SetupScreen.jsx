@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { Button, Checkbox, Collapse, Input, Tag } from "antd";
-import { CloseOutlined, FolderOpenOutlined, PlusOutlined } from "@ant-design/icons";
+import { Button, Checkbox, Collapse, Input, Select, Tag } from "antd";
+import { CloseOutlined, FolderOpenOutlined, PlusOutlined, StarOutlined } from "@ant-design/icons";
 
 const ADVANCED_OPTIONS = [
   {
@@ -20,8 +20,17 @@ const ADVANCED_OPTIONS = [
   },
 ];
 
-export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFolder, onPickPreferredRoot, runtimeInfo }) {
+export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFolder, runtimeInfo }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const preferredFolderOptions = useMemo(
+    () => form.folders
+      .filter((folder) => folder.path.trim())
+      .map((folder, index) => ({
+        value: folder.id,
+        label: `תיקייה ${index + 1} - ${folder.path.trim()}`,
+      })),
+    [form.folders],
+  );
 
   const handlePathChange = (id, path) => {
     setForm((prev) => ({
@@ -109,23 +118,23 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
 
           <div className="setup-form-group">
             <label>תיקייה מועדפת לשמירה</label>
-            <div className="folder-list-item setup-inline-row">
-              <Input
+            <div className="setup-preferred-row">
+              <Select
                 aria-label="תיקייה מועדפת לשמירה"
-                variant="borderless"
                 size="small"
-                className="mono-text"
-                placeholder={String.raw`למשל: D:\Music\Keep`}
-                value={form.preferred_root}
-                onChange={(event) => setForm((prev) => ({ ...prev, preferred_root: event.target.value }))}
+                allowClear
+                className="setup-preferred-select"
+                placeholder="ללא העדפה"
+                value={form.preferred_folder_id || undefined}
+                options={preferredFolderOptions}
+                suffixIcon={<StarOutlined />}
+                notFoundContent="הוסיפו קודם תיקיות פעילות לבחירה"
+                optionFilterProp="label"
+                onChange={(value) => setForm((prev) => ({ ...prev, preferred_folder_id: value ?? "" }))}
               />
-              {runtimeInfo?.isElectron ? (
-                <Button size="small" icon={<FolderOpenOutlined />} onClick={onPickPreferredRoot} aria-label="בחר תיקייה מועדפת">
-                  בחר תיקייה
-                </Button>
-              ) : null}
+              <Tag className="setup-preferred-chip" variant="filled">מתוך התיקיות שנבחרו</Tag>
             </div>
-            <div className="setup-helper-text">אם תגדירו תיקייה מועדפת, המערכת תעדיף לשמור עותקים שנמצאים בה כאשר איכותם דומה.</div>
+            <div className="setup-helper-text">בחירה כאן משמשת כהעדפה בלבד כאשר כמה עותקים דומים באיכותם. אין צורך לבחור תיקייה נפרדת מחוץ לרשימה.</div>
           </div>
 
           <div className="setup-form-group">

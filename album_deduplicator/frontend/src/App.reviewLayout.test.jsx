@@ -180,11 +180,12 @@ describe("App review layout", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App />);
-    const folderInputs = screen.getAllByRole("textbox");
+    render(<App />); 
+    const folderInputs = screen.getAllByRole("textbox", { name: /תיקייה לסריקה/i }); 
 
-    fireEvent.change(folderInputs[0], { target: { value: "C:\\Music" } });
-    fireEvent.change(folderInputs[1], { target: { value: "D:\\Archive" } });
+    fireEvent.change(folderInputs[0], { target: { value: "C:\\Music" } }); 
+    fireEvent.click(screen.getByRole("button", { name: /הוסף תיקייה נוספת/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" }), { target: { value: "D:\\Archive" } }); 
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
 
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));

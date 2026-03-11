@@ -160,7 +160,7 @@
     - `בטוח למחיקה`
     - `דורש סקירה`
     - `כל התוצאות`
-  - מסך `setup` נשאר קומפקטי עם שורת root אחת פתוחה כברירת מחדל, בחירה native מרובת תיקיות ב-Desktop, שדה `preferred_root` גלוי, ו-section מתקדם קצר עבור `force_rescan`, `Full Hash Scan` ו-`Gemini`.
+  - מסך `setup` נשאר קומפקטי עם שורת root אחת פתוחה כברירת מחדל, בחירה native מרובת תיקיות ב-Desktop, בחירת `preferred_root` מתוך ה-roots שכבר נוספו, ו-section מתקדם קצר עבור `force_rescan`, `Full Hash Scan` ו-`Gemini`.
   - שינוי keeper ידני.
   - סימון פרטני של עותקים למחיקה.
   - פתיחה מיידית של נתיבים ב-Explorer.
@@ -467,7 +467,7 @@ final_score = base_score
 
 - הזנת roots בשדות נפרדים
 - בחירה מרובת תיקיות באותו דו-שיח native עבור roots
-- root מועדף
+- בחירת root מועדף מתוך הרשימה הקיימת
 - כפתורי הוספה/הסרה לשדות roots
 - בחירת תיקיות native ב-Electron
 - כפתור ניתוח אחד

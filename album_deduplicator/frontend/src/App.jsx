@@ -4,7 +4,7 @@ import heIL from "antd/locale/he_IL";
 import { useDeduplicator } from "./hooks/useDeduplicator";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import * as api from "./api";
-import { getRuntimeInfo, getRuntimeSnapshot, openDesktopPath, pickPreferredRoot, pickScanFolders } from "./desktop";
+import { getRuntimeInfo, getRuntimeSnapshot, openDesktopPath, pickScanFolders } from "./desktop";
 import { SetupScreen } from "./components/SetupScreen";
 import { ScanningScreen } from "./components/ScanningScreen";
 import { SummaryScreen } from "./components/SummaryScreen";
@@ -38,7 +38,7 @@ function AppContent() {
   const [appView, setAppView] = useState("setup");
   const [form, setForm] = useState({
     folders: [{ id: "f1", path: "" }],
-    preferred_root: "",
+    preferred_folder_id: "",
     force_rescan: false,
     clear_cache: false,
     full_hash_scan: false,
@@ -74,6 +74,15 @@ function AppContent() {
   }, [d.selectedClusterId, d.selectedTab]);
 
   useEffect(() => {
+    if (!form.preferred_folder_id) return;
+    const preferredStillExists = form.folders.some(
+      (folder) => folder.id === form.preferred_folder_id && folder.path.trim(),
+    );
+    if (preferredStillExists) return;
+    setForm((prev) => (prev.preferred_folder_id ? { ...prev, preferred_folder_id: "" } : prev));
+  }, [form.folders, form.preferred_folder_id]);
+
+  useEffect(() => {
     if (!d.error) return;
     antContext.notification.error({ message: "שגיאה", description: d.error, placement: "topLeft" });
     d.setError("");
@@ -90,10 +99,11 @@ function AppContent() {
     d.setError("");
     d.setSuccessSummary(null);
     try {
+      const { preferred_folder_id, ...formPayload } = form;
       const payload = {
-        ...form,
+        ...formPayload,
         folders: normalizeFolderPaths(form.folders),
-        preferred_root: form.preferred_root || null,
+        preferred_root: form.folders.find((folder) => folder.id === preferred_folder_id)?.path.trim() || null,
       };
       const created = await api.createAnalysisSession(payload);
       d.setSessionId(created.session_id);
@@ -166,12 +176,6 @@ function AppContent() {
     }));
   };
 
-  const handlePickPreferredRoot = async () => {
-    const path = await pickPreferredRoot();
-    if (!path) return;
-    setForm((prev) => ({ ...prev, preferred_root: path }));
-  };
-
   useKeyboardShortcuts({
     appView, status: d.status, clusters: d.clusters, selectedCluster, selectedClusterId: d.selectedClusterId,
     setSelectedClusterId: d.setSelectedClusterId, currentKeeperId, focusedAlbumId, setFocusedAlbumId,
@@ -189,7 +193,6 @@ function AppContent() {
             onSubmit={handleScanSubmit}
             onPickFolders={handlePickFolders}
             onPickFolder={handlePickFolder}
-            onPickPreferredRoot={handlePickPreferredRoot}
             runtimeInfo={runtimeInfo}
           />
         )}
