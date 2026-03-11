@@ -198,14 +198,17 @@ describe("App", () => {
   });
 
   it("renders the compact setup flow with the restored settings options", () => {
+    window.albumDeduplicator = createDesktopBridge();
     vi.stubGlobal("fetch", vi.fn());
 
     render(<App />);
 
     expect(screen.getByText("מיוזיק אוטומטיק")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "בחר תיקייה עבור שורה 1" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "תיקייה לסריקה 2" })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "תיקייה מועדפת לשמירה" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "בחר תיקייה מועדפת" })).toBeInTheDocument();
     fireEvent.click(screen.getByText("הגדרות מתקדמות"));
     expect(screen.getByRole("checkbox", { name: "רענון מלא מהדיסק" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "בדיקת Hash מלאה" })).toBeInTheDocument();
@@ -243,7 +246,7 @@ describe("App", () => {
 
     const folderInputs = getScanFolderInputs();
     fireEvent.change(folderInputs[0], { target: { value: "C:\\Music" } });
-    fireEvent.click(screen.getByRole("button", { name: "הוסף תיקייה נוספת" }));
+    fireEvent.click(screen.getByRole("button", { name: /הוסף תיקייה נוספת/ }));
     fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" }), { target: { value: "D:\\Archive" } });
     fireEvent.click(screen.getByText("הגדרות מתקדמות"));
     fireEvent.click(screen.getByRole("checkbox", { name: "בדיקת Hash מלאה" }));
@@ -273,7 +276,7 @@ describe("App", () => {
       target: { value: "C:\\Music" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "בחירת תיקיות..." }));
+    fireEvent.click(screen.getByRole("button", { name: /הוספת כמה תיקיות/ }));
     
     await waitFor(() => {
       expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" })).toBeInTheDocument();
@@ -286,6 +289,22 @@ describe("App", () => {
       expect(pathInputs[1]).toHaveValue("D:\\Archive");
       expect(pathInputs[2]).toHaveValue("E:\\Collection");
     });
+  });
+
+  it("fills a single scan row from the folder picker button", async () => {
+    const selectScanFolders = vi.fn(async () => ["D:\\Archive"]);
+    window.albumDeduplicator = createDesktopBridge({ selectScanFolders });
+    vi.stubGlobal("fetch", vi.fn());
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "בחר תיקייה עבור שורה 1" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toHaveValue("D:\\Archive");
+    });
+
+    expect(selectScanFolders).toHaveBeenCalledWith({ allowMultiple: false, defaultPath: undefined });
   });
 
   it("opens the finalize screen and requires confirmation before delete", async () => {
@@ -319,7 +338,7 @@ describe("App", () => {
 
     const folderInputs = getScanFolderInputs();
     fireEvent.change(folderInputs[0], { target: { value: "C:\\Music" } });
-    fireEvent.click(screen.getByRole("button", { name: "הוסף תיקייה נוספת" }));
+    fireEvent.click(screen.getByRole("button", { name: /הוסף תיקייה נוספת/ }));
     fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" }), { target: { value: "D:\\Archive" } });
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
 

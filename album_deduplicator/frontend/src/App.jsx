@@ -156,6 +156,16 @@ function AppContent() {
     if (paths.length) setForm((prev) => ({ ...prev, folders: mergeFolderInputs(prev.folders, paths) }));
   };
 
+  const handlePickFolder = async (folderId, currentPath = "") => {
+    const paths = await pickScanFolders({ allowMultiple: false, defaultPath: currentPath || undefined });
+    const nextPath = paths[0];
+    if (!nextPath) return;
+    setForm((prev) => ({
+      ...prev,
+      folders: prev.folders.map((folder) => (folder.id === folderId ? { ...folder, path: nextPath } : folder)),
+    }));
+  };
+
   const handlePickPreferredRoot = async () => {
     const path = await pickPreferredRoot();
     if (!path) return;
@@ -178,6 +188,7 @@ function AppContent() {
             setForm={setForm}
             onSubmit={handleScanSubmit}
             onPickFolders={handlePickFolders}
+            onPickFolder={handlePickFolder}
             onPickPreferredRoot={handlePickPreferredRoot}
             runtimeInfo={runtimeInfo}
           />

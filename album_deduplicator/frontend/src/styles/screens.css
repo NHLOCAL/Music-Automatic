@@ -36,6 +36,27 @@
   gap: 8px;
 }
 
+.folder-row-action.ant-btn {
+  flex-shrink: 0;
+}
+
+.folder-row-action--picker.ant-btn {
+  padding-inline: 10px;
+}
+
+.folder-row-action--remove.ant-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #8b5e3c;
+}
+
+.folder-row-action--remove.ant-btn:hover {
+  color: #8f1d1d;
+  background: rgba(201, 58, 58, 0.08);
+}
+
 .folder-list-item:last-child {
   border-bottom: none;
 }

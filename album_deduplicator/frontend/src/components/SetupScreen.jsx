@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Button, Checkbox, Collapse, Input, Tag } from "antd";
+import { CloseOutlined, FolderOpenOutlined, PlusOutlined } from "@ant-design/icons";
 
 const ADVANCED_OPTIONS = [
   {
@@ -19,7 +20,7 @@ const ADVANCED_OPTIONS = [
   },
 ];
 
-export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPreferredRoot, runtimeInfo }) {
+export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFolder, onPickPreferredRoot, runtimeInfo }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handlePathChange = (id, path) => {
@@ -54,7 +55,7 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
           <p className="setup-eyebrow">הגדרת סריקה בטוחה</p>
           <h1>
             <span className="setup-brand-title">מיוזיק אוטומטיק</span>
-            <span className="setup-title-subline">בחרו תיקיות לבדיקה ואאתר עבורכם אלבומים כפולים או כמעט זהים.</span>
+            <span className="setup-title-subline">בחרו תיקיות לבדיקה והמערכת תאתר עבורכם אלבומים כפולים</span>
           </h1>
         </div>
 
@@ -69,14 +70,30 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
                     variant="borderless"
                     size="small"
                     className="mono-text"
-                    placeholder="למשל: C:\\Music\\Albums"
+                    placeholder={String.raw`למשל: C:\Music\Albums`}
                     value={folder.path}
                     onChange={(event) => handlePathChange(folder.id, event.target.value)}
                   />
-                  {form.folders.length > 1 ? (
-                    <Button type="text" size="small" onClick={() => removeFolder(folder.id)} aria-label={`הסר תיקייה ${index + 1}`}>
-                      הסר שורה
+                  {runtimeInfo?.isElectron ? (
+                    <Button
+                      size="small"
+                      icon={<FolderOpenOutlined />}
+                      className="folder-row-action folder-row-action--picker"
+                      onClick={() => onPickFolder(folder.id, folder.path)}
+                      aria-label={`בחר תיקייה עבור שורה ${index + 1}`}
+                    >
+                      בחר תיקייה
                     </Button>
+                  ) : null}
+                  {form.folders.length > 1 ? (
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CloseOutlined />}
+                      className="folder-row-action folder-row-action--remove"
+                      onClick={() => removeFolder(folder.id)}
+                      aria-label={`הסר תיקייה ${index + 1}`}
+                    />
                   ) : null}
                 </div>
               ))}
@@ -84,9 +101,9 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
             <div className="setup-helper-text">התחילו עם תיקייה אחת, והוסיפו עוד שורות רק אם יש עוד מקורות שחשוב להשוות.</div>
             <div className="setup-inline-actions">
               {runtimeInfo?.isElectron ? (
-                <Button size="small" onClick={onPickFolders}>בחירת תיקיות...</Button>
+                <Button size="small" icon={<FolderOpenOutlined />} onClick={onPickFolders}>הוספת כמה תיקיות</Button>
               ) : null}
-              <Button size="small" onClick={addFolder}>הוסף תיקייה נוספת</Button>
+              <Button size="small" icon={<PlusOutlined />} onClick={addFolder}>הוסף תיקייה נוספת</Button>
             </div>
           </div>
 
@@ -98,12 +115,14 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickPref
                 variant="borderless"
                 size="small"
                 className="mono-text"
-                placeholder="למשל: D:\\Music\\Keep"
+                placeholder={String.raw`למשל: D:\Music\Keep`}
                 value={form.preferred_root}
                 onChange={(event) => setForm((prev) => ({ ...prev, preferred_root: event.target.value }))}
               />
               {runtimeInfo?.isElectron ? (
-                <Button size="small" onClick={onPickPreferredRoot}>בחירה...</Button>
+                <Button size="small" icon={<FolderOpenOutlined />} onClick={onPickPreferredRoot} aria-label="בחר תיקייה מועדפת">
+                  בחר תיקייה
+                </Button>
               ) : null}
             </div>
             <div className="setup-helper-text">אם תגדירו תיקייה מועדפת, המערכת תעדיף לשמור עותקים שנמצאים בה כאשר איכותם דומה.</div>
