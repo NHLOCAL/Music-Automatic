@@ -1,18 +1,36 @@
 import { useState, useEffect, useCallback, startTransition } from "react";
 import * as api from "../api";
 import { getActiveKeeperId, hasExplicitKeeperDecision } from "../utils";
+
+const INITIAL_PROGRESS = {
+  step: "queued",
+  stage: "queued",
+  message: "ממתין",
+  human_message: "ממתין לתחילת הניתוח.",
+  current: 0,
+  total: 1,
+  percent: 0,
+  warnings: [],
+};
+
+const INITIAL_PREVIEW = {
+  items: [],
+  total_count: 0,
+  total_size_mb: 0,
+  auto_selected_count: 0,
+  manual_selected_count: 0,
+};
+
 export function useDeduplicator() {
   const [sessionId, setSessionId] = useState(null);
   const [status, setStatus] = useState("idle");
-  const [progress, setProgress] = useState({
-    step: "queued", stage: "queued", message: "ממתין", human_message: "ממתין לתחילת הניתוח.", current: 0, total: 1, percent: 0, warnings: []
-  });
+  const [progress, setProgress] = useState(INITIAL_PROGRESS);
   const [summary, setSummary] = useState(null);
   const [clusters, setClusters] = useState([]);
   const [allClusters, setAllClusters] = useState([]);
   const [decisions, setDecisions] = useState({});
   const [deleteSelections, setDeleteSelections] = useState({});
-  const [preview, setPreview] = useState({ items: [], total_count: 0, total_size_mb: 0, auto_selected_count: 0, manual_selected_count: 0 });
+  const [preview, setPreview] = useState(INITIAL_PREVIEW);
   const [selectedClusterId, setSelectedClusterId] = useState(null);
   const [error, setError] = useState("");
   const [successSummary, setSuccessSummary] = useState(null);
@@ -85,6 +103,23 @@ export function useDeduplicator() {
       refreshData(sessionId, selectedTab);
     }
   }, [selectedTab, sessionId, status, refreshData]);
+  const resetSession = useCallback(() => {
+    startTransition(() => {
+      setSessionId(null);
+      setStatus("idle");
+      setProgress(INITIAL_PROGRESS);
+      setSummary(null);
+      setClusters([]);
+      setAllClusters([]);
+      setDecisions({});
+      setDeleteSelections({});
+      setPreview(INITIAL_PREVIEW);
+      setSelectedClusterId(null);
+      setSelectedTab("safe");
+      setError("");
+      setSuccessSummary(null);
+    });
+  }, []);
   const handleDecision = async (clusterId, keeperId, deleteFolderIds = null) => {
     if (!sessionId) return;
     const cluster = clusters.find((item) => item.cluster_id === clusterId);
@@ -129,7 +164,7 @@ export function useDeduplicator() {
   return {
     sessionId, setSessionId, status, setStatus, progress, summary, clusters, setClusters, allClusters, setAllClusters,
     decisions, setDecisions, deleteSelections, setDeleteSelections, preview, setPreview, selectedClusterId, setSelectedClusterId,
-    error, setError, successSummary, setSuccessSummary, selectedTab, setSelectedTab,
-    refreshData, handleDecision
+    error, setError, successSummary, setSuccessSummary, selectedTab, setSelectedTab, setSummary, setProgress,
+    refreshData, handleDecision, resetSession
   };
 }

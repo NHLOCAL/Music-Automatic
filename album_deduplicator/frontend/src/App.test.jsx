@@ -183,6 +183,10 @@ function getScanFolderInputs() {
   return screen.getAllByRole("textbox", { name: /תיקייה לסריקה/i });
 }
 
+function getWorkflowStep(key) {
+  return screen.getByTestId(`workflow-step-${key}`).closest(".ant-steps-item");
+}
+
 describe("App", () => {
   beforeEach(() => {
     MockEventSource.instances = [];
@@ -203,6 +207,12 @@ describe("App", () => {
 
     render(<App />);
 
+    expect(screen.getByTestId("workflow-rail")).toBeInTheDocument();
+    expect(getWorkflowStep("setup")).not.toHaveClass("ant-steps-item-disabled");
+    expect(getWorkflowStep("scanning")).toHaveClass("ant-steps-item-disabled");
+    expect(getWorkflowStep("summary")).toHaveClass("ant-steps-item-disabled");
+    expect(getWorkflowStep("review")).toHaveClass("ant-steps-item-disabled");
+    expect(getWorkflowStep("finalize")).toHaveClass("ant-steps-item-disabled");
     expect(screen.getByText("מיוזיק אוטומטיק")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "בחר תיקייה עבור שורה 1" })).toBeInTheDocument();
@@ -418,4 +428,161 @@ describe("App", () => {
     expect(await screen.findByText("להעביר את הפריטים המסומנים לסל המחזור?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "כן, להעביר" })).toBeInTheDocument();
   }, 15000);
+
+  it("shows the scan step as active while a session is running and keeps future steps disabled", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("progress", {
+      stage: "compare",
+      message: "משווה בין אלבומים",
+      human_message: "המערכת משווה בין העותקים שנמצאו.",
+      current: 4,
+      total: 10,
+      percent: 40,
+      warnings: [],
+    });
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "סריקה בתהליך" })).toBeInTheDocument());
+
+    expect(getWorkflowStep("setup")).toHaveClass("ant-steps-item-disabled");
+    expect(getWorkflowStep("scanning")).toHaveClass("ant-steps-item-active");
+    expect(getWorkflowStep("summary")).toHaveClass("ant-steps-item-disabled");
+    expect(getWorkflowStep("review")).toHaveClass("ant-steps-item-disabled");
+    expect(getWorkflowStep("finalize")).toHaveClass("ant-steps-item-disabled");
+    expect(screen.getByTestId("workflow-step-badge-scanning")).toHaveTextContent("40%");
+  });
+
+  it("allows jumping between completed views without clearing the current session", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse(clusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(previewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse(sessionSummary);
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument());
+    expect(screen.getByText("1 בטוחות")).toBeInTheDocument();
+    expect(screen.getByText("0 לסקירה")).toBeInTheDocument();
+    expect(screen.getByText("1 למחיקה")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("workflow-step-review"));
+    await waitFor(() => expect(screen.getByTestId("review-workspace")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("workflow-step-finalize"));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "אישור העברה לסל המחזור (1 תיקיות)" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId("workflow-step-setup"));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "E:\\Updated Music" },
+    });
+
+    fireEvent.click(screen.getByTestId("workflow-step-finalize"));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "אישור העברה לסל המחזור (1 תיקיות)" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId("workflow-step-review"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "עבור לשלב ההעברה" })).toBeInTheDocument());
+  });
+
+  it("keeps the old session available while editing setup and resets it only after submitting a new scan", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        const body = JSON.parse(options.body);
+        if (body.folders[0] === "E:\\Fresh Scan") {
+          return jsonResponse({ session_id: "session-2", status: "queued" });
+        }
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse(clusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(previewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse(sessionSummary);
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("workflow-step-finalize"));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "אישור העברה לסל המחזור (1 תיקיות)" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId("workflow-step-setup"));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toBeInTheDocument());
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "E:\\Fresh Scan" },
+    });
+
+    fireEvent.click(screen.getByTestId("workflow-step-review"));
+    await waitFor(() => expect(screen.getByTestId("review-workspace")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("workflow-step-setup"));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toHaveValue("E:\\Fresh Scan"));
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "סריקה בתהליך" })).toBeInTheDocument());
+
+    expect(getWorkflowStep("scanning")).toHaveClass("ant-steps-item-active");
+    expect(getWorkflowStep("summary")).toHaveClass("ant-steps-item-disabled");
+    expect(getWorkflowStep("review")).toHaveClass("ant-steps-item-disabled");
+    expect(getWorkflowStep("finalize")).toHaveClass("ant-steps-item-disabled");
+  });
 });

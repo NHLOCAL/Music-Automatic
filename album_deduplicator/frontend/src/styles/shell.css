@@ -8,10 +8,11 @@
   height: 100vh;
   display: flex;
   overflow: hidden;
+  position: relative;
 }
 
 .modal-backdrop {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background:
     radial-gradient(circle at top, rgba(156, 211, 211, 0.24), transparent 36%),

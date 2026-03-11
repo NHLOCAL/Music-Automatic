@@ -1,5 +1,6 @@
 @import "./styles/base.css";
 @import "./styles/shell.css";
+@import "./styles/workflow.css";
 @import "./styles/screens.css";
 @import "./styles/review.css";
 @import "./styles/finalize.css";

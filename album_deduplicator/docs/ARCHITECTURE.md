@@ -151,11 +151,13 @@
   - flow ראשי.
   - עוטף את כל ה־renderer ב־`HappyProvider` + `ConfigProvider` של `Ant Design`.
   - מגדיר `RTL`, theme tokens, ו-notifications דרך `AntD App`.
+  - מציג `workflow rail` גלובלי ודביק בחלק העליון של ה-shell, עם מעבר בין `setup`, `scan`, `summary`, `review`, ו-`finalize` לפי מצב ה-session.
   - מזהה אם היישום רץ בתוך `Electron`
   - יצירת session.
   - האזנה ל-`SSE`.
   - ניהול roots בשדות נפרדים עם add/remove ברור.
   - fallback ידני להזנת roots גם ב-Desktop כאשר chooser native של Windows נכשל עבור תיקיות מסוימות.
+  - חזרה ל-`setup` דרך ה-rail משאירה את ה-session האחרון זמין ל-`summary` / `review` / `finalize` עד שמתחילים סריקה חדשה בפועל.
   - הצגת tabs:
     - `בטוח למחיקה`
     - `דורש סקירה`

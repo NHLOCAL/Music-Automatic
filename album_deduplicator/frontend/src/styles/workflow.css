@@ -1,0 +1,133 @@
+.workflow-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  background: var(--bg-app);
+}
+
+.workflow-rail-shell {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  padding: 12px 16px 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 246, 0.96), rgba(255, 253, 246, 0.88)),
+    var(--bg-app);
+  border-bottom: 1px solid rgba(34, 85, 85, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.workflow-rail-inner {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.workflow-rail.ant-steps {
+  min-width: 860px;
+  background: rgba(255, 253, 246, 0.8);
+  border: 1px solid rgba(34, 85, 85, 0.12);
+  border-radius: 18px;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(34, 85, 85, 0.08);
+}
+
+.workflow-rail .ant-steps-item {
+  min-width: 0;
+}
+
+.workflow-rail .ant-steps-item-container {
+  border-radius: 14px;
+}
+
+.workflow-rail .ant-steps-item-active .ant-steps-item-container {
+  background: linear-gradient(180deg, rgba(156, 211, 211, 0.26), rgba(255, 253, 246, 0.92));
+}
+
+.workflow-rail .ant-steps-item-disabled .ant-steps-item-container {
+  opacity: 0.58;
+}
+
+.workflow-rail .ant-steps-item-finish .ant-steps-item-container,
+.workflow-rail .ant-steps-item-process .ant-steps-item-container {
+  box-shadow: inset 0 0 0 1px rgba(34, 85, 85, 0.08);
+}
+
+.workflow-rail-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.workflow-rail-title-label {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.workflow-rail-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.workflow-rail-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 85, 85, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text-main);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.workflow-rail-badge--primary {
+  color: #0c4aa6;
+  background: rgba(0, 96, 223, 0.1);
+}
+
+.workflow-rail-badge--success {
+  color: #1a7f37;
+  background: rgba(74, 194, 107, 0.14);
+}
+
+.workflow-rail-badge--warning {
+  color: #8c5b18;
+  background: rgba(250, 173, 20, 0.18);
+}
+
+.workflow-rail-badge--danger {
+  color: #b42318;
+  background: rgba(201, 58, 58, 0.12);
+}
+
+.workflow-rail-description {
+  display: inline-block;
+  max-width: 210px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.workflow-view-shell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 960px) {
+  .workflow-rail-shell {
+    padding-inline: 10px;
+  }
+
+  .workflow-rail.ant-steps {
+    min-width: 760px;
+  }
+}
