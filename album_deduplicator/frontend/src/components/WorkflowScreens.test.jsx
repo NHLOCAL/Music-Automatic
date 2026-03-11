@@ -30,8 +30,8 @@ describe("Workflow screens", () => {
     expect(screen.getByText("21/50")).toBeInTheDocument();
     expect(screen.getByText("פריטים שעובדו")).toBeInTheDocument();
     expect(screen.getByText("סטטוס")).toBeInTheDocument();
-    expect(screen.getByText("85%")).toBeInTheDocument();
-    expect(screen.getByText("האחוז הכולל משלב את כל שלבי הניתוח יחד: סריקה, חישוב איכות והשוואה.")).toBeInTheDocument();
+    expect(screen.getByText("90%")).toBeInTheDocument();
+    expect(screen.getByText("האחוז הכולל משלב את כל שלבי הניתוח יחד: סריקה, איתור התאמות, חישוב איכות והשוואה.")).toBeInTheDocument();
   });
 
   it("renders the summary screen with the current actions", () => {

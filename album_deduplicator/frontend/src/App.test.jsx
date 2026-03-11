@@ -514,7 +514,7 @@ describe("App", () => {
     expect(getWorkflowStep("summary")).toHaveClass("ant-steps-item-disabled");
     expect(getWorkflowStep("review")).toHaveClass("ant-steps-item-disabled");
     expect(getWorkflowStep("finalize")).toHaveClass("ant-steps-item-disabled");
-    expect(screen.getByTestId("workflow-step-badge-scanning")).toHaveTextContent("85%");
+    expect(screen.getByTestId("workflow-step-badge-scanning")).toHaveTextContent("90%");
   });
 
   it("allows jumping between completed views without clearing the current session", async () => {

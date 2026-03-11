@@ -1,6 +1,7 @@
 const STAGE_ALIASES = {
   scanning: "scan",
   clustering: "compare",
+  scoring: "compare",
 };
 
 export const SCAN_STAGE_META = {
@@ -23,22 +24,30 @@ export const SCAN_STAGE_META = {
   scan: {
     label: "סורק תיקיות",
     rangeStart: 10,
-    rangeEnd: 55,
+    rangeEnd: 45,
     strokeColor: "#2f7a6d",
     railColor: "rgba(47, 122, 109, 0.16)",
     chipColor: "#2f7a6d",
   },
+  matching: {
+    label: "מאתר התאמות",
+    rangeStart: 45,
+    rangeEnd: 70,
+    strokeColor: "#8a6489",
+    railColor: "rgba(138, 100, 137, 0.16)",
+    chipColor: "#8a6489",
+  },
   quality: {
     label: "מחשב איכות",
-    rangeStart: 55,
-    rangeEnd: 75,
+    rangeStart: 70,
+    rangeEnd: 84,
     strokeColor: "#3a73b8",
     railColor: "rgba(58, 115, 184, 0.16)",
     chipColor: "#3a73b8",
   },
   compare: {
     label: "משווה אלבומים",
-    rangeStart: 75,
+    rangeStart: 84,
     rangeEnd: 99,
     strokeColor: "#b5662c",
     railColor: "rgba(181, 102, 44, 0.16)",

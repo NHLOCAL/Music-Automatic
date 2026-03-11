@@ -35,7 +35,7 @@ export function ScanningScreen({ progress }) {
             <Progress percent={overallPercent} showInfo={false} strokeColor={strokeColor} railColor={railColor} />
             <div className="scan-status-text">{progress.human_message}</div>
             <div className="scan-progress-note">
-              האחוז הכולל משלב את כל שלבי הניתוח יחד: סריקה, חישוב איכות והשוואה.
+              האחוז הכולל משלב את כל שלבי הניתוח יחד: סריקה, איתור התאמות, חישוב איכות והשוואה.
             </div>
             <div className="scan-progress-summary">
               <div className="scan-progress-stat">

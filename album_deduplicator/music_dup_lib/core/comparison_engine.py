@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any, Callable
 from itertools import combinations
 from collections import defaultdict
 import re
@@ -8,6 +8,9 @@ from .. import config
 from ..models import FolderInfo, FileInfo, FolderComparisonResult
 from ..utils import cached_string_similarity, normalize_filename_for_sort
 logger = logging.getLogger(__name__)
+
+ComparisonProgressCallback = Callable[[int, int], None]
+
 class ComparisonEngine:
     def __init__(self, enable_hashing: bool = config.ENABLE_HASHING):
         self.enable_hashing = enable_hashing
@@ -74,17 +77,25 @@ class ComparisonEngine:
         # Normalize by the total number of unique "other" files across both folders
         return total_score / len(all_names) if len(all_names) > 0 else 1.0
         
-    def find_similar_folders(self, all_folders: Dict[Path, FolderInfo]) -> List[FolderComparisonResult]:
+    def find_similar_folders(
+        self,
+        all_folders: Dict[Path, FolderInfo],
+        progress_callback: Optional[ComparisonProgressCallback] = None,
+    ) -> List[FolderComparisonResult]:
         logger.info(f"Starting comparison of {len(all_folders)} folders.")
         comparison_results: List[FolderComparisonResult] = []
         folder_items = list(all_folders.values())
+        total_pairs = (len(folder_items) * (len(folder_items) - 1)) // 2
         
         # This loop now processes ALL combinations of folders
-        for folder1, folder2 in combinations(folder_items, 2):
+        for current_index, (folder1, folder2) in enumerate(combinations(folder_items, 2), start=1):
             comparison_result = self.compare_two_folders(folder1, folder2)
             
             if comparison_result:
                 comparison_results.append(comparison_result)
+
+            if progress_callback:
+                progress_callback(current_index, total_pairs)
         
         # Sort is optional here but can be helpful for debugging the full list.
         # The main sorting for display will happen in main.py on the filtered list.

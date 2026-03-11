@@ -71,7 +71,16 @@ class AnalysisOrchestrator:
         scanned_folders = folder_scanner.scan_folders(options.folders)
         self._emit(progress_handler, "scan", "סריקה הושלמה", len(options.folders) or 1, len(options.folders) or 1)
 
-        comparison_results = comparison_engine.find_similar_folders(scanned_folders)
+        comparison_results = comparison_engine.find_similar_folders(
+            scanned_folders,
+            progress_callback=lambda current, total: self._emit(
+                progress_handler,
+                "matching",
+                "מאתר התאמות בין אלבומים",
+                current,
+                total,
+            ),
+        )
         compared_pairs_total = len(comparison_results)
         cached_results_map = {}
         if not options.force_rescan and not options.clear_cache:
@@ -154,6 +163,7 @@ class AnalysisOrchestrator:
         mapping = {
             "setup": "setup",
             "scan": "scan",
+            "matching": "matching",
             "quality": "quality",
             "scoring": "compare",
             "complete": "complete",
@@ -164,6 +174,7 @@ class AnalysisOrchestrator:
         messages = {
             "setup": "מכין את סביבת העבודה וההגדרות לפני תחילת הסריקה.",
             "scan": "סורק תיקיות ומזהה אלבומים שאפשר להשוות.",
+            "matching": "בודק אילו אלבומים דומים מספיק כדי להמשיך להשוואה עמוקה.",
             "quality": "מחשב איכות, עטיפות ונתוני שמע כדי להבין איזה עותק עדיף לשמור.",
             "scoring": "משווה בין האלבומים ובודק אם מדובר בכפילויות בטוחות או במקרים גבוליים.",
             "complete": "הניתוח הסתיים. אפשר להתחיל לעבור על הקבוצות הבטוחות והקבוצות שדורשות סקירה.",
