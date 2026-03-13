@@ -70,6 +70,7 @@
   - הסורק מזהה מראש רק `leaf folders` שיכולים להיות אלבומים, במקום לסרוק כל תיקייה פעמיים
   - העיבוד זורם עם `bounded worker queue`, כך שלא נצבר backlog גדול של `Future`-ים בזיכרון
   - cache התיקיות נכתב מחדש מתוך snapshot קיים בלי `load+merge` נוסף, ובפורמט JSON קומפקטי יותר
+  - כאשר סריקת `warm cache` לא משנה אף תיקייה, המערכת מדלגת לגמרי על כתיבה מחדש של `music_data.json`
   - חילוץ metadata משתמש בפתיחה מפורטת אחת לכל קובץ כאשר צריך `albumartist/lyrics`, במקום כמה פתיחות חוזרות
   - אובייקטי `FileInfo` / `FolderInfo` / `FolderComparisonResult` עברו ל-`slots` כדי לצמצם overhead בזיכרון
 - שלב ההשוואה עבר אופטימיזציה בלי לשנות scoring או thresholds:
@@ -198,6 +199,19 @@ python main.py "C:/Music" "D:/Archive" -p "C:/Music"
 ```bash
 pytest tests -q
 ```
+
+### Benchmark / Profiling
+
+```bash
+cd album_deduplicator
+python tools/benchmark_analysis.py "D:/שמע/כל המוזיקה" --report-path logs/benchmarks/latest.md
+```
+
+הכלי מפיק גם:
+
+- זמני stage ברמת `scan` / `comparison` / `scoring` / `clustering`
+- `cProfile` מסודר לפונקציות הכבדות ביותר
+- דוח markdown תחת `logs/benchmarks/`
 
 ### Frontend
 

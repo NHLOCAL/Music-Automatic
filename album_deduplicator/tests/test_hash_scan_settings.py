@@ -86,6 +86,62 @@ def test_folder_scanner_rescans_when_cached_hash_strategy_differs(monkeypatch, t
     assert saved_cache[str(root)]["hashing_strategy"] == "full"
 
 
+def test_folder_scanner_skips_cache_rewrite_when_everything_comes_from_cache(monkeypatch, tmp_path):
+    root = tmp_path / "album"
+    root.mkdir()
+    cache_file = tmp_path / "music_cache.json"
+    comparison_cache = tmp_path / "comparison_cache.pkl"
+    store = DataStore(music_cache_file=cache_file, comparison_cache_file=comparison_cache)
+    cached_entry = {
+        str(root): {
+            "path": str(root),
+            "folder_name": root.name,
+            "parent_folder_name": root.parent.name,
+            "files": [],
+            "album_art_hash": None,
+            "other_files": [],
+            "file_hashes_present": False,
+            "avg_bitrate": 0.0,
+            "unique_artists": [],
+            "unique_albums": [],
+            "generic_filename_score": 0.0,
+            "generic_title_score": 0.0,
+            "hebrew_metadata_ratio": 0.0,
+            "metadata_completeness_ratio": 0.0,
+            "lossless_ratio": 0.0,
+            "lyrics_ratio": 0.0,
+            "quality_score": None,
+            "quality_breakdown": {},
+            "hashing_strategy": "partial",
+        }
+    }
+    store.save_data(cached_entry)
+
+    scanner = FolderScanner(
+        file_processor=FileProcessor(enable_hashing=True, full_hash_scan=False),
+        data_store=store,
+    )
+    candidate = FolderScanCandidate(
+        path=root,
+        music_file_paths=[root / "01.mp3", root / "02.mp3", root / "03.mp3"],
+        other_file_paths=[],
+        album_art_file_paths=[],
+    )
+    monkeypatch.setattr(scanner, "_iter_folder_candidates", lambda roots: iter([candidate]))
+
+    save_calls = []
+    monkeypatch.setattr(
+        store,
+        "save_data",
+        lambda *args, **kwargs: save_calls.append((args, kwargs)),
+    )
+
+    result = scanner.scan_folders([root])
+
+    assert root in result
+    assert save_calls == []
+
+
 def test_data_store_ignores_comparison_cache_with_different_hash_profile(tmp_path):
     store = DataStore(
         music_cache_file=tmp_path / "music_cache.json",

@@ -60,6 +60,7 @@ class FolderScanner:
         processed_folders: Dict[Path, FolderInfo] = {}
         cached_data = self.data_store.load_data()
         cache_to_persist = dict(cached_data)
+        cache_modified_ref = [False]
         candidates_found = 0
         futures: Dict[concurrent.futures.Future[Optional[FolderInfo]], FolderScanCandidate] = {}
 
@@ -84,6 +85,7 @@ class FolderScanner:
                         futures=futures,
                         processed_folders=processed_folders,
                         cache_to_persist=cache_to_persist,
+                        cache_modified_ref=cache_modified_ref,
                         wait_for_all=False,
                     )
 
@@ -91,13 +93,17 @@ class FolderScanner:
                 futures=futures,
                 processed_folders=processed_folders,
                 cache_to_persist=cache_to_persist,
+                cache_modified_ref=cache_modified_ref,
                 wait_for_all=True,
             )
 
         logger.info(
             f"Scan complete. Found {candidates_found} candidate folders and processed {len(processed_folders)} folders."
         )
-        self.data_store.save_data(cache_to_persist, merge=False)
+        if cache_modified_ref[0]:
+            self.data_store.save_data(cache_to_persist, merge=False)
+        else:
+            logger.info("Folder cache did not change during scan; skipping music cache rewrite.")
         return processed_folders
 
     def _resolve_max_workers(self) -> int:
@@ -197,6 +203,7 @@ class FolderScanner:
         futures: Dict[concurrent.futures.Future[Optional[FolderInfo]], FolderScanCandidate],
         processed_folders: Dict[Path, FolderInfo],
         cache_to_persist: Dict[str, Any],
+        cache_modified_ref: List[bool],
         wait_for_all: bool,
     ) -> None:
         if not futures:
@@ -211,7 +218,11 @@ class FolderScanner:
                 result = future.result()
                 if result:
                     processed_folders[result.path] = result
-                    cache_to_persist[str(result.path)] = self._folder_info_to_dict(result)
+                    serialized = self._folder_info_to_dict(result)
+                    cache_key = str(result.path)
+                    if cache_to_persist.get(cache_key) != serialized:
+                        cache_modified_ref[0] = True
+                        cache_to_persist[cache_key] = serialized
             except Exception as e:
                 logger.error(f"Error processing folder {candidate.path}: {e}", exc_info=True)
 
