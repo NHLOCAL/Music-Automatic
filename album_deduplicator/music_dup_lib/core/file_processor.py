@@ -46,7 +46,7 @@ from mutagen.flac import FLAC
 
 
 from .. import config
-from ..utils import fix_jibrish_text, get_file_size_mb, contains_hebrew
+from ..utils import fix_jibrish_text
 from ..models import FileInfo
 
 
@@ -75,8 +75,13 @@ class FileProcessor:
             return None
 
         filename = filepath.name
-        size_mb = get_file_size_mb(filepath)
-        file_hash = self._calculate_hash(filepath) if self.enable_hashing else None
+        try:
+            file_size_bytes = filepath.stat().st_size
+        except OSError as e:
+            logger.error(f"Error getting file size for {filepath}: {e}")
+            file_size_bytes = 0
+        size_mb = file_size_bytes / (1024 * 1024) if file_size_bytes > 0 else 0.0
+        file_hash = self._calculate_hash(filepath, file_size=file_size_bytes) if self.enable_hashing else None
 
         metadata = self._extract_metadata(filepath)
 
@@ -123,9 +128,12 @@ class FileProcessor:
             audio = MutagenFile(filepath, easy=True)
             if audio:
                 # Extract EasyID3 tags
+                current_tags = {}
                 for key, value in audio.items():
                     # EasyID3 usually returns lists, take the first element
-                    metadata[key] = str(value[0]) if value and value[0] is not None else None
+                    normalized_value = str(value[0]) if value and value[0] is not None else None
+                    metadata[key] = normalized_value
+                    current_tags[key] = normalized_value
 
 
                 # Extract bitrate and duration from info
@@ -136,9 +144,6 @@ class FileProcessor:
                     if hasattr(audio.info, 'length') and audio.info.length:
                         metadata['duration'] = float(audio.info.length) # Store as float seconds
 
-                current_tags = {}
-                for k, v_list in audio.items():
-                    current_tags[k] = str(v_list[0]) if v_list and v_list[0] is not None else None
                 metadata['all_tags'] = current_tags
 
                 self._augment_metadata_from_detailed_tags(filepath, metadata)
@@ -244,10 +249,12 @@ class FileProcessor:
             return False
 
 
-    def _calculate_hash(self, filepath: Path) -> Optional[str]:
+    def _calculate_hash(self, filepath: Path, file_size: Optional[int] = None) -> Optional[str]:
         if self.full_hash_scan:
             return self._calculate_full_hash(filepath)
-        return self._calculate_partial_hash(filepath)
+        if file_size is None:
+            return self._calculate_partial_hash(filepath)
+        return self._calculate_partial_hash(filepath, file_size=file_size)
 
     def _calculate_full_hash(self, filepath: Path) -> Optional[str]:
         try:
@@ -266,10 +273,11 @@ class FileProcessor:
             logger.error(f"Unexpected error during full hashing for {filepath}: {e}", exc_info=True)
             return None
 
-    def _calculate_partial_hash(self, filepath: Path) -> Optional[str]:
+    def _calculate_partial_hash(self, filepath: Path, file_size: Optional[int] = None) -> Optional[str]:
 
         try:
-            file_size = filepath.stat().st_size
+            if file_size is None:
+                file_size = filepath.stat().st_size
             if file_size < config.HASH_CHUNK_SIZE * 2:
                 with open(filepath, 'rb') as f:
                     content = f.read()
@@ -320,10 +328,11 @@ class FileProcessor:
             logger.warning(f"Other file not found or is not a file: {filepath}")
             return None
         try:
+            file_size = filepath.stat().st_size
             return {
                 'name': filepath.name,
-                'size_bytes': filepath.stat().st_size,
-                'hash': self._calculate_hash(filepath) if self.enable_hashing else None
+                'size_bytes': file_size,
+                'hash': self._calculate_hash(filepath, file_size=file_size) if self.enable_hashing else None
             }
         except OSError as e:
             logger.error(f"Error processing other file info for {filepath}: {e}")
