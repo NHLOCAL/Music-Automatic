@@ -159,6 +159,44 @@ def test_data_store_ignores_comparison_cache_with_different_hash_profile(tmp_pat
     assert store.load_comparison_results(cache_profile="full") == {}
 
 
+def test_data_store_save_comparison_results_reuses_supplied_existing_map(monkeypatch, tmp_path):
+    store = DataStore(
+        music_cache_file=tmp_path / "music_cache.json",
+        comparison_cache_file=tmp_path / "comparison_cache.pkl",
+    )
+    existing_result = FolderComparisonResult(
+        folder1_path=Path("C:/music/existing-a"),
+        folder2_path=Path("C:/music/existing-b"),
+        weighted_score=88.0,
+    )
+    new_result = FolderComparisonResult(
+        folder1_path=Path("C:/music/new-a"),
+        folder2_path=Path("C:/music/new-b"),
+        weighted_score=91.0,
+    )
+
+    monkeypatch.setattr(
+        store,
+        "load_comparison_results",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cache reload should be skipped")),
+    )
+
+    store.save_comparison_results(
+        [new_result],
+        cache_profile="partial",
+        existing_results_map={
+            frozenset({str(existing_result.folder1_path), str(existing_result.folder2_path)}): existing_result,
+        },
+    )
+
+    reloaded_store = DataStore(
+        music_cache_file=tmp_path / "music_cache.json",
+        comparison_cache_file=tmp_path / "comparison_cache.pkl",
+    )
+    saved_results = reloaded_store.load_comparison_results(cache_profile="partial")
+    assert len(saved_results) == 2
+
+
 def test_folder_scanner_only_processes_leaf_album_candidates(monkeypatch, tmp_path):
     root = tmp_path / "music"
     root.mkdir()

@@ -237,6 +237,8 @@ class ScoringService:
             if result.is_identical_by_hash:
                 result.ml_similarity_score = None
                 continue
+            if result.ml_similarity_score is not None:
+                continue
 
             cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
             cached_result = cached_results_map.get(cache_key)
@@ -295,6 +297,14 @@ class ScoringService:
         gemini_analyzer: Optional[GeminiAnalyzerType],
         base_score: float,
     ) -> tuple[Optional[str], Optional[float], Optional[str], Optional[str]]:
+        if result.gemini_verdict is not None and result.gemini_error is None:
+            return (
+                result.gemini_verdict,
+                result.gemini_similarity_score,
+                result.gemini_reason,
+                None,
+            )
+
         if cached_result:
             cached_verdict = getattr(cached_result, "gemini_verdict", None)
             cached_score = getattr(cached_result, "gemini_similarity_score", None)

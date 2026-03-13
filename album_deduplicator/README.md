@@ -75,7 +75,9 @@
   - אובייקטי `FileInfo` / `FolderInfo` / `FolderComparisonResult` עברו ל-`slots` כדי לצמצם overhead בזיכרון
 - שלב ההשוואה עבר אופטימיזציה בלי לשנות scoring או thresholds:
   - המערכת מייצרת זוגות רק בתוך קבוצות עם אותו מספר קבצי מוזיקה, במקום לבדוק מראש גם זוגות שבטוח ייפסלו
+  - בהרצות `warm cache`, זוגות שכבר נשמרו ב-`comparison_results_cache.pkl` נטענים לפני שלב ההשוואה ומדלגים על `compare_two_folders` ו-ML/Gemini חוזרים כשאין צורך
   - הכנות חוזרות להשוואה, כמו מיון קבצים ומיפוי `other files`, מחושבות פעם אחת לכל תיקייה וממוחזרות בין זוגות
+  - metadata נוסף לכל קובץ מנורמל פעם אחת בזמן ה-prepare של התיקייה, במקום לחשב `set intersections` מחדש בכל זוג השוואה
   - עיבוד metadata בסיסי לכל קובץ נמנע ממעברים כפולים מיותרים על אותם tags, ו-hash reuse של `stat` מקטין קריאות filesystem עודפות
 - hashing ברירת המחדל הוא `partial hash`; אפשר להפעיל `full hash scan` ידנית מתוך ההגדרות המתקדמות.
 - מחיקה אוטומטית מוצעת רק כאשר:
@@ -210,6 +212,7 @@ python tools/benchmark_analysis.py "D:/שמע/כל המוזיקה" --report-path
 הכלי מפיק גם:
 
 - זמני stage ברמת `scan` / `comparison` / `scoring` / `clustering`
+- זמני hot-path granular עבור `scanner.process_folder_candidate` ו-`comparison.compare_two_folders`, כך שאפשר לראות מיד אם `warm cache` באמת חותך עבודה
 - `cProfile` מסודר לפונקציות הכבדות ביותר
 - דוח markdown תחת `logs/benchmarks/`
 

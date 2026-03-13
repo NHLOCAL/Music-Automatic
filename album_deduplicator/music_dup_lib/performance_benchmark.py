@@ -177,12 +177,34 @@ def run_benchmark(
         )
         stack.enter_context(
             patch.object(
+                FolderScanner,
+                "_process_folder_candidate",
+                new=_make_timed_method(
+                    "scanner.process_folder_candidate",
+                    recorder,
+                    FolderScanner._process_folder_candidate,
+                ),
+            )
+        )
+        stack.enter_context(
+            patch.object(
                 ComparisonEngine,
                 "find_similar_folders",
                 new=_make_timed_method(
                     "comparison.find_similar_folders",
                     recorder,
                     ComparisonEngine.find_similar_folders,
+                ),
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                ComparisonEngine,
+                "compare_two_folders",
+                new=_make_timed_method(
+                    "comparison.compare_two_folders",
+                    recorder,
+                    ComparisonEngine.compare_two_folders,
                 ),
             )
         )

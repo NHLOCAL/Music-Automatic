@@ -109,10 +109,18 @@ class DataStore:
             return {}
     def save_comparison_results(self,
                                 results_to_update: Union[List[FolderComparisonResult], Dict[FrozenSet[Path], FolderComparisonResult], Dict[FrozenSet[str], FolderComparisonResult]],
-                                cache_profile: str = "partial"):
+                                cache_profile: str = "partial",
+                                existing_results_map: Union[Dict[FrozenSet[str], FolderComparisonResult], None] = None):
         logger.info(f"Attempting to save/update comparison results to Pickle file: {self.comparison_cache_file}")
-        existing_results_map: Dict[FrozenSet[str], FolderComparisonResult] = self.load_comparison_results(cache_profile=cache_profile)
-        logger.info(f"Loaded {len(existing_results_map)} existing comparison results. Merging with {len(results_to_update) if isinstance(results_to_update, (list, dict)) else 'N/A'} new/updated results.")
+        if existing_results_map is None:
+            existing_results_map = self.load_comparison_results(cache_profile=cache_profile)
+            logger.info(f"Loaded {len(existing_results_map)} existing comparison results. Merging with {len(results_to_update) if isinstance(results_to_update, (list, dict)) else 'N/A'} new/updated results.")
+        else:
+            existing_results_map = dict(existing_results_map)
+            logger.info(
+                f"Reusing in-memory comparison cache with {len(existing_results_map)} existing entries. "
+                f"Merging with {len(results_to_update) if isinstance(results_to_update, (list, dict)) else 'N/A'} new/updated results."
+            )
         update_map_str_keys: Dict[FrozenSet[str], FolderComparisonResult] = {}
         if isinstance(results_to_update, list):
             for res in results_to_update:

@@ -71,6 +71,10 @@ class AnalysisOrchestrator:
         scanned_folders = folder_scanner.scan_folders(options.folders)
         self._emit(progress_handler, "scan", "סריקה הושלמה", len(options.folders) or 1, len(options.folders) or 1)
 
+        cached_results_map = {}
+        if not options.force_rescan and not options.clear_cache:
+            cached_results_map = self.data_store.load_comparison_results(cache_profile=hash_strategy)
+
         comparison_results = comparison_engine.find_similar_folders(
             scanned_folders,
             progress_callback=lambda current, total: self._emit(
@@ -80,11 +84,9 @@ class AnalysisOrchestrator:
                 current,
                 total,
             ),
+            cached_results_map=cached_results_map,
         )
         compared_pairs_total = len(comparison_results)
-        cached_results_map = {}
-        if not options.force_rescan and not options.clear_cache:
-            cached_results_map = self.data_store.load_comparison_results(cache_profile=hash_strategy)
 
         scoring_service = ScoringService(
             preferred_bitrate=options.bitrate_mode,
@@ -102,7 +104,11 @@ class AnalysisOrchestrator:
         )
 
         if cache_updates:
-            self.data_store.save_comparison_results(cache_updates, cache_profile=hash_strategy)
+            self.data_store.save_comparison_results(
+                cache_updates,
+                cache_profile=hash_strategy,
+                existing_results_map=cached_results_map,
+            )
 
         recommendation_service = RecommendationService(preferred_root=options.preferred_root)
         album_summaries = recommendation_service.build_album_summaries(scanned_folders)

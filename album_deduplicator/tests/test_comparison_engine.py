@@ -102,3 +102,41 @@ def test_comparison_engine_reuses_prepared_folder_cache(monkeypatch):
     assert first_result.weighted_score == second_result.weighted_score
     assert first_result.similarity_scores == second_result.similarity_scores
     assert len(normalize_calls) == len(folder_a.files) + len(folder_b.files)
+
+
+def test_comparison_engine_reuses_cached_pair_results_without_recomputing():
+    engine = ComparisonEngine(enable_hashing=False)
+    folder_a = make_folder("C:/music/A", 3)
+    folder_b = make_folder("D:/music/B", 3)
+    cached_result = FolderComparisonResult(
+        folder1_path=folder_a.path,
+        folder2_path=folder_b.path,
+        similarity_scores={},
+        weighted_score=91.5,
+        ml_similarity_score=93.0,
+        gemini_verdict="same_album",
+        gemini_similarity_score=90.0,
+        gemini_reason="cached",
+        final_combined_score=92.55,
+    )
+
+    def fail_compare(*args, **kwargs):
+        raise AssertionError("compare_two_folders should not run for cached pairs")
+
+    engine.compare_two_folders = fail_compare  # type: ignore[method-assign]
+
+    results = engine.find_similar_folders(
+        {
+            folder_a.path: folder_a,
+            folder_b.path: folder_b,
+        },
+        cached_results_map={
+            frozenset({str(folder_a.path), str(folder_b.path)}): cached_result,
+        },
+    )
+
+    assert len(results) == 1
+    assert results[0].weighted_score == 91.5
+    assert results[0].ml_similarity_score == 93.0
+    assert engine.last_run_stats.cached_pairs == 1
+    assert engine.last_run_stats.computed_pairs == 0

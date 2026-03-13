@@ -53,7 +53,9 @@
 - `comparison_engine.py`
   - השוואת זוג תיקיות.
   - יוצר זוגות להשוואה רק בתוך קבוצות עם אותו מספר קבצי מוזיקה, כי זוגות אחרים ייפסלו בכל מקרה.
+  - ממחזר תוצאות זוגות שכבר קיימות ב-`comparison_results_cache.pkl` עוד לפני `compare_two_folders`, כדי לחסוך compare עמוק בהרצות `warm cache`.
   - ממחזר prepared folder data כמו סדר קבצים ממוין ומיפויי `other files`, כדי לא לחשב את אותן הכנות שוב ושוב לכל זוג.
+  - מנרמל metadata נוסף של כל קובץ פעם אחת בזמן הכנת התיקייה, במקום לבצע `set intersections` ו-normalization מחדש בכל זוג.
   - חישוב `weighted_score` האלגוריתמי.
   - דילוג על זוגות עם מספר שירי מוזיקה שונה.
 - `quality_analyzer.py`
@@ -87,6 +89,8 @@
 - `analysis_orchestrator.py`
   - entrypoint לניתוח מלא.
   - מריץ scan, compare, score, cluster.
+  - טוען cache של comparisons לפני שלב ההשוואה ומעביר אותו ל-`ComparisonEngine`, כך שזוגות שכבר חושבו לא יעברו compare עמוק שוב.
+  - ממחזר את אותו comparison cache גם בזמן save, בלי `load` נוסף של אותו קובץ.
   - מדווח progress לשכבות מעליו.
 - `scoring_service.py`
   - מחשב `algorithmic_score`, `ml_score`, `base_score`, `gemini_score`, `final_score`.
