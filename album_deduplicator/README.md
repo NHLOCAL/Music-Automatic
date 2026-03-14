@@ -237,6 +237,23 @@ npm run dist:desktop
 
 הבילד של `Electron` כולל את ה-renderer הבנוי ואת קוד ה-backend כ-source resources. ברירת המחדל היא הרצת backend דרך `Python` מקומי; אם בעתיד יתווסף backend ארוז כ-executable, מעטפת Electron תעדיף אותו אוטומטית.
 
+### Windows CI/CD
+
+לפריסה אוטומטית של גרסאות `Windows` קיים כעת workflow ייעודי:
+
+- [`.github/workflows/album-deduplicator-windows-release.yml`](../.github/workflows/album-deduplicator-windows-release.yml)
+
+הזרימה היא:
+
+- `pull_request` ו-`push` ל-`main` מריצים `pytest`, `npm test`, ו-`npm run build`
+- `push` ל-`main` וגם `workflow_dispatch` מייצרים מתקין `NSIS` לא חתום תחת `frontend/desktop-dist` ומעלים אותו כ-artifact
+- tag מהצורה `album-deduplicator-vX.Y.Z` מפרסם אוטומטית `GitHub Release` עם מתקין `Windows`
+- שם ה-tag חייב להתאים ל-`version` שב-`frontend/package.json`
+
+תיעוד מלא של תהליך השחרור, naming convention, והמגבלות הנוכחיות נמצא כאן:
+
+- [docs/WINDOWS_RELEASES.md](docs/WINDOWS_RELEASES.md)
+
 ## הערות
 
 - אם קובץ ה-ML לא נמצא ב-`album_deduplicator/data`, המערכת תחפש אותו אוטומטית גם ב-`similarity_model/models`.
