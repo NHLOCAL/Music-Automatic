@@ -1,7 +1,9 @@
 import logging
+import os
 from pathlib import Path
 MUSIC_DUP_LIB_ROOT = Path(__file__).resolve().parent
 ALBUM_DEDUP_PROJECT_ROOT = MUSIC_DUP_LIB_ROOT.parent
+REPO_ROOT = ALBUM_DEDUP_PROJECT_ROOT.parent
 DATA_DIR = ALBUM_DEDUP_PROJECT_ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 LOGS_DIR = ALBUM_DEDUP_PROJECT_ROOT / "logs"
@@ -14,6 +16,11 @@ ARTIST_CSV_FILENAME = "singer-list.csv"
 ARTIST_CSV_FILE = DATA_DIR / ARTIST_CSV_FILENAME
 ML_MODEL_FILENAME = "lgbm_regressor_model.joblib"
 ML_MODEL_FILE = DATA_DIR / ML_MODEL_FILENAME
+SIMILARITY_MODEL_FALLBACK_FILE = REPO_ROOT / "similarity_model" / "models" / ML_MODEL_FILENAME
+ML_PREDICTION_BATCH_SIZE = 256
+ML_MAX_THREADS = max(1, min(4, max(1, (os.cpu_count() or 1) // 2)))
+SCAN_MAX_WORKERS = None
+SCAN_MAX_PENDING_TASKS_MULTIPLIER = 2
 ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.wav', '.aac', '.m4a', '.ogg'}
 LOSSLESS_EXTENSIONS = {'.flac', '.wav'}
 IGNORED_FILES = {'cover.jpg', 'folder.jpg', 'thumbs.db', 'desktop.ini',
@@ -45,6 +52,10 @@ SIMILARITY_WEIGHTS = {
 }
 GEMINI_SCORE_WEIGHT = 0.7
 ALGORITHMIC_SCORE_WEIGHT = 0.3
+BASE_SCORE_ALGORITHMIC_WEIGHT = 0.35
+BASE_SCORE_ML_WEIGHT = 0.65
+FINAL_SCORE_BASE_WEIGHT = 0.85
+FINAL_SCORE_GEMINI_WEIGHT = 0.15
 QUALITY_WEIGHTS = {
     'hebrew_metadata': 2.0,
     'metadata_completeness': 2.0,
@@ -60,10 +71,12 @@ HIGH_BITRATE_TARGET = 320  # kbps
 MID_BITRATE_TARGET = 128   # kbps
 BITRATE_SCORE_TOLERANCE = 192 # For 128kbps target, how far can it be to still get some score
 MIN_SIMILARITY_FOR_MERGE = 80.0
-DEFAULT_MIN_SIMILARITY_FOR_DELETE = 85.0
+DEFAULT_MIN_SIMILARITY_FOR_DELETE = 60.0
+REVIEW_MIN_SIMILARITY = 60.0
+SAFE_DELETE_MIN_SIMILARITY = 90.0
 DEFAULT_LOG_LEVEL = "INFO"
 LOG_FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
-MAX_WORKERS = None # os.cpu_count() will be used by default if None
+MAX_WORKERS = None # Legacy override. Folder scanning now prefers SCAN_MAX_WORKERS.
 LRU_CACHE_SIZE = 10000
 JIBRISH_FIX_LANGUAGE = "heb"
 # --- הגדרות Gemini ---
@@ -71,11 +84,29 @@ GEMINI_API_KEY_ENV_VAR = "GEMINI_API_KEY" # שם משתנה הסביבה
 # קובץ ההנחיות ל-Gemini, נמצא יחסית למיקום קובץ זה, בתיקיית 'external' של music_dup_lib
 GEMINI_SYSTEM_INST_FILE = MUSIC_DUP_LIB_ROOT / "external" / "gemini_system_instruction.txt"
 GEMINI_MODEL_NAME = "gemini-2.5-flash" # "gemini-2.5-flash-preview-05-20" # "gemini-2.0-flash-lite"
-DEFAULT_GEMINI_SIMILARITY_RANGE = "40-90" # Min-Max % for sending pairs to Gemini
+DEFAULT_GEMINI_SIMILARITY_RANGE = "60-90" # Min-Max % for sending pairs to Gemini
 GEMINI_API_DELAY_SECONDS = 0.5 # Delay between API calls (seconds)
 GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE = 95.0
+GEMINI_REVIEW_MIN = REVIEW_MIN_SIMILARITY
+GEMINI_REVIEW_MAX = SAFE_DELETE_MIN_SIMILARITY
+API_DEV_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 # --- הגדרות עבור data_preparation.py (אם משתמשים ב-config זה כמקור) ---
 # These might be used if data_preparation.py imports this config and needs these values.
 # If data_preparation.py defines its own, these are just for reference or album_deduplicator's internal use.
 FILTER_PAIRS_BY_FILE_COUNT_FOR_ML = True
 FILTER_PAIRS_BY_FILE_COUNT_FOR_ML_GEMINI = True # Filter pairs for Gemini labeling if music file counts differ
+
+
+def is_review_candidate(score: float) -> bool:
+    return score > REVIEW_MIN_SIMILARITY
+
+
+def is_safe_delete_candidate(score: float) -> bool:
+    return score > SAFE_DELETE_MIN_SIMILARITY
+
+
+def is_gemini_review_candidate(score: float) -> bool:
+    return REVIEW_MIN_SIMILARITY < score <= SAFE_DELETE_MIN_SIMILARITY
