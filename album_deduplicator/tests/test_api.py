@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from api.app import app, store
+from api.session_store import SessionEventBuffer
 from music_dup_lib.models import FileInfo, FolderInfo
 from music_dup_lib.services import AnalysisOptions, DeletionService
 from music_dup_lib.services.dto import (
@@ -400,6 +401,31 @@ def test_api_delete_single_updates_preview(monkeypatch):
     assert preview_response.json()["total_count"] == 0
 
 
+def test_api_delete_single_respects_explicit_keep_all():
+    session = store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+    session.snapshot = build_snapshot()
+    cluster = next(iter(session.snapshot.clusters.values()))
+    session.decisions = {cluster.cluster_id: None}
+    session.resolution_states = {cluster.cluster_id: "skipped"}
+    session.delete_selections = {cluster.cluster_id: set()}
+    session.status = "completed"
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/analysis-sessions/{session.session_id}/delete-single",
+        json={"cluster_id": cluster.cluster_id, "folder_id": cluster.deletable_folder_ids[0]},
+    )
+
+    assert response.status_code == 400
+    assert "keeper פעיל" in response.json()["detail"]
+
+
 def test_api_open_explorer(monkeypatch, tmp_path):
     api_app_module = importlib.import_module("api.app")
     opened = {}
@@ -434,3 +460,23 @@ def test_api_album_cover_and_track_stream_endpoints(tmp_path):
     stream_response = client.get(f"/api/analysis-sessions/{session.session_id}/albums/{folder_id}/tracks/0/stream")
     assert stream_response.status_code == 200
     assert stream_response.content == track_path.read_bytes()
+
+
+def test_session_event_buffer_coalesces_progress_and_stays_bounded():
+    buffer = SessionEventBuffer(maxlen=3)
+
+    buffer.put({"event": "status", "data": {"status": "running"}})
+    buffer.put({"event": "progress", "data": {"current": 1}})
+    buffer.put({"event": "progress", "data": {"current": 2}})
+    buffer.put({"event": "progress", "data": {"current": 3}})
+    buffer.put({"event": "completed", "data": {"status": "completed"}})
+
+    events = []
+    while not buffer.empty():
+        events.append(buffer.get_nowait())
+
+    assert events == [
+        {"event": "status", "data": {"status": "running"}},
+        {"event": "progress", "data": {"current": 3}},
+        {"event": "completed", "data": {"status": "completed"}},
+    ]

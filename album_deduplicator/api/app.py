@@ -263,10 +263,10 @@ def create_app() -> FastAPI:
 
 
 def _get_session_or_404(session_id: str):
-    try:
-        return store.get_session(session_id) or _raise_404(session_id)
-    except KeyError:
-        return _raise_404(session_id)
+    session = store.get_session(session_id)
+    if session is None:
+        _raise_404(session_id)
+    return session
 
 
 def _raise_404(session_id: str):

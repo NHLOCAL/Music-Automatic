@@ -69,13 +69,24 @@ class RecommendationService:
             if len(component) < 2:
                 continue
 
+            component_list = sorted(component)
             component_pairs = self._component_pairs(component, pair_lookup_by_folder_ids)
             recommended_keeper_id, keeper_reasons, reason_codes, clear_keeper = self._pick_keeper(component, albums)
-            all_pairs_safe = all(
+            pairwise_complete = self._has_full_pairwise_coverage(component_list, component_pairs)
+            all_pairs_safe = pairwise_complete and all(
                 pair.is_identical_by_hash or config.is_safe_delete_candidate(pair.final_score)
                 for pair in (pairs[pair_id] for pair_id in component_pairs)
             )
             keeper_covers_members = self._keeper_covers_members(component, component_pairs, pairs, recommended_keeper_id)
+
+            if not pairwise_complete:
+                reason_codes.append("pairwise_validation_incomplete")
+                keeper_reasons.append(
+                    RecommendationReason(
+                        "pairwise_validation_incomplete",
+                        "לא כל הזוגות בתוך הקבוצה אומתו ישירות, ולכן אי אפשר להציע מחיקה אוטומטית.",
+                    )
+                )
 
             confidence_bucket = "review"
             if clear_keeper and recommended_keeper_id and all_pairs_safe and keeper_covers_members:
@@ -91,7 +102,6 @@ class RecommendationService:
                 )
 
             cluster_id = stable_id("cluster", "|".join(sorted(component)))
-            component_list = sorted(component)
             comparison_highlights = self._build_comparison_highlights(component_list, albums)
             recommended_keeper_reason = keeper_reasons[0].message if keeper_reasons else None
             human_summary = self._build_human_summary(
@@ -102,6 +112,7 @@ class RecommendationService:
                 recommended_keeper_id=recommended_keeper_id,
                 confidence_bucket=confidence_bucket,
                 clear_keeper=clear_keeper,
+                pairwise_complete=pairwise_complete,
             )
             clusters[cluster_id] = AlbumCluster(
                 cluster_id=cluster_id,
@@ -120,7 +131,7 @@ class RecommendationService:
                 resolution_state="auto" if confidence_bucket == "safe" and recommended_keeper_id else "skipped",
                 recommended_keeper_reason=recommended_keeper_reason,
                 comparison_highlights=comparison_highlights,
-                technical_summary=self._build_technical_summary(component_pairs, pairs),
+                technical_summary=self._build_technical_summary(component_list, component_pairs, pairs),
             )
 
         return dict(
@@ -164,6 +175,14 @@ class RecommendationService:
                 if pair_id:
                     pair_ids.add(pair_id)
         return pair_ids
+
+    def _has_full_pairwise_coverage(
+        self,
+        component_list: List[str],
+        component_pairs: Set[str],
+    ) -> bool:
+        expected_pair_count = len(component_list) * (len(component_list) - 1) // 2
+        return len(component_pairs) == expected_pair_count
 
     def _pick_keeper(
         self,
@@ -239,6 +258,7 @@ class RecommendationService:
         recommended_keeper_id: Optional[str],
         confidence_bucket: str,
         clear_keeper: bool,
+        pairwise_complete: bool,
     ) -> str:
         pair_scores = [pairs[pair_id].final_score for pair_id in pair_ids]
         min_score = min(pair_scores) if pair_scores else 0.0
@@ -249,6 +269,12 @@ class RecommendationService:
             )
 
         keeper = albums[recommended_keeper_id]
+        if not pairwise_complete:
+            return (
+                f"נמצאו {album_count} אלבומים דומים מאוד, אבל לא כל הזוגות בתוך הקבוצה אומתו ישירות. "
+                f"ההמלצה הראשונית היא לשמור את \"{keeper.name}\" ולבצע סקירה ידנית."
+            )
+
         if confidence_bucket == "safe":
             if keeper.in_preferred_root:
                 return (
@@ -337,13 +363,28 @@ class RecommendationService:
 
         return highlights
 
-    def _build_technical_summary(self, pair_ids: Set[str], pairs: Dict[str, PairAnalysis]) -> str:
+    def _build_technical_summary(
+        self,
+        component_list: List[str],
+        pair_ids: Set[str],
+        pairs: Dict[str, PairAnalysis],
+    ) -> str:
         if not pair_ids:
             return "אין פירוט טכני זמין."
         pair_values = [pairs[pair_id] for pair_id in pair_ids]
         min_score = min(pair.final_score for pair in pair_values)
         identical_count = sum(1 for pair in pair_values if pair.is_identical_by_hash)
-        return (
+        summary = (
             f"{len(pair_values)} זוגות הושוו. הציון הנמוך ביותר בקבוצה הוא {min_score:.1f}%. "
             f"{identical_count} זוגות זוהו כזהים לחלוטין לפי hash."
         )
+        expected_pair_count = len(component_list) * (len(component_list) - 1) // 2
+        missing_pair_count = expected_pair_count - len(pair_values)
+        if missing_pair_count > 0:
+            missing_pairs_text = (
+                "חסר עוד זוג אחד"
+                if missing_pair_count == 1
+                else f"חסרים עוד {missing_pair_count} זוגות"
+            )
+            summary += f" {missing_pairs_text} כדי לאמת pairwise מלא לכל חברי הקבוצה."
+        return summary

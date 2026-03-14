@@ -134,6 +134,7 @@
 - `session_store.py`
   - ניהול `analysis sessions` בזיכרון.
   - שמירת progress, snapshot, decisions, סימוני מחיקה פרטניים ו-preview.
+  - buffer חסום לאירועי `SSE`, עם coalescing של `progress`, כדי למנוע growth לא מוגבל בזיכרון כאשר אין consumer פעיל.
   - background execution לכל session.
 
 ### `frontend/electron`
@@ -342,7 +343,8 @@ final_score = base_score
 
 רק כאשר כל התנאים מתקיימים:
 
-- כל הקשרים הרלוונטיים בטוחים:
+- כל הזוגות בתוך הקבוצה אומתו ישירות
+- כל הקשרים שנבדקו בטוחים:
   - `identical_by_hash`, או
   - `final_score > 90`
 - יש `keeper` יחיד וברור

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import deque
 import queue
 import threading
 import uuid
@@ -18,6 +19,48 @@ from music_dup_lib.services import (
 )
 
 logger = logging.getLogger(__name__)
+MAX_SESSION_EVENTS = 256
+
+
+class SessionEventBuffer:
+    def __init__(self, maxlen: int = MAX_SESSION_EVENTS):
+        self._events: deque[dict] = deque()
+        self._maxlen = maxlen
+        self._lock = threading.Lock()
+
+    def put(self, event: dict) -> None:
+        with self._lock:
+            if event.get("event") == "progress":
+                self._drop_latest_progress_locked()
+            elif len(self._events) >= self._maxlen:
+                self._drop_oldest_progress_locked()
+
+            if len(self._events) >= self._maxlen:
+                self._events.popleft()
+
+            self._events.append(event)
+
+    def get_nowait(self) -> dict:
+        with self._lock:
+            if not self._events:
+                raise queue.Empty
+            return self._events.popleft()
+
+    def empty(self) -> bool:
+        with self._lock:
+            return not self._events
+
+    def _drop_latest_progress_locked(self) -> None:
+        for index in range(len(self._events) - 1, -1, -1):
+            if self._events[index].get("event") == "progress":
+                del self._events[index]
+                return
+
+    def _drop_oldest_progress_locked(self) -> None:
+        for index, buffered_event in enumerate(self._events):
+            if buffered_event.get("event") == "progress":
+                del self._events[index]
+                return
 
 
 @dataclass
@@ -41,7 +84,7 @@ class SessionState:
     decisions: Dict[str, Optional[str]] = field(default_factory=dict)
     preview: DeletePreview = field(default_factory=DeletePreview)
     error: Optional[str] = None
-    events: "queue.Queue[dict]" = field(default_factory=queue.Queue)
+    events: SessionEventBuffer = field(default_factory=SessionEventBuffer)
     lock: threading.Lock = field(default_factory=threading.Lock)
     resolution_states: Dict[str, str] = field(default_factory=dict)
     deleted_folder_ids: Set[str] = field(default_factory=set)
@@ -207,7 +250,11 @@ class SessionStore:
             cluster = session.snapshot.clusters.get(cluster_id)
             if cluster is None:
                 raise KeyError(f"Unknown cluster id: {cluster_id}")
-            keeper_id = session.decisions.get(cluster_id) or cluster.recommended_keeper_id
+            keeper_id = (
+                session.decisions[cluster_id]
+                if cluster_id in session.decisions
+                else cluster.recommended_keeper_id
+            )
             if keeper_id is None:
                 raise ValueError("לא ניתן למחוק בודד בלי keeper פעיל לקבוצה.")
             if folder_id == keeper_id:

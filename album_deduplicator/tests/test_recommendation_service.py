@@ -143,3 +143,32 @@ def test_recommendation_builds_human_highlights_for_quality_and_art():
     assert "ביטרייט גבוה יותר" in labels
     assert "כולל עטיפת אלבום" in labels
     assert cluster.recommended_keeper_reason is not None
+
+
+def test_recommendation_requires_full_pairwise_validation_for_safe_clusters():
+    folder_a = make_folder("C:/music/A", 80.0)
+    folder_b = make_folder("C:/music/B", 96.0)
+    folder_c = make_folder("D:/music/C", 85.0)
+    folders = {
+        folder_a.path: folder_a,
+        folder_b.path: folder_b,
+        folder_c.path: folder_c,
+    }
+
+    service = RecommendationService()
+    albums = service.build_album_summaries(folders)
+    pair_ab = make_pair(folder_a.path, folder_b.path, 98.0)
+    pair_bc = make_pair(folder_b.path, folder_c.path, 97.0)
+
+    clusters = service.build_clusters(
+        folders,
+        {pair_ab.pair_id: pair_ab, pair_bc.pair_id: pair_bc},
+        albums,
+    )
+    cluster = next(iter(clusters.values()))
+
+    assert cluster.recommended_keeper_id == stable_id("folder", str(folder_b.path))
+    assert cluster.confidence_bucket == "review"
+    assert "pairwise_validation_incomplete" in cluster.reason_codes
+    assert "לא כל הזוגות בתוך הקבוצה אומתו ישירות" in cluster.human_summary
+    assert "חסר עוד זוג אחד" in cluster.technical_summary
