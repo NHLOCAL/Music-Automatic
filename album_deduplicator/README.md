@@ -7,6 +7,7 @@
 - `FastAPI` משמש כ-backend רשמי עם sessions, `SSE` להתקדמות, ו-DTOs יציבים לפרונטנד.
 - תור אירועי ה-`SSE` ב-session store כעת חסום ומכווץ אירועי `progress`, כך שגם ניתוחים ארוכים ללא מאזין פעיל לא יצברו backlog לא מוגבל בזיכרון.
 - `Electron` משמש כמעטפת desktop הראשית: הוא פותח חלון, מרים את ה-backend, ומספק יכולות מערכת דרך `preload bridge`.
+- מעטפת ה-`Desktop` ואריזת `Windows` משתמשות כעת באייקון היישום הרשמי שמופק מתוך `9-Photoroom.png`, כולל לחלון `Electron`, ל-`favicon` של ה-renderer, ולקובצי ה-`NSIS` הארוזים.
 - `React` משמש כ-renderer הראשי החדש, עם `Ant Design 6`, `Happy Work Theme`, RTL מלא, ו-tabs של `בטוח למחיקה`, `דורש סקירה`, ו-`כל התוצאות`.
 - מסך הסריקה מציג roots בשדות נפרדים עם הוספה/הסרה ברורה, במקום שדה טקסט יחיד.
 - לכל שורת root במסך ההגדרה יש כעת גם כפתור `בחר תיקייה` ייעודי, בנוסף לבחירה מרוכזת של כמה roots יחד.
@@ -232,10 +233,13 @@ npm run build
 
 ```bash
 cd frontend
+npm run sync:icons
 npm run dist:desktop
 ```
 
-הבילד של `Electron` כולל את ה-renderer הבנוי ואת קוד ה-backend כ-source resources. ברירת המחדל היא הרצת backend דרך `Python` מקומי; אם בעתיד יתווסף backend ארוז כ-executable, מעטפת Electron תעדיף אותו אוטומטית.
+הפקודה `npm run sync:icons` מסנכרנת את `9-Photoroom.png` אל נכסי `PNG` ו-`ICO` שבהם משתמשים חלון ה-`Electron` ו-`electron-builder`.
+
+הבילד של `Electron` כולל את ה-renderer הבנוי, את קוד ה-backend כ-source resources, וגם את נכסי האייקון הארוזים. ברירת המחדל היא הרצת backend דרך `Python` מקומי; אם בעתיד יתווסף backend ארוז כ-executable, מעטפת Electron תעדיף אותו אוטומטית.
 
 ### Windows CI/CD
 

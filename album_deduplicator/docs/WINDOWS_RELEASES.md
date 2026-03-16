@@ -5,6 +5,7 @@
 ## קבצים רלוונטיים
 
 - `frontend/package.json`
+- `frontend/scripts/sync-icons.py`
 - `.github/workflows/album-deduplicator-windows-release.yml`
 
 ## מה ה-workflow עושה
@@ -40,6 +41,7 @@ pytest tests -q
 
 cd frontend
 npm test
+npm run sync:icons
 npm run dist:desktop
 ```
 
@@ -55,6 +57,7 @@ git push origin album-deduplicator-v0.1.0
 ## למה נבחרה הגישה הזו
 
 - `electron-builder` כבר נמצא בפרויקט ומוגדר ל-`NSIS`, כך שאין צורך להוסיף מערכת packaging נוספת
+- האייקון של האפליקציה נגזר אוטומטית מתוך `album_deduplicator/9-Photoroom.png`, כך שחלון ה-`Electron`, קובץ ה-`exe`, המתקין וה-uninstaller משתמשים באותו נכס רשמי
 - `GitHub Releases` הוא provider נתמך ישירות על ידי `electron-builder`, ולכן התהליך קצר ויציב יותר מפתרון custom
 - הפלט כולל `latest.yml`, כך שאם בהמשך תתווסף שכבת `electron-updater`, בסיס הפרסום כבר קיים
 - ה-workflow מפריד בין `preview artifacts` לבין release אמיתי, כדי לא לפרסם כל build ללקוחות
@@ -68,6 +71,15 @@ git push origin album-deduplicator-v0.1.0
 - ה-release כרגע לא מבצע `code signing`
   - ב-`Windows`, אפליקציה לא חתומה עלולה לקבל אזהרות `SmartScreen`
   - ה-workflow מבטל `CSC_IDENTITY_AUTO_DISCOVERY` כדי למנוע כשלי build בסביבה לא חתומה
+
+## תחזוקת אייקון האפליקציה
+
+- מקור האמת של האייקון הוא `album_deduplicator/9-Photoroom.png`
+- `npm run sync:icons` יוצר/מעדכן ממנו את:
+  - `frontend/public/app-icon.png`
+  - `frontend/electron/assets/icons/app-icon.png`
+  - `frontend/electron/assets/icons/app-icon.ico`
+- `npm run build`, `npm run electron`, ו-`npm run dev:electron` מריצים את הסנכרון הזה אוטומטית, כך שכל build או הרצה של מעטפת ה-Desktop משתמשים בגרסה המעודכנת של האייקון
 
 ## שלב מומלץ הבא
 

@@ -143,6 +143,7 @@
 
 - `main.cjs`
   - יוצר `BrowserWindow`
+  - טוען את אייקון היישום מתוך נכסי `electron/assets/icons`, כך שגם חלון הפיתוח וגם החבילה הארוזה משתמשים באותו icon
   - מרים `FastAPI` כתהליך מקומי
   - ממתין ל-`GET /api/health`
   - מנהל lifecycle של backend בעת פתיחה/סגירה

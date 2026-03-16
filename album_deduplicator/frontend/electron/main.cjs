@@ -36,6 +36,11 @@ function getPackagedBackendExecutable() {
   return path.join(process.resourcesPath, "backend", `album-deduplicator-api${extension}`);
 }
 
+function getWindowIconPath() {
+  const iconFileName = process.platform === "win32" ? "app-icon.ico" : "app-icon.png";
+  return path.join(__dirname, "assets", "icons", iconFileName);
+}
+
 function getSpawnCandidates(port) {
   const sourceRoot = getBackendSourceRoot();
   const sharedArgs = [
@@ -226,6 +231,7 @@ async function createMainWindow() {
     minHeight: 820,
     show: false,
     backgroundColor: "#f4f1ea",
+    icon: getWindowIconPath(),
     title: "Music Automatic",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),

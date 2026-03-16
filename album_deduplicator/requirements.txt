@@ -4,6 +4,7 @@ rapidfuzz
 joblib
 pandas
 numpy
+Pillow
 Send2Trash
 fastapi
 uvicorn
