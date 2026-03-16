@@ -43,6 +43,7 @@
     "appId": "com.musicautomatic.albumdeduplicator",
     "productName": "Music Automatic",
     "directories": {
+      "buildResources": "build",
       "output": "desktop-dist"
     },
     "files": [
@@ -66,12 +67,12 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "electron/assets/icons/app-icon.ico"
+      "icon": "build/icons/app-icon.ico"
     },
     "nsis": {
-      "installerIcon": "electron/assets/icons/app-icon.ico",
-      "uninstallerIcon": "electron/assets/icons/app-icon.ico",
-      "installerHeaderIcon": "electron/assets/icons/app-icon.ico"
+      "installerIcon": "build/icons/app-icon.ico",
+      "uninstallerIcon": "build/icons/app-icon.ico",
+      "installerHeaderIcon": "build/icons/app-icon.ico"
     },
     "publish": [
       {

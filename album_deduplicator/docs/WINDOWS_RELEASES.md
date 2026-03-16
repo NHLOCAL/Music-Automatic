@@ -57,7 +57,7 @@ git push origin album-deduplicator-v0.1.0
 ## למה נבחרה הגישה הזו
 
 - `electron-builder` כבר נמצא בפרויקט ומוגדר ל-`NSIS`, כך שאין צורך להוסיף מערכת packaging נוספת
-- האייקון של האפליקציה נגזר אוטומטית מתוך `album_deduplicator/9-Photoroom.png`, כך שחלון ה-`Electron`, קובץ ה-`exe`, המתקין וה-uninstaller משתמשים באותו נכס רשמי
+- האייקון של האפליקציה נגזר אוטומטית מתוך `album_deduplicator/frontend/build/icons/app-icon-source.png`, כך שחלון ה-`Electron`, קובץ ה-`exe`, המתקין וה-uninstaller משתמשים באותו נכס רשמי
 - `GitHub Releases` הוא provider נתמך ישירות על ידי `electron-builder`, ולכן התהליך קצר ויציב יותר מפתרון custom
 - הפלט כולל `latest.yml`, כך שאם בהמשך תתווסף שכבת `electron-updater`, בסיס הפרסום כבר קיים
 - ה-workflow מפריד בין `preview artifacts` לבין release אמיתי, כדי לא לפרסם כל build ללקוחות
@@ -74,8 +74,9 @@ git push origin album-deduplicator-v0.1.0
 
 ## תחזוקת אייקון האפליקציה
 
-- מקור האמת של האייקון הוא `album_deduplicator/9-Photoroom.png`
+- מקור האמת של האייקון הוא `album_deduplicator/frontend/build/icons/app-icon-source.png`
 - `npm run sync:icons` יוצר/מעדכן ממנו את:
+  - `frontend/build/icons/app-icon.ico`
   - `frontend/public/app-icon.png`
   - `frontend/electron/assets/icons/app-icon.png`
   - `frontend/electron/assets/icons/app-icon.ico`
