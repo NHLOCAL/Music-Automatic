@@ -2,10 +2,12 @@ const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const net = require("node:net");
 const path = require("node:path");
+const { resolveAppVersion } = require("./app-version.cjs");
 
 const ELECTRON_DEV_URL = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:5173";
 const BACKEND_HOST = "127.0.0.1";
 const BACKEND_START_TIMEOUT_MS = 30_000;
+const DESKTOP_APP_VERSION = resolveAppVersion();
 
 let backendProcess = null;
 let backendBaseUrl = null;
@@ -148,6 +150,7 @@ async function startBackend() {
         cwd: candidate.cwd,
         env: {
           ...process.env,
+          ALBUM_DEDUP_VERSION: DESKTOP_APP_VERSION,
           PYTHONIOENCODING: "utf-8",
           PYTHONUTF8: "1",
         },
@@ -182,7 +185,7 @@ function setupIpcHandlers() {
   ipcMain.handle("desktop:get-runtime", () => ({
     isElectron: true,
     backendBaseUrl,
-    version: app.getVersion(),
+    version: DESKTOP_APP_VERSION,
     platform: process.platform,
   }));
 
@@ -239,7 +242,7 @@ async function createMainWindow() {
       nodeIntegration: false,
       additionalArguments: [
         `--backend-base-url=${backendBaseUrl}`,
-        `--app-version=${app.getVersion()}`,
+        `--app-version=${DESKTOP_APP_VERSION}`,
       ],
     },
   });

@@ -153,16 +153,6 @@ jobs:
         working-directory: ${{ env.FRONTEND_DIR }}
         run: npm ci
 
-      - name: Verify tag matches frontend version
-        shell: pwsh
-        run: |
-          $package = Get-Content -Raw -Encoding UTF8 "${{ env.FRONTEND_DIR }}/package.json" | ConvertFrom-Json
-          $expectedTag = "album-deduplicator-v$($package.version)"
-          $actualTag = "${{ github.ref_name }}"
-          if ($actualTag -ne $expectedTag) {
-            throw "Tag '$actualTag' does not match package version '$($package.version)'. Expected '$expectedTag'."
-          }
-
       - name: Publish Windows release assets
         working-directory: ${{ env.FRONTEND_DIR }}
         env:

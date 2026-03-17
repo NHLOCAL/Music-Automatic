@@ -12,9 +12,9 @@
     "dev:electron": "npm run sync:icons && concurrently -k \"vite --host 127.0.0.1 --port 5173\" \"wait-on tcp:127.0.0.1:5173 && cross-env ELECTRON_RENDERER_URL=http://127.0.0.1:5173 electron .\"",
     "electron": "npm run sync:icons && electron .",
     "build": "npm run sync:icons && vite build",
-    "build:desktop": "npm run build && electron-builder --dir --publish never",
-    "dist:desktop": "npm run build && electron-builder --publish never",
-    "dist:desktop:publish": "npm run build && electron-builder --publish always",
+    "build:desktop": "npm run build && electron-builder --config electron-builder.config.cjs --dir --publish never",
+    "dist:desktop": "npm run build && electron-builder --config electron-builder.config.cjs --publish never",
+    "dist:desktop:publish": "npm run build && electron-builder --config electron-builder.config.cjs --publish always",
     "preview": "vite preview",
     "test": "vitest run"
   },
@@ -38,52 +38,6 @@
     "vite": "^6.2.0",
     "vitest": "^3.0.8",
     "wait-on": "^8.0.5"
-  },
-  "build": {
-    "appId": "com.musicautomatic.albumdeduplicator",
-    "productName": "Music Automatic",
-    "directories": {
-      "buildResources": "build",
-      "output": "desktop-dist"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "../api",
-        "to": "backend-source/api"
-      },
-      {
-        "from": "../music_dup_lib",
-        "to": "backend-source/music_dup_lib"
-      },
-      {
-        "from": "../frontend/dist",
-        "to": "backend-source/frontend/dist"
-      }
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "build/icons/app-icon.ico"
-    },
-    "nsis": {
-      "installerIcon": "build/icons/app-icon.ico",
-      "uninstallerIcon": "build/icons/app-icon.ico",
-      "installerHeaderIcon": "build/icons/app-icon.ico"
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "NHLOCAL",
-        "repo": "Music-Automatic",
-        "tagNamePrefix": "album-deduplicator-v",
-        "releaseType": "release"
-      }
-    ],
-    "artifactName": "${productName}-${version}-setup-${arch}.${ext}"
   },
   "repository": {
     "type": "git",

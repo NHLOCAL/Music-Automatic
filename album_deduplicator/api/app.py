@@ -49,8 +49,23 @@ from api.session_store import SessionStore
 store = SessionStore()
 
 
+def _resolve_app_version() -> str:
+    env_version = os.getenv("ALBUM_DEDUP_VERSION", "").strip()
+    if env_version:
+        return env_version
+
+    package_json_path = Path(__file__).resolve().parent.parent / "frontend" / "package.json"
+    try:
+        package_data = json.loads(package_json_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "0.1.0"
+
+    version = package_data.get("version")
+    return version.strip() if isinstance(version, str) and version.strip() else "0.1.0"
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="Album Deduplicator API", version="2.0.0")
+    app = FastAPI(title="Album Deduplicator API", version=_resolve_app_version())
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.API_DEV_CORS_ORIGINS,

@@ -5,6 +5,8 @@
 ## קבצים רלוונטיים
 
 - `frontend/package.json`
+- `frontend/electron/app-version.cjs`
+- `frontend/electron-builder.config.cjs`
 - `frontend/scripts/sync-icons.py`
 - `.github/workflows/album-deduplicator-windows-release.yml`
 
@@ -27,13 +29,12 @@
 
 3. `publish-release`
    - רץ רק על tag מהצורה `album-deduplicator-vX.Y.Z`
-   - מאמת שה-tag תואם ל-`version` שב-`frontend/package.json`
+   - מחלץ את גרסת האפליקציה ישירות מתוך ה-tag
    - בונה ומפרסם את קובצי ה-`Windows` מתוך `frontend/desktop-dist` ל-`GitHub Releases` דרך `electron-builder`
 
 ## איך משחררים גרסה
 
-1. עדכן את `version` ב-`album_deduplicator/frontend/package.json`
-2. ודא שהבדיקות עוברות מקומית:
+1. ודא שהבדיקות עוברות מקומית:
 
 ```bash
 cd album_deduplicator
@@ -45,18 +46,25 @@ npm run sync:icons
 npm run dist:desktop
 ```
 
-3. צור tag תואם גרסה:
+2. צור tag release:
 
 ```bash
 git tag album-deduplicator-v0.1.0
 git push origin album-deduplicator-v0.1.0
 ```
 
-4. ה-workflow ייצור `GitHub Release` ויצרף אליו את מתקין ה-`Windows`
+3. ה-workflow ייצור `GitHub Release` ויצרף אליו את מתקין ה-`Windows`
+
+במהלך ה-build:
+
+- `frontend/electron/app-version.cjs` מעדיף את `GITHUB_REF_NAME` או tag מקומי שמצביע ל-`HEAD`
+- `electron-builder` מקבל את הגרסה דרך `extraMetadata.version`
+- `Electron` מעביר את אותה גרסה גם ל-backend דרך `ALBUM_DEDUP_VERSION`
 
 ## למה נבחרה הגישה הזו
 
 - `electron-builder` כבר נמצא בפרויקט ומוגדר ל-`NSIS`, כך שאין צורך להוסיף מערכת packaging נוספת
+- ה-tag ב-Git הוא כעת מקור האמת לגרסת release, ולכן לא צריך לעדכן ידנית את `frontend/package.json` לפני כל שחרור
 - האייקון של האפליקציה נגזר אוטומטית מתוך `album_deduplicator/frontend/build/icons/app-icon-source.png`, כך שחלון ה-`Electron`, קובץ ה-`exe`, המתקין וה-uninstaller משתמשים באותו נכס רשמי
 - `GitHub Releases` הוא provider נתמך ישירות על ידי `electron-builder`, ולכן התהליך קצר ויציב יותר מפתרון custom
 - הפלט כולל `latest.yml`, כך שאם בהמשך תתווסף שכבת `electron-updater`, בסיס הפרסום כבר קיים

@@ -252,7 +252,7 @@ npm run dist:desktop
 - `pull_request` ו-`push` ל-`main` מריצים `pytest`, `npm test`, ו-`npm run build`
 - `push` ל-`main` וגם `workflow_dispatch` מייצרים מתקין `NSIS` לא חתום תחת `frontend/desktop-dist` ומעלים אותו כ-artifact
 - tag מהצורה `album-deduplicator-vX.Y.Z` מפרסם אוטומטית `GitHub Release` עם מתקין `Windows`
-- שם ה-tag חייב להתאים ל-`version` שב-`frontend/package.json`
+- גרסת ה-release נגזרת אוטומטית מה-tag עצמו, בלי צורך לעדכן ידנית את `frontend/package.json`
 
 תיעוד מלא של תהליך השחרור, naming convention, והמגבלות הנוכחיות נמצא כאן:
 
