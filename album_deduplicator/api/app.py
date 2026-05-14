@@ -385,6 +385,7 @@ def _cluster_model(session, cluster_id: str) -> ClusterSummaryModel:
         cluster_id=cluster.cluster_id,
         confidence_bucket=cluster.confidence_bucket,
         recommended_keeper_id=cluster.recommended_keeper_id,
+        selected_keeper_id=session.decisions.get(cluster_id),
         selected_delete_folder_ids=sorted(session.delete_selections.get(cluster_id, set())),
         human_summary=cluster.human_summary,
         resolution_state=cluster.resolution_state,

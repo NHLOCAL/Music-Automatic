@@ -102,6 +102,33 @@ describe("useDeduplicator", () => {
     });
   });
 
+  it("hydrates restored user-selected keeper decisions from cluster responses", async () => {
+    const restoredCluster = {
+      ...baseReviewCluster,
+      resolution_state: "user_selected",
+      recommended_keeper_id: "folder-1",
+      selected_keeper_id: "folder-2",
+      selected_delete_folder_ids: ["folder-1"],
+    };
+    api.getClusters.mockResolvedValue({ clusters: [restoredCluster] });
+    api.getDeletePreview.mockResolvedValue({
+      ...previewResponse,
+      items: [{ cluster_id: "cluster-review-1", folder_id: "folder-1", selection_source: "user_selected" }],
+    });
+
+    const { result } = renderHook(() => useDeduplicator());
+
+    act(() => {
+      result.current.setSessionId("session-1");
+      result.current.setStatus("completed");
+    });
+
+    await waitFor(() => {
+      expect(result.current.decisions["cluster-review-1"]).toBe("folder-2");
+      expect(result.current.deleteSelections["cluster-review-1"]).toEqual(["folder-1"]);
+    });
+  });
+
   it("creates delete selections when the user confirms the recommended keeper in a review cluster", async () => {
     const { result } = renderHook(() => useDeduplicator());
 

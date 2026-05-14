@@ -332,6 +332,7 @@ def test_api_cluster_decisions_and_delete_execution(monkeypatch):
     assert clusters_response.status_code == 200
     assert len(clusters_response.json()["clusters"]) == 1
     assert clusters_response.json()["clusters"][0]["human_summary"]
+    assert clusters_response.json()["clusters"][0]["selected_keeper_id"] == cluster.recommended_keeper_id
     assert clusters_response.json()["clusters"][0]["selected_delete_folder_ids"] == [cluster.deletable_folder_ids[0]]
     assert clusters_response.json()["clusters"][0]["albums"][0]["album_art_preview_url"].endswith("/cover")
     assert clusters_response.json()["clusters"][0]["albums"][0]["tracks"][0]["stream_url"].endswith("/stream")
@@ -567,6 +568,48 @@ def test_saved_user_decision_is_reapplied_after_rescan(tmp_path):
     assert next_session.delete_selections[cluster.cluster_id] == {drop_id}
     assert next_session.resolution_states[cluster.cluster_id] == "user_selected"
     assert next_session.preview.total_count == 1
+
+
+def test_restored_non_recommended_keeper_is_exposed_in_cluster_response(tmp_path):
+    decision_store = UserDecisionStore(tmp_path / "decisions" / "album_decisions.json")
+    local_store = SessionStore(decision_store=decision_store)
+    session = local_store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+    session.snapshot = build_snapshot()
+    cluster = next(iter(session.snapshot.clusters.values()))
+    manual_keeper_id = cluster.deletable_folder_ids[0]
+    manual_delete_id = cluster.recommended_keeper_id
+    session.decisions = {cluster.cluster_id: manual_keeper_id}
+    session.resolution_states = {cluster.cluster_id: "user_selected"}
+    session.delete_selections = {cluster.cluster_id: {manual_delete_id}}
+    session.preview = DeletionService().build_preview(
+        session.snapshot.clusters,
+        session.snapshot.albums,
+        session.decisions,
+        resolution_states=session.resolution_states,
+        delete_selections=session.delete_selections,
+    )
+    session.status = "completed"
+
+    client = TestClient(app)
+    original_store = app_module_store = importlib.import_module("api.app").store
+    importlib.import_module("api.app").store = local_store
+    try:
+        response = client.get(f"/api/analysis-sessions/{session.session_id}/clusters?bucket=all")
+    finally:
+        importlib.import_module("api.app").store = original_store
+
+    assert app_module_store is original_store
+    assert response.status_code == 200
+    cluster_response = response.json()["clusters"][0]
+    assert cluster_response["recommended_keeper_id"] == cluster.recommended_keeper_id
+    assert cluster_response["selected_keeper_id"] == manual_keeper_id
+    assert cluster_response["selected_delete_folder_ids"] == [manual_delete_id]
 
 
 def test_feedback_summary_and_export_endpoint(tmp_path):

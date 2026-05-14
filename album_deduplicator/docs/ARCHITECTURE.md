@@ -420,6 +420,7 @@ final_score = base_score
 - breakdown של pairs
 - reason codes
 - recommended keeper
+- selected keeper בפועל, כאשר המשתמש כבר בחר תיקייה לשמירה או החלטה נשמרה מסריקה קודמת
 - selected delete folder ids
 
 ### `POST /api/analysis-sessions/{session_id}/decisions`

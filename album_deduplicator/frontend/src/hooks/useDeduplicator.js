@@ -103,7 +103,9 @@ export function useDeduplicator() {
         setDecisions((prev) => {
           const next = { ...prev };
           fullClusters.forEach(c => {
-            if (!(c.cluster_id in next) && c.resolution_state === "auto" && c.recommended_keeper_id) {
+            if (c.selected_keeper_id !== undefined) {
+              next[c.cluster_id] = c.selected_keeper_id;
+            } else if (!(c.cluster_id in next) && c.resolution_state === "auto" && c.recommended_keeper_id) {
               next[c.cluster_id] = c.recommended_keeper_id;
             }
           });
