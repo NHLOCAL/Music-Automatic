@@ -21,6 +21,25 @@ const INITIAL_PREVIEW = {
   manual_selected_count: 0,
 };
 
+const ACTIVE_SESSION_STORAGE_KEY = "albumDeduplicator.activeSessionId";
+
+function readStoredSessionId() {
+  try {
+    return window.localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSessionId(sessionId) {
+  try {
+    if (sessionId) window.localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, sessionId);
+    else window.localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+  } catch {
+    // Storage can be unavailable in restricted browser contexts; session restore is best effort.
+  }
+}
+
 function buildOptimisticPreviewAfterKeepAll(currentPreview, clusterId) {
   const safePreview = currentPreview ?? INITIAL_PREVIEW;
   const currentItems = Array.isArray(safePreview.items) ? safePreview.items : [];
@@ -45,7 +64,7 @@ function buildOptimisticPreviewAfterKeepAll(currentPreview, clusterId) {
 }
 
 export function useDeduplicator() {
-  const [sessionId, setSessionId] = useState(null);
+  const [sessionIdState, setSessionIdState] = useState(() => readStoredSessionId());
   const [status, setStatus] = useState("idle");
   const [progress, setProgress] = useState(INITIAL_PROGRESS);
   const [summary, setSummary] = useState(null);
@@ -58,6 +77,11 @@ export function useDeduplicator() {
   const [error, setError] = useState("");
   const [successSummary, setSuccessSummary] = useState(null);
   const [selectedTab, setSelectedTab] = useState("safe");
+  const sessionId = sessionIdState;
+  const setSessionId = useCallback((nextSessionId) => {
+    setSessionIdState(nextSessionId);
+    writeStoredSessionId(nextSessionId);
+  }, []);
   const refreshData = useCallback(async (sid, tab) => {
     try {
       const clusterRequests = tab === "all"
@@ -98,6 +122,31 @@ export function useDeduplicator() {
       setError(err.message);
     }
   }, []);
+  useEffect(() => {
+    if (!sessionId || status !== "idle") return;
+    let active = true;
+
+    async function restoreStoredSession() {
+      try {
+        const sessionData = await api.getAnalysisSession(sessionId);
+        if (!active) return;
+        setStatus(sessionData.status);
+        setSummary(sessionData);
+        setProgress(sessionData.progress);
+        if (sessionData.status === "completed") {
+          await refreshData(sessionId, selectedTab);
+        }
+      } catch {
+        if (!active) return;
+        setSessionId(null);
+      }
+    }
+
+    restoreStoredSession();
+    return () => {
+      active = false;
+    };
+  }, [sessionId, selectedTab, setSessionId, status, refreshData]);
   useEffect(() => {
     if (!sessionId) return;
     const events = api.getEventSource(sessionId);
@@ -141,6 +190,7 @@ export function useDeduplicator() {
       setSelectedTab("safe");
       setError("");
       setSuccessSummary(null);
+      writeStoredSessionId(null);
     });
   }, []);
   const handleDecision = async (clusterId, keeperId, deleteFolderIds = null) => {

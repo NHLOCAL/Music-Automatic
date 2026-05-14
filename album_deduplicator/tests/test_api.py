@@ -5,10 +5,11 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from api.app import app, store
-from api.session_store import SessionEventBuffer
+from api.session_store import SessionEventBuffer, SessionStore
 from music_dup_lib import config
 from music_dup_lib.models import FileInfo, FolderInfo
 from music_dup_lib.services import AnalysisOptions, DeletionService
+from music_dup_lib.services.user_decision_store import UserDecisionStore
 from music_dup_lib.services.dto import (
     AlbumCluster,
     AlbumSummary,
@@ -498,6 +499,74 @@ def test_keeper_selection_does_not_write_candidate_feedback_events(tmp_path):
     )
 
     assert not feedback_file.exists()
+
+
+def test_user_decision_is_saved_to_local_decision_store(tmp_path):
+    decision_store = UserDecisionStore(tmp_path / "decisions" / "album_decisions.json")
+    local_store = SessionStore(decision_store=decision_store)
+    session = local_store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+    session.snapshot = build_snapshot()
+    cluster = next(iter(session.snapshot.clusters.values()))
+    keeper_id = cluster.recommended_keeper_id
+    drop_id = cluster.deletable_folder_ids[0]
+
+    local_store.apply_decisions(
+        session.session_id,
+        {cluster.cluster_id: keeper_id},
+        {cluster.cluster_id: {drop_id}},
+    )
+
+    saved = json.loads(decision_store.decision_file.read_text(encoding="utf-8"))
+    saved_decision = saved["decisions"][cluster.cluster_id]
+    assert saved["schema_version"] == "1.0"
+    assert saved_decision["keeper_id"] == keeper_id
+    assert saved_decision["delete_folder_ids"] == [drop_id]
+    assert saved_decision["folder_ids"] == sorted(cluster.folder_ids)
+
+
+def test_saved_user_decision_is_reapplied_after_rescan(tmp_path):
+    decision_store = UserDecisionStore(tmp_path / "decisions" / "album_decisions.json")
+    initial_store = SessionStore(decision_store=decision_store)
+    first_session = initial_store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+    first_session.snapshot = build_snapshot()
+    cluster = next(iter(first_session.snapshot.clusters.values()))
+    keeper_id = cluster.recommended_keeper_id
+    drop_id = cluster.deletable_folder_ids[0]
+    initial_store.apply_decisions(
+        first_session.session_id,
+        {cluster.cluster_id: keeper_id},
+        {cluster.cluster_id: {drop_id}},
+    )
+
+    rescanned_store = SessionStore(decision_store=decision_store)
+    rescanned_store._orchestrator.run = lambda options, progress_handler=None: build_snapshot()
+    next_session = rescanned_store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+
+    rescanned_store.run_analysis_sync(next_session.session_id)
+
+    assert next_session.status == "completed"
+    assert next_session.decisions[cluster.cluster_id] == keeper_id
+    assert next_session.delete_selections[cluster.cluster_id] == {drop_id}
+    assert next_session.resolution_states[cluster.cluster_id] == "user_selected"
+    assert next_session.preview.total_count == 1
 
 
 def test_feedback_summary_and_export_endpoint(tmp_path):

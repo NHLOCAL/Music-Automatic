@@ -64,6 +64,7 @@ const emptyPreviewResponse = {
 
 describe("useDeduplicator", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     let currentCluster = { ...baseReviewCluster, selected_delete_folder_ids: [] };
 
     api.getAnalysisSession.mockResolvedValue(sessionResponse);
@@ -82,7 +83,23 @@ describe("useDeduplicator", () => {
   });
 
   afterEach(() => {
+    window.localStorage.clear();
     vi.clearAllMocks();
+  });
+
+  it("restores the last completed session from local storage", async () => {
+    window.localStorage.setItem("albumDeduplicator.activeSessionId", "session-1");
+    api.getAnalysisSession.mockResolvedValue({ ...sessionResponse, status: "completed" });
+
+    const { result } = renderHook(() => useDeduplicator());
+
+    await waitFor(() => {
+      expect(api.getAnalysisSession).toHaveBeenCalledWith("session-1");
+      expect(result.current.sessionId).toBe("session-1");
+      expect(result.current.status).toBe("completed");
+      expect(result.current.preview.total_count).toBe(1);
+      expect(result.current.clusters).toHaveLength(1);
+    });
   });
 
   it("creates delete selections when the user confirms the recommended keeper in a review cluster", async () => {

@@ -116,6 +116,10 @@
   - מתעד מחיקות מוצלחות כ-`same_album_confirmed` עם `evidence_strength=strong`.
   - אינו מתעד סימוני keeper/מחיקה זמניים או החלטת `שמור את כל העותקים`, כדי להימנע מ-labels שהמשתמש עוד יכול לשנות.
   - שומר יחד עם כל אירוע את ה-cluster, ה-keeper, ה-target, ציוני הזוגות, וספי/משקלי ה-scoring שהיו בתוקף.
+- `user_decision_store.py`
+  - שומר החלטות משתמש ידניות לקובץ JSON מקומי תחת user-data.
+  - נשען על `cluster_id` ו-`folder_id` יציבים, ומחיל החלטה מחדש רק כאשר אותה קבוצת תיקיות מופיעה שוב בסריקה חדשה.
+  - מיועד לשחזור עבודה, ולא משמש כ-dataset אימון.
 - `dto.py`
   - אובייקטים יציבים לשכבות העליונות:
     - `AnalysisSnapshot`
@@ -139,6 +143,7 @@
 - `session_store.py`
   - ניהול `analysis sessions` בזיכרון.
   - שמירת progress, snapshot, decisions, סימוני מחיקה פרטניים ו-preview.
+  - החלת החלטות ידניות שנשמרו מקומית לאחר סריקה חדשה של אותו cluster.
   - buffer חסום לאירועי `SSE`, עם coalescing של `progress`, כדי למנוע growth לא מוגבל בזיכרון כאשר אין consumer פעיל.
   - background execution לכל session.
 
@@ -173,6 +178,7 @@
   - ניהול roots בשדות נפרדים עם add/remove ברור.
   - fallback ידני להזנת roots גם ב-Desktop כאשר chooser native של Windows נכשל עבור תיקיות מסוימות.
   - חזרה ל-`setup` דרך ה-rail משאירה את ה-session האחרון זמין ל-`summary` / `review` / `finalize` עד שמתחילים סריקה חדשה בפועל.
+  - שומר את מזהה ה-session האחרון ב-`localStorage`, כדי ש-reload של ה-renderer יוכל להתחבר שוב ל-session פעיל כל עוד ה-backend המקומי עדיין רץ.
   - הצגת tabs:
     - `בטוח למחיקה`
     - `דורש סקירה`

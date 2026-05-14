@@ -16,6 +16,7 @@ from music_dup_lib.services import (
     DeletionService,
     DeleteExecution,
     DeletePreview,
+    UserDecisionStore,
     UserFeedbackLogger,
 )
 
@@ -93,10 +94,11 @@ class SessionState:
 
 
 class SessionStore:
-    def __init__(self):
+    def __init__(self, decision_store: Optional[UserDecisionStore] = None):
         self._sessions: Dict[str, SessionState] = {}
         self._orchestrator = AnalysisOrchestrator()
         self._deletion_service = DeletionService()
+        self._decision_store = decision_store or UserDecisionStore()
         self.feedback_logger = UserFeedbackLogger()
         self._lock = threading.Lock()
 
@@ -113,65 +115,79 @@ class SessionStore:
         session = self._require_session(session_id)
 
         def target() -> None:
-            with session.lock:
-                session.status = "running"
-            self._push_event(session, "status", {"status": "running"})
-            try:
-                snapshot = self._orchestrator.run(
-                    session.options,
-                    progress_handler=lambda event: self._handle_progress(session, event),
-                )
-                decisions = {
-                    cluster_id: cluster.recommended_keeper_id if cluster.confidence_bucket == "safe" else None
-                    for cluster_id, cluster in snapshot.clusters.items()
-                }
-                resolution_states = {
-                    cluster_id: "auto" if cluster.confidence_bucket == "safe" and cluster.recommended_keeper_id else "skipped"
-                    for cluster_id, cluster in snapshot.clusters.items()
-                }
-                delete_selections = {
-                    cluster_id: self._default_delete_selection(
-                        cluster,
-                        decisions.get(cluster_id),
-                        set(),
-                    )
-                    for cluster_id, cluster in snapshot.clusters.items()
-                }
-                self._apply_resolution_states(snapshot, resolution_states, set())
-                preview = self._deletion_service.build_preview(
-                    clusters=snapshot.clusters,
-                    albums=snapshot.albums,
-                    decisions=decisions,
-                    resolution_states=resolution_states,
-                    delete_selections=delete_selections,
-                )
-                with session.lock:
-                    session.snapshot = snapshot
-                    session.decisions = decisions
-                    session.resolution_states = resolution_states
-                    session.delete_selections = delete_selections
-                    session.preview = preview
-                    session.status = "completed"
-                    session.progress = {
-                        "step": "completed",
-                        "stage": "complete",
-                        "message": "הניתוח הושלם",
-                        "human_message": "הניתוח הסתיים. אפשר להתחיל לעבור על הקבוצות הבטוחות והקבוצות שדורשות סקירה.",
-                        "current": 1,
-                        "total": 1,
-                        "percent": 100.0,
-                        "warnings": snapshot.warnings.warnings,
-                    }
-                self._push_event(session, "completed", {"status": "completed"})
-            except Exception as exc:
-                logger.exception("Analysis session failed: %s", session_id)
-                with session.lock:
-                    session.status = "failed"
-                    session.error = str(exc)
-                self._push_event(session, "failed", {"status": "failed", "error": str(exc)})
+            self.run_analysis_sync(session_id)
 
         thread = threading.Thread(target=target, daemon=True)
         thread.start()
+
+    def run_analysis_sync(self, session_id: str) -> None:
+        session = self._require_session(session_id)
+        with session.lock:
+            session.status = "running"
+        self._push_event(session, "status", {"status": "running"})
+        try:
+            snapshot = self._orchestrator.run(
+                session.options,
+                progress_handler=lambda event: self._handle_progress(session, event),
+            )
+            decisions = {
+                cluster_id: cluster.recommended_keeper_id if cluster.confidence_bucket == "safe" else None
+                for cluster_id, cluster in snapshot.clusters.items()
+            }
+            resolution_states = {
+                cluster_id: "auto" if cluster.confidence_bucket == "safe" and cluster.recommended_keeper_id else "skipped"
+                for cluster_id, cluster in snapshot.clusters.items()
+            }
+            delete_selections = {
+                cluster_id: self._default_delete_selection(
+                    cluster,
+                    decisions.get(cluster_id),
+                    set(),
+                )
+                for cluster_id, cluster in snapshot.clusters.items()
+            }
+            for cluster_id, stored_decision in self._decision_store.decisions_for_snapshot(snapshot).items():
+                cluster = snapshot.clusters[cluster_id]
+                decisions[cluster_id] = stored_decision.keeper_id
+                resolution_states[cluster_id] = stored_decision.resolution_state
+                delete_selections[cluster_id] = self._normalize_delete_selection(
+                    cluster=cluster,
+                    keeper_id=stored_decision.keeper_id,
+                    requested_folder_ids=stored_decision.delete_folder_ids,
+                    deleted_folder_ids=set(),
+                )
+            self._apply_resolution_states(snapshot, resolution_states, set())
+            preview = self._deletion_service.build_preview(
+                clusters=snapshot.clusters,
+                albums=snapshot.albums,
+                decisions=decisions,
+                resolution_states=resolution_states,
+                delete_selections=delete_selections,
+            )
+            with session.lock:
+                session.snapshot = snapshot
+                session.decisions = decisions
+                session.resolution_states = resolution_states
+                session.delete_selections = delete_selections
+                session.preview = preview
+                session.status = "completed"
+                session.progress = {
+                    "step": "completed",
+                    "stage": "complete",
+                    "message": "הניתוח הושלם",
+                    "human_message": "הניתוח הסתיים. אפשר להתחיל לעבור על הקבוצות הבטוחות והקבוצות שדורשות סקירה.",
+                    "current": 1,
+                    "total": 1,
+                    "percent": 100.0,
+                    "warnings": snapshot.warnings.warnings,
+                }
+            self._push_event(session, "completed", {"status": "completed"})
+        except Exception as exc:
+            logger.exception("Analysis session failed: %s", session_id)
+            with session.lock:
+                session.status = "failed"
+                session.error = str(exc)
+            self._push_event(session, "failed", {"status": "failed", "error": str(exc)})
 
     def apply_decisions(
         self,
@@ -212,6 +228,14 @@ class SessionStore:
                 delete_selections=session.delete_selections,
                 excluded_folder_ids=session.deleted_folder_ids,
             )
+            for cluster_id, keeper_id in decisions.items():
+                self._decision_store.save_decision(
+                    snapshot=session.snapshot,
+                    cluster_id=cluster_id,
+                    keeper_id=keeper_id,
+                    delete_folder_ids=session.delete_selections.get(cluster_id, set()),
+                    resolution_state=session.resolution_states.get(cluster_id, "skipped"),
+                )
             return session.preview
 
     def get_preview(self, session_id: str) -> DeletePreview:

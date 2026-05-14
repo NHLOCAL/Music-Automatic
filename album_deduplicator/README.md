@@ -5,6 +5,7 @@
 ## מה חדש
 
 - `FastAPI` משמש כ-backend רשמי עם sessions, `SSE` להתקדמות, ו-DTOs יציבים לפרונטנד.
+- החלטות בחירת אלבומים ידניות נשמרות כעת מקומית ב-user-data, כך ש-reload של הממשק יכול לחזור ל-session פעיל, וסריקה מחודשת של אותם clusters מחילה מחדש את הבחירות הקודמות.
 - תור אירועי ה-`SSE` ב-session store כעת חסום ומכווץ אירועי `progress`, כך שגם ניתוחים ארוכים ללא מאזין פעיל לא יצברו backlog לא מוגבל בזיכרון.
 - `Electron` משמש כמעטפת desktop הראשית: הוא פותח חלון, מרים את ה-backend, ומספק יכולות מערכת דרך `preload bridge`.
 - מעטפת ה-`Desktop` ואריזת `Windows` משתמשות כעת באייקון היישום הרשמי שמנוהל תחת `frontend/build/icons/app-icon-source.png`, כולל לחלון `Electron`, ל-`favicon` של ה-renderer, ולקובצי ה-`NSIS` הארוזים.
@@ -111,7 +112,7 @@
   - `DeletionService`
 - `api/`
   - אפליקציית `FastAPI`
-  - in-memory session store
+  - in-memory session store עם persistence מקומי להחלטות משתמש ידניות
 - `frontend/`
   - אפליקציית `React + Vite`
   - שכבת UI מבוססת `Ant Design 6` עם `HappyProvider`
