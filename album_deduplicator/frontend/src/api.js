@@ -41,6 +41,9 @@ export function getClusters(sessionId, bucket) {
 export function getDeletePreview(sessionId) {
   return requestJson(`/api/analysis-sessions/${sessionId}/delete-preview`);
 }
+export function getFeedbackSummary() {
+  return requestJson("/api/ml-feedback/summary");
+}
 export function updateDecisions(sessionId, payload) {
   return requestJson(`/api/analysis-sessions/${sessionId}/decisions`, {
     method: "POST",

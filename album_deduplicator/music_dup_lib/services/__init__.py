@@ -18,3 +18,4 @@ from .dto import (
 )
 from .recommendation_service import RecommendationService
 from .scoring_service import ScoringService
+from .user_feedback_logger import FeedbackSummary, UserFeedbackLogger

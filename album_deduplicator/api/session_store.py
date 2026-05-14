@@ -16,6 +16,7 @@ from music_dup_lib.services import (
     DeletionService,
     DeleteExecution,
     DeletePreview,
+    UserFeedbackLogger,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,7 @@ class SessionStore:
         self._sessions: Dict[str, SessionState] = {}
         self._orchestrator = AnalysisOrchestrator()
         self._deletion_service = DeletionService()
+        self.feedback_logger = UserFeedbackLogger()
         self._lock = threading.Lock()
 
     def create_session(self, options: AnalysisOptions) -> SessionState:
@@ -189,6 +191,11 @@ class SessionStore:
                     continue
                 if keeper_id is None:
                     session.delete_selections[cluster_id] = set()
+                    self.feedback_logger.log_keep_all_decision(
+                        session_id=session.session_id,
+                        snapshot=session.snapshot,
+                        cluster_id=cluster_id,
+                    )
                     continue
                 requested_selection = None
                 if delete_selections and cluster_id in delete_selections:
@@ -201,6 +208,14 @@ class SessionStore:
                     requested_folder_ids=requested_selection,
                     deleted_folder_ids=session.deleted_folder_ids,
                 )
+                if session.resolution_states[cluster_id] == "user_selected":
+                    self.feedback_logger.log_candidate_decision(
+                        session_id=session.session_id,
+                        snapshot=session.snapshot,
+                        cluster_id=cluster_id,
+                        keeper_id=keeper_id,
+                        delete_folder_ids=session.delete_selections[cluster_id],
+                    )
             self._apply_resolution_states(session.snapshot, session.resolution_states, session.deleted_folder_ids)
             session.preview = self._deletion_service.build_preview(
                 clusters=session.snapshot.clusters,
@@ -218,9 +233,17 @@ class SessionStore:
 
     def execute_delete(self, session_id: str, folder_ids: list[str]) -> DeleteExecution:
         session = self._require_session(session_id)
+        preview_items = list(session.preview.items)
         execution = self._deletion_service.execute(session.preview, folder_ids)
         removed_ids = {result.folder_id for result in execution.results if result.success}
         with session.lock:
+            self.feedback_logger.log_delete_execution(
+                session_id=session.session_id,
+                snapshot=session.snapshot,
+                execution=execution,
+                preview_items=preview_items,
+                source="bulk_delete",
+            )
             session.deleted_folder_ids.update(removed_ids)
             for selection in session.delete_selections.values():
                 selection.difference_update(removed_ids)
@@ -269,9 +292,17 @@ class SessionStore:
                 selection_source="user_selected",
             )
 
-        execution = self._deletion_service.execute(DeletePreview(items=[preview_item]), [folder_id])
+        preview_items = [preview_item]
+        execution = self._deletion_service.execute(DeletePreview(items=preview_items), [folder_id])
         removed_ids = {result.folder_id for result in execution.results if result.success}
         with session.lock:
+            self.feedback_logger.log_delete_execution(
+                session_id=session.session_id,
+                snapshot=session.snapshot,
+                execution=execution,
+                preview_items=preview_items,
+                source="single_delete",
+            )
             session.deleted_folder_ids.update(removed_ids)
             for selection in session.delete_selections.values():
                 selection.difference_update(removed_ids)

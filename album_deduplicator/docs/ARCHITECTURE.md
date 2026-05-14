@@ -111,6 +111,11 @@
 - `deletion_service.py`
   - בונה `delete preview`.
   - מבצע `send2trash`.
+- `user_feedback_logger.py`
+  - כותב אירועי החלטות משתמש לקובץ `JSONL` בנתיב user-data גלובלי שמתאים גם להתקנות ארוזות.
+  - מתעד מחיקות מוצלחות כ-`same_album_confirmed` עם `evidence_strength=strong`.
+  - מתעד החלטת `שמור את כל העותקים` כ-`not_safe_to_delete` עם `evidence_strength=medium`.
+  - שומר יחד עם כל אירוע את ה-cluster, ה-keeper, ה-target, ציוני הזוגות, וספי/משקלי ה-scoring שהיו בתוקף.
 - `dto.py`
   - אובייקטים יציבים לשכבות העליונות:
     - `AnalysisSnapshot`
@@ -454,6 +459,19 @@ final_score = base_score
 ### `POST /api/analysis-sessions/{session_id}/delete-executions`
 
 מבצע מחיקה בפועל ומחזיר תוצאה מפורטת.
+
+### `GET /api/ml-feedback/summary`
+
+מחזיר את מצב קובץ ה-feedback המקומי:
+
+- path מלא לקובץ ה-`JSONL`
+- מספר אירועים שנשמרו
+- גודל הקובץ
+- URL ליצוא
+
+### `GET /api/ml-feedback/export`
+
+מחזיר את קובץ ה-`JSONL` להורדה כ-`album-deduplicator-user-feedback.jsonl`, כדי לאפשר שיתוף ידני של נתוני אימון.
 
 ## Cache ו-persistence
 

@@ -98,6 +98,10 @@
 
 - [ML_VALIDATION.md](docs/ML_VALIDATION.md)
 
+לתיעוד איסוף החלטות משתמשים בפועל לצורך שיפור מודל ה-`ML`, פורמט קובץ ה-`JSONL`, ומיקום הקובץ בהתקנות משתמש:
+
+- [USER_FEEDBACK_DATASET.md](docs/USER_FEEDBACK_DATASET.md)
+
 ## מבנה עיקרי
 
 - `music_dup_lib/services/`
@@ -196,6 +200,8 @@ python main.py "C:/Music" "D:/Archive" -p "C:/Music"
 - `GET /api/analysis-sessions/{session_id}/albums/{folder_id}/cover`
 - `GET /api/analysis-sessions/{session_id}/albums/{folder_id}/tracks/{track_index}/stream`
 - `POST /api/system/open-explorer`
+- `GET /api/ml-feedback/summary`
+- `GET /api/ml-feedback/export`
 
 ## בדיקות
 

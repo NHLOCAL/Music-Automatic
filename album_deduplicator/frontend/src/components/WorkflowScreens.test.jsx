@@ -59,6 +59,7 @@ describe("Workflow screens", () => {
 
   it("renders the finalize screen and opens a confirmation before delete", async () => {
     const onKeepAllCopies = vi.fn();
+    const onExportFeedback = vi.fn();
 
     render(
       <FinalizeDeletionScreen
@@ -114,6 +115,13 @@ describe("Workflow screens", () => {
         isExecuting={false}
         openExplorer={vi.fn()}
         onKeepAllCopies={onKeepAllCopies}
+        feedbackSummary={{
+          event_count: 7,
+          size_bytes: 2048,
+          feedback_file_path: "C:/Users/me/AppData/Local/Music Automatic/Album Deduplicator/user_feedback/user_feedback_events.jsonl",
+          export_url: "/api/ml-feedback/export",
+        }}
+        onExportFeedback={onExportFeedback}
       />,
     );
 
@@ -122,7 +130,13 @@ describe("Workflow screens", () => {
     expect(screen.getByText("Archive Copy")).toBeInTheDocument();
     expect(screen.getByText("Best")).toBeInTheDocument();
     expect(screen.getByText("אפשר לבטל את ההעברה לקבוצה הזו ולהשאיר את כל העותקים.")).toBeInTheDocument();
+    expect(screen.getByText("7 אירועי אימון נשמרו")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "יצא נתונים לשיתוף" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "בטל העברה ושמור הכל" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "יצא נתונים לשיתוף" }));
+
+    expect(onExportFeedback).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "בטל העברה ושמור הכל" }));
 

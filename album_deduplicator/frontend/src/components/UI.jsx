@@ -2,7 +2,7 @@ import React, { forwardRef } from "react";
 import {
   ArrowLeftOutlined, BulbOutlined, CheckCircleOutlined, CheckOutlined,
   ClockCircleOutlined, ClusterOutlined, CloseOutlined, CustomerServiceOutlined,
-  DatabaseOutlined, DeleteOutlined, DownOutlined, ExclamationCircleOutlined,
+  DatabaseOutlined, DeleteOutlined, DownloadOutlined, DownOutlined, ExclamationCircleOutlined,
   EyeOutlined, FolderOpenOutlined, InfoCircleOutlined, LineChartOutlined,
   PauseOutlined, CaretRightFilled, PlusOutlined, SafetyCertificateOutlined,
   SearchOutlined, SettingOutlined, StarOutlined, SwapOutlined, UndoOutlined
@@ -16,7 +16,7 @@ const iconMap = {
   layers: ClusterOutlined, compare: SwapOutlined, chart: LineChartOutlined,
   clock: ClockCircleOutlined, database: DatabaseOutlined, info: InfoCircleOutlined,
   "arrow-left": ArrowLeftOutlined, bulb: BulbOutlined, play: CaretRightFilled, pause: PauseOutlined,
-  scan: SearchOutlined, undo: UndoOutlined,
+  scan: SearchOutlined, undo: UndoOutlined, download: DownloadOutlined,
 };
 
 export const Icon = forwardRef(function Icon({ name, size = 16, className = "", style, onClick }, ref) {

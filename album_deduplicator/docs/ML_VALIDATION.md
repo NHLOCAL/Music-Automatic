@@ -258,6 +258,16 @@
 - לבנות סט ולידציה ידני ייעודי ל-`safe delete`
 - לבצע split ללא leakage
 - למדוד את `base_score` ו-`final_score`, לא רק את `ml_score`
+
+## איסוף feedback ממשתמשים בפועל
+
+נוסף מנגנון איסוף החלטות משתמשים תחת `album_deduplicator`, כדי להתחיל לבנות evidence אמיתי מהשימוש במוצר:
+
+- מחיקה מוצלחת לסל המחזור נרשמת כ-`same_album_confirmed` עם `evidence_strength=strong`.
+- החלטת `שמור את כל העותקים` נרשמת כ-`not_safe_to_delete` עם `evidence_strength=medium`.
+- כל אירוע נשמר כ-`JSONL` וכולל את ציוני ה-pairs ואת מדיניות ה-scoring שהייתה בתוקף בזמן ההחלטה.
+
+תיעוד הפורמט והמיקום נמצא ב-[USER_FEEDBACK_DATASET.md](USER_FEEDBACK_DATASET.md).
 - לבחון במיוחד מקרים של `algo נמוך + ml גבוה`
 
 ## שאלת העבודה הנכונה להמשך

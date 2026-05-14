@@ -1,10 +1,12 @@
 import importlib
+import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from api.app import app, store
 from api.session_store import SessionEventBuffer
+from music_dup_lib import config
 from music_dup_lib.models import FileInfo, FolderInfo
 from music_dup_lib.services import AnalysisOptions, DeletionService
 from music_dup_lib.services.dto import (
@@ -399,6 +401,139 @@ def test_api_delete_single_updates_preview(monkeypatch):
     assert response.json()["moved_count"] == 1
     preview_response = client.get(f"/api/analysis-sessions/{session.session_id}/delete-preview")
     assert preview_response.json()["total_count"] == 0
+
+
+def test_successful_bulk_delete_writes_ml_feedback_event(monkeypatch, tmp_path):
+    feedback_file = tmp_path / "feedback" / "user_feedback_events.jsonl"
+    store.feedback_logger.feedback_file = feedback_file
+    session = store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+    session.snapshot = build_snapshot()
+    cluster = next(iter(session.snapshot.clusters.values()))
+    drop_id = cluster.deletable_folder_ids[0]
+    session.decisions = {cluster.cluster_id: cluster.recommended_keeper_id}
+    session.resolution_states = {cluster.cluster_id: "auto"}
+    session.delete_selections = {cluster.cluster_id: {drop_id}}
+    session.preview = DeletionService().build_preview(
+        session.snapshot.clusters,
+        session.snapshot.albums,
+        session.decisions,
+        resolution_states=session.resolution_states,
+        delete_selections=session.delete_selections,
+    )
+    session.status = "completed"
+
+    monkeypatch.setattr(
+        "music_dup_lib.services.deletion_service.send2trash",
+        lambda path: None,
+    )
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+
+    client = TestClient(app)
+    response = client.post(
+        f"/api/analysis-sessions/{session.session_id}/delete-executions",
+        json={"folder_ids": [drop_id]},
+    )
+
+    assert response.status_code == 200
+    events = [json.loads(line) for line in feedback_file.read_text(encoding="utf-8").splitlines()]
+    assert len(events) == 1
+    event = events[0]
+    assert event["schema_version"] == "1.0"
+    assert event["event_type"] == "delete_executed"
+    assert event["label"] == "same_album_confirmed"
+    assert event["evidence_strength"] == "strong"
+    assert event["session_id"] == session.session_id
+    assert event["cluster"]["cluster_id"] == cluster.cluster_id
+    assert event["keeper"]["folder_id"] == cluster.recommended_keeper_id
+    assert event["target"]["folder_id"] == drop_id
+    assert event["pairs"][0]["final_score"] == 98.55
+    assert event["model_policy"]["base_score_ml_weight"] == config.BASE_SCORE_ML_WEIGHT
+
+
+def test_keep_all_decision_writes_not_safe_feedback_event(tmp_path):
+    feedback_file = tmp_path / "feedback" / "user_feedback_events.jsonl"
+    store.feedback_logger.feedback_file = feedback_file
+    session = store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+    session.snapshot = build_snapshot()
+    cluster = next(iter(session.snapshot.clusters.values()))
+    session.decisions = {cluster.cluster_id: cluster.recommended_keeper_id}
+    session.resolution_states = {cluster.cluster_id: "auto"}
+    session.delete_selections = {cluster.cluster_id: set(cluster.deletable_folder_ids)}
+
+    store.apply_decisions(session.session_id, {cluster.cluster_id: None}, {cluster.cluster_id: set()})
+
+    events = [json.loads(line) for line in feedback_file.read_text(encoding="utf-8").splitlines()]
+    assert len(events) == 1
+    assert events[0]["event_type"] == "decision_saved"
+    assert events[0]["label"] == "not_safe_to_delete"
+    assert events[0]["evidence_strength"] == "medium"
+    assert events[0]["cluster"]["cluster_id"] == cluster.cluster_id
+
+
+def test_keeper_selection_writes_candidate_feedback_events(tmp_path):
+    feedback_file = tmp_path / "feedback" / "user_feedback_events.jsonl"
+    store.feedback_logger.feedback_file = feedback_file
+    session = store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+    session.snapshot = build_snapshot()
+    cluster = next(iter(session.snapshot.clusters.values()))
+    drop_id = cluster.deletable_folder_ids[0]
+
+    store.apply_decisions(
+        session.session_id,
+        {cluster.cluster_id: cluster.recommended_keeper_id},
+        {cluster.cluster_id: {drop_id}},
+    )
+
+    events = [json.loads(line) for line in feedback_file.read_text(encoding="utf-8").splitlines()]
+    assert len(events) == 1
+    event = events[0]
+    assert event["event_type"] == "decision_saved"
+    assert event["label"] == "user_selected_candidate"
+    assert event["evidence_strength"] == "medium"
+    assert event["keeper"]["folder_id"] == cluster.recommended_keeper_id
+    assert event["target"]["folder_id"] == drop_id
+    assert event["decision"]["delete_folder_ids"] == [drop_id]
+
+
+def test_feedback_summary_and_export_endpoint(tmp_path):
+    feedback_file = tmp_path / "feedback" / "user_feedback_events.jsonl"
+    store.feedback_logger.feedback_file = feedback_file
+    feedback_file.parent.mkdir(parents=True, exist_ok=True)
+    feedback_file.write_text(
+        json.dumps({"schema_version": "1.0", "event_type": "delete_executed"}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    client = TestClient(app)
+    summary_response = client.get("/api/ml-feedback/summary")
+    assert summary_response.status_code == 200
+    summary = summary_response.json()
+    assert summary["event_count"] == 1
+    assert summary["export_url"] == "/api/ml-feedback/export"
+    assert summary["feedback_file_path"] == str(feedback_file)
+
+    export_response = client.get("/api/ml-feedback/export")
+    assert export_response.status_code == 200
+    assert export_response.headers["content-type"].startswith("application/x-ndjson")
+    assert export_response.content == feedback_file.read_bytes()
 
 
 def test_api_delete_single_respects_explicit_keep_all():

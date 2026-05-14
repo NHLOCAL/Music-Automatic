@@ -33,6 +33,7 @@ from api.schemas import (
     DeletePreviewItemModel,
     DeletePreviewResponse,
     DegradedFlags,
+    FeedbackSummaryResponse,
     FolderSummaryModel,
     ModeSummary,
     OpenExplorerRequest,
@@ -191,6 +192,27 @@ def create_app() -> FastAPI:
         _get_session_or_404(session_id)
         preview = store.get_preview(session_id)
         return _preview_model(preview)
+
+    @app.get("/api/ml-feedback/summary", response_model=FeedbackSummaryResponse)
+    def get_feedback_summary() -> FeedbackSummaryResponse:
+        summary = store.feedback_logger.summary()
+        return FeedbackSummaryResponse(
+            feedback_file_path=str(summary.feedback_file_path),
+            event_count=summary.event_count,
+            size_bytes=summary.size_bytes,
+            export_url=summary.export_url,
+        )
+
+    @app.get("/api/ml-feedback/export")
+    def export_feedback() -> FileResponse:
+        summary = store.feedback_logger.summary()
+        if not summary.feedback_file_path.exists():
+            raise HTTPException(status_code=404, detail="No ML feedback data has been collected yet.")
+        return FileResponse(
+            summary.feedback_file_path,
+            media_type="application/x-ndjson; charset=utf-8",
+            filename="album-deduplicator-user-feedback.jsonl",
+        )
 
     @app.post("/api/analysis-sessions/{session_id}/delete-executions", response_model=DeleteExecutionResponse)
     def execute_delete(session_id: str, payload: DeleteExecutionRequest) -> DeleteExecutionResponse:

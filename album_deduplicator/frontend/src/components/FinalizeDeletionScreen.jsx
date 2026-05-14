@@ -3,8 +3,17 @@ import { Button, Popconfirm, Tooltip } from "antd";
 import { Icon, StatusTag } from "./UI";
 import { formatSizeMb, getClusterDisplayTitle } from "../utils";
 
-export function FinalizeDeletionScreen({ workflow, onExecute, isExecuting, openExplorer, onKeepAllCopies }) {
+export function FinalizeDeletionScreen({
+  workflow,
+  onExecute,
+  isExecuting,
+  openExplorer,
+  onKeepAllCopies,
+  feedbackSummary,
+  onExportFeedback,
+}) {
   const { pendingGroups, summary } = workflow;
+  const feedbackCount = feedbackSummary?.event_count ?? 0;
 
   return (
     <div className="data-table-container">
@@ -13,7 +22,19 @@ export function FinalizeDeletionScreen({ workflow, onExecute, isExecuting, openE
           <h2>אישור העברה לסל המחזור ({summary.pendingCount} תיקיות)</h2>
           <div className="finalize-header-note">הפריטים יסומנו לסל המחזור בלבד, ללא מחיקה לצמיתות.</div>
         </div>
-        <div style={{display:'flex', gap: 12}}>
+        <div className="finalize-header-actions">
+          <div className="feedback-export-panel">
+            <div className="feedback-export-count">{feedbackCount} אירועי אימון נשמרו</div>
+            <div className="feedback-export-note">נתוני החלטות ומחיקות בפועל נשמרים לקובץ מקומי שאפשר לשתף לאימון מודל.</div>
+            <Button
+              size="small"
+              icon={<Icon name="download" size={14} />}
+              onClick={onExportFeedback}
+              disabled={!feedbackSummary?.export_url || feedbackCount === 0}
+            >
+              יצא נתונים לשיתוף
+            </Button>
+          </div>
           <Popconfirm
             title="להעביר את הפריטים המסומנים לסל המחזור?"
             description="אפשר לחזור דרך ה-workflow rail אם צריך לשנות keeper או סימון מחיקה."

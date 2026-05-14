@@ -52,6 +52,7 @@ function AppContent() {
   const [focusedAlbumId, setFocusedAlbumId] = useState(null);
   const [runtimeInfo, setRuntimeInfo] = useState(getRuntimeSnapshot());
   const [deleteAttemptResults, setDeleteAttemptResults] = useState({});
+  const [feedbackSummary, setFeedbackSummary] = useState(null);
   const d = useDeduplicator();
 
   const selectedCluster = d.clusters.find((cluster) => cluster.cluster_id === d.selectedClusterId) || null;
@@ -107,6 +108,19 @@ function AppContent() {
     d.setSuccessSummary(null);
   }, [antContext.notification, d]);
 
+  const refreshFeedbackSummary = async () => {
+    try {
+      const summary = await api.getFeedbackSummary();
+      setFeedbackSummary(summary);
+    } catch {
+      setFeedbackSummary(null);
+    }
+  };
+
+  useEffect(() => {
+    refreshFeedbackSummary();
+  }, []);
+
   const submitScan = async () => {
     d.setError("");
     d.setSuccessSummary(null);
@@ -138,6 +152,7 @@ function AppContent() {
       d.setAllClusters([]);
       d.setSelectedClusterId(null);
       setDeleteAttemptResults({});
+      await refreshFeedbackSummary();
       setAppView("scanning");
     } catch (err) {
       d.setError(err.message);
@@ -190,6 +205,7 @@ function AppContent() {
       const execution = await api.executeDelete(d.sessionId, targetIds);
       setDeleteAttemptResults((prev) => mergeDeleteAttemptResults(prev, execution.results));
       await d.refreshData(d.sessionId, d.selectedTab);
+      await refreshFeedbackSummary();
       if(appView === "finalize") setAppView("review"); // Return to IDE mode after mass delete
     } catch (err) {
       d.setError(err.message);
@@ -204,6 +220,12 @@ function AppContent() {
 
   const clearClusterDecision = async (clusterId) => {
     await d.handleDecision(clusterId, null, []);
+    await refreshFeedbackSummary();
+  };
+
+  const exportFeedbackData = () => {
+    if (!feedbackSummary?.export_url) return;
+    window.open(api.buildApiUrl(feedbackSummary.export_url), "_blank", "noopener,noreferrer");
   };
 
   const navigateToSetup = () => {
@@ -316,6 +338,8 @@ function AppContent() {
                 isExecuting={executingDelete}
                 openExplorer={openExplorer}
                 onKeepAllCopies={clearClusterDecision}
+                feedbackSummary={feedbackSummary}
+                onExportFeedback={exportFeedbackData}
               />
             )}
           </div>

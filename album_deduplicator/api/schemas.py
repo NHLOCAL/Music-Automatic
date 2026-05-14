@@ -191,6 +191,13 @@ class DeleteExecutionResponse(BaseModel):
     results: List[DeleteExecutionItemModel] = Field(default_factory=list)
 
 
+class FeedbackSummaryResponse(BaseModel):
+    feedback_file_path: str
+    event_count: int = 0
+    size_bytes: int = 0
+    export_url: str
+
+
 class SingleDeleteRequest(BaseModel):
     cluster_id: str
     folder_id: str
