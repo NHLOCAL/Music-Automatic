@@ -18,6 +18,7 @@ from mutagen.mp3 import MP3, HeaderNotFoundError as MP3HeaderNotFoundError
 
 from music_dup_lib import config
 from music_dup_lib.services import AnalysisOptions
+from music_dup_lib.services.user_feedback_logger import build_feedback_export_filename
 from api.schemas import (
     AnalysisSessionCreateRequest,
     AnalysisSessionCreatedResponse,
@@ -211,7 +212,7 @@ def create_app() -> FastAPI:
         return FileResponse(
             summary.feedback_file_path,
             media_type="application/x-ndjson; charset=utf-8",
-            filename="album-deduplicator-user-feedback.jsonl",
+            filename=build_feedback_export_filename(),
         )
 
     @app.post("/api/analysis-sessions/{session_id}/delete-executions", response_model=DeleteExecutionResponse)

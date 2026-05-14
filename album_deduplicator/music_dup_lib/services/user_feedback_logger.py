@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import getpass
+import re
+import secrets
+import socket
 import threading
 import uuid
 from dataclasses import dataclass
@@ -35,6 +39,21 @@ def resolve_user_feedback_file() -> Path:
     else:
         base_dir = Path.home() / ".local" / "share" / "music-automatic" / "album-deduplicator"
     return base_dir / "user_feedback" / FEEDBACK_FILENAME
+
+
+def sanitize_filename_part(value: str, fallback: str) -> str:
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "-", str(value or "").strip())
+    cleaned = re.sub(r"\s+", "-", cleaned)
+    cleaned = re.sub(r"-+", "-", cleaned).strip("-")[:40]
+    return cleaned or fallback
+
+
+def build_feedback_export_filename(now: Optional[datetime] = None) -> str:
+    timestamp = (now or datetime.now(timezone.utc)).strftime("%Y%m%d-%H%M%S")
+    username = sanitize_filename_part(getpass.getuser(), "user")
+    hostname = sanitize_filename_part(socket.gethostname(), "machine")
+    random_id = secrets.token_hex(3)
+    return f"ma-feedback_{timestamp}_{username}-{hostname}_{random_id}.jsonl"
 
 
 class UserFeedbackLogger:

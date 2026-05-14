@@ -533,6 +533,8 @@ def test_feedback_summary_and_export_endpoint(tmp_path):
     export_response = client.get("/api/ml-feedback/export")
     assert export_response.status_code == 200
     assert export_response.headers["content-type"].startswith("application/x-ndjson")
+    assert "ma-feedback_" in export_response.headers["content-disposition"]
+    assert export_response.headers["content-disposition"].endswith(".jsonl\"")
     assert export_response.content == feedback_file.read_bytes()
 
 

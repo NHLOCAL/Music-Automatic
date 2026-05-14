@@ -4,6 +4,7 @@ const fs = require("node:fs/promises");
 const net = require("node:net");
 const path = require("node:path");
 const { resolveAppVersion } = require("./app-version.cjs");
+const { buildFeedbackExportFilename } = require("./feedback-export-filename.cjs");
 
 const ELECTRON_DEV_URL = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:5173";
 const BACKEND_HOST = "127.0.0.1";
@@ -235,7 +236,7 @@ function setupIpcHandlers() {
 
     const result = await dialog.showSaveDialog(mainWindow, {
       title: "יצוא נתוני אימון",
-      defaultPath: "album-deduplicator-user-feedback.jsonl",
+      defaultPath: buildFeedbackExportFilename(),
       filters: [
         { name: "JSON Lines", extensions: ["jsonl"] },
         { name: "All Files", extensions: ["*"] },
