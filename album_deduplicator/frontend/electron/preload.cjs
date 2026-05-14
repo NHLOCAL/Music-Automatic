@@ -19,4 +19,5 @@ contextBridge.exposeInMainWorld("albumDeduplicator", {
   selectPreferredRoot: () => ipcRenderer.invoke("desktop:pick-preferred-root"),
   openPath: (targetPath) => ipcRenderer.invoke("desktop:open-path", targetPath),
   revealPath: (targetPath) => ipcRenderer.invoke("desktop:reveal-path", targetPath),
+  exportFeedback: (exportUrl) => ipcRenderer.invoke("desktop:export-feedback", exportUrl),
 });

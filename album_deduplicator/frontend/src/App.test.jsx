@@ -53,6 +53,7 @@ function createDesktopBridge(overrides = {}) {
     selectPreferredRoot: vi.fn(async () => null),
     openPath: vi.fn(async () => ({ ok: true })),
     revealPath: vi.fn(async () => ({ ok: true })),
+    exportFeedback: vi.fn(async () => ({ ok: true, filePath: "C:\\Exports\\album-deduplicator-user-feedback.jsonl" })),
     ...overrides,
   };
 }
@@ -177,6 +178,13 @@ const emptyPreviewResponse = {
   total_size_mb: 0,
   auto_selected_count: 0,
   manual_selected_count: 0,
+};
+
+const feedbackSummaryResponse = {
+  feedback_file_path: "C:/Users/me/AppData/Local/Music Automatic/Album Deduplicator/user_feedback/user_feedback_events.jsonl",
+  event_count: 3,
+  size_bytes: 1024,
+  export_url: "/api/ml-feedback/export",
 };
 
 function getScanFolderInputs() {
@@ -427,6 +435,53 @@ describe("App", () => {
 
     expect(await screen.findByText("להעביר את הפריטים המסומנים לסל המחזור?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "כן, להעביר" })).toBeInTheDocument();
+  }, 15000);
+
+  it("exports feedback through the Electron bridge without opening a blank child window", async () => {
+    const exportFeedback = vi.fn(async () => ({ ok: true, filePath: "C:\\Exports\\feedback.jsonl" }));
+    window.albumDeduplicator = createDesktopBridge({ exportFeedback });
+    const openMock = vi.fn();
+    vi.stubGlobal("open", openMock);
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).includes("/api/ml-feedback/summary")) {
+        return jsonResponse(feedbackSummaryResponse);
+      }
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse(clusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(previewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse(sessionSummary);
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("workflow-step-finalize"));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "יצא נתונים לשיתוף" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "יצא נתונים לשיתוף" }));
+
+    await waitFor(() => {
+      expect(exportFeedback).toHaveBeenCalledWith("http://127.0.0.1:9900/api/ml-feedback/export");
+    });
+    expect(openMock).not.toHaveBeenCalled();
   }, 15000);
 
   it("keeps the finalize screen stable when canceling a pending transfer for a cluster", async () => {

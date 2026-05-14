@@ -52,3 +52,18 @@ export async function openDesktopPath(targetPath) {
   }
   return true;
 }
+
+export async function exportFeedbackFile(exportUrl) {
+  const bridge = getBridge();
+  if (bridge?.exportFeedback) {
+    return bridge.exportFeedback(exportUrl);
+  }
+
+  const link = document.createElement("a");
+  link.href = exportUrl;
+  link.download = "album-deduplicator-user-feedback.jsonl";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  return { ok: true, filePath: null };
+}

@@ -1,5 +1,6 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { spawn } = require("node:child_process");
+const fs = require("node:fs/promises");
 const net = require("node:net");
 const path = require("node:path");
 const { resolveAppVersion } = require("./app-version.cjs");
@@ -223,6 +224,35 @@ function setupIpcHandlers() {
   ipcMain.handle("desktop:reveal-path", async (_event, targetPath) => {
     shell.showItemInFolder(targetPath);
     return { ok: true };
+  });
+
+  ipcMain.handle("desktop:export-feedback", async (_event, exportUrl) => {
+    const requestedUrl = new URL(exportUrl);
+    const backendUrl = new URL(backendBaseUrl);
+    if (requestedUrl.origin !== backendUrl.origin || requestedUrl.pathname !== "/api/ml-feedback/export") {
+      throw new Error("Invalid feedback export URL.");
+    }
+
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: "יצוא נתוני אימון",
+      defaultPath: "album-deduplicator-user-feedback.jsonl",
+      filters: [
+        { name: "JSON Lines", extensions: ["jsonl"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+    if (result.canceled || !result.filePath) {
+      return { ok: false, canceled: true };
+    }
+
+    const response = await fetch(requestedUrl.toString());
+    if (!response.ok) {
+      throw new Error(`Failed to export feedback data: ${response.status}`);
+    }
+    const content = Buffer.from(await response.arrayBuffer());
+    await fs.writeFile(result.filePath, content);
+    shell.showItemInFolder(result.filePath);
+    return { ok: true, canceled: false, filePath: result.filePath };
   });
 }
 

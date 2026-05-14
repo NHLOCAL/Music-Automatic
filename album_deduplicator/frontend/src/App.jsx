@@ -5,7 +5,7 @@ import heIL from "antd/locale/he_IL";
 import { useDeduplicator } from "./hooks/useDeduplicator";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import * as api from "./api";
-import { getRuntimeInfo, getRuntimeSnapshot, openDesktopPath, pickScanFolders } from "./desktop";
+import { exportFeedbackFile, getRuntimeInfo, getRuntimeSnapshot, openDesktopPath, pickScanFolders } from "./desktop";
 import { SetupScreen } from "./components/SetupScreen";
 import { ScanningScreen } from "./components/ScanningScreen";
 import { SummaryScreen } from "./components/SummaryScreen";
@@ -223,9 +223,19 @@ function AppContent() {
     await refreshFeedbackSummary();
   };
 
-  const exportFeedbackData = () => {
+  const exportFeedbackData = async () => {
     if (!feedbackSummary?.export_url) return;
-    window.open(api.buildApiUrl(feedbackSummary.export_url), "_blank", "noopener,noreferrer");
+    try {
+      const result = await exportFeedbackFile(api.buildApiUrl(feedbackSummary.export_url));
+      if (result?.canceled) return;
+      antContext.notification.success({
+        title: "נתוני האימון יוצאו",
+        description: result?.filePath ? `הקובץ נשמר: ${result.filePath}` : "קובץ ה-JSONL מוכן לשיתוף.",
+        placement: "topLeft",
+      });
+    } catch (err) {
+      d.setError(err.message);
+    }
   };
 
   const navigateToSetup = () => {

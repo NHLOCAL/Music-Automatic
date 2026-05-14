@@ -1,11 +1,10 @@
 import { getRuntimeSnapshot } from "./desktop";
 
-const API_BASE = getRuntimeSnapshot().backendBaseUrl;
-
 export function buildApiUrl(path) {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE}${path}`;
+  const apiBase = getRuntimeSnapshot().backendBaseUrl;
+  return `${apiBase}${path}`;
 }
 
 export async function requestJson(path, options = {}) {
