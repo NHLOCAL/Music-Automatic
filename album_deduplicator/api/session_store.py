@@ -191,11 +191,6 @@ class SessionStore:
                     continue
                 if keeper_id is None:
                     session.delete_selections[cluster_id] = set()
-                    self.feedback_logger.log_keep_all_decision(
-                        session_id=session.session_id,
-                        snapshot=session.snapshot,
-                        cluster_id=cluster_id,
-                    )
                     continue
                 requested_selection = None
                 if delete_selections and cluster_id in delete_selections:
@@ -208,14 +203,6 @@ class SessionStore:
                     requested_folder_ids=requested_selection,
                     deleted_folder_ids=session.deleted_folder_ids,
                 )
-                if session.resolution_states[cluster_id] == "user_selected":
-                    self.feedback_logger.log_candidate_decision(
-                        session_id=session.session_id,
-                        snapshot=session.snapshot,
-                        cluster_id=cluster_id,
-                        keeper_id=keeper_id,
-                        delete_folder_ids=session.delete_selections[cluster_id],
-                    )
             self._apply_resolution_states(session.snapshot, session.resolution_states, session.deleted_folder_ids)
             session.preview = self._deletion_service.build_preview(
                 clusters=session.snapshot.clusters,

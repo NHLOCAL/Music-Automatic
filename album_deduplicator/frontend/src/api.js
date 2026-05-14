@@ -43,6 +43,9 @@ export function getDeletePreview(sessionId) {
 export function getFeedbackSummary() {
   return requestJson("/api/ml-feedback/summary");
 }
+export function clearFeedbackHistory() {
+  return requestJson("/api/ml-feedback", { method: "DELETE" });
+}
 export function updateDecisions(sessionId, payload) {
   return requestJson(`/api/analysis-sessions/${sessionId}/decisions`, {
     method: "POST",

@@ -238,6 +238,20 @@ function AppContent() {
     }
   };
 
+  const clearFeedbackHistory = async () => {
+    try {
+      const summary = await api.clearFeedbackHistory();
+      setFeedbackSummary(summary);
+      antContext.notification.success({
+        title: "היסטוריית הזיהויים נוקתה",
+        description: "קובץ נתוני האימון המקומי נמחק.",
+        placement: "topLeft",
+      });
+    } catch (err) {
+      d.setError(err.message);
+    }
+  };
+
   const navigateToSetup = () => {
     d.setError("");
     d.setSuccessSummary(null);
@@ -350,6 +364,7 @@ function AppContent() {
                 onKeepAllCopies={clearClusterDecision}
                 feedbackSummary={feedbackSummary}
                 onExportFeedback={exportFeedbackData}
+                onClearFeedbackHistory={clearFeedbackHistory}
               />
             )}
           </div>

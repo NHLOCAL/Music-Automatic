@@ -73,73 +73,13 @@ class UserFeedbackLogger:
             size_bytes=size_bytes,
         )
 
-    def log_keep_all_decision(
-        self,
-        *,
-        session_id: str,
-        snapshot: AnalysisSnapshot,
-        cluster_id: str,
-    ) -> None:
-        cluster = snapshot.clusters.get(cluster_id)
-        if cluster is None:
-            return
-        self._append_event(
-            {
-                **self._base_event(session_id=session_id, event_type="decision_saved"),
-                "label": "not_safe_to_delete",
-                "evidence_strength": "medium",
-                "decision": {
-                    "keeper_folder_id": None,
-                    "delete_folder_ids": [],
-                    "source": "keep_all",
-                },
-                "cluster": self._cluster_payload(snapshot, cluster_id),
-                "keeper": None,
-                "target": None,
-                "pairs": self._pair_payloads(snapshot, cluster.pair_ids),
-                "model_policy": self._model_policy_payload(),
-            }
-        )
-
-    def log_candidate_decision(
-        self,
-        *,
-        session_id: str,
-        snapshot: AnalysisSnapshot,
-        cluster_id: str,
-        keeper_id: str,
-        delete_folder_ids: Iterable[str],
-    ) -> None:
-        cluster = snapshot.clusters.get(cluster_id)
-        if cluster is None:
-            return
-        selected_ids = [folder_id for folder_id in delete_folder_ids if folder_id != keeper_id]
-        for folder_id in selected_ids:
-            self._append_event(
-                {
-                    **self._base_event(session_id=session_id, event_type="decision_saved"),
-                    "label": "user_selected_candidate",
-                    "evidence_strength": "medium",
-                    "decision": {
-                        "keeper_folder_id": keeper_id,
-                        "delete_folder_ids": [folder_id],
-                        "source": "delete_selection",
-                    },
-                    "cluster": self._cluster_payload(snapshot, cluster_id),
-                    "keeper": self._album_payload(snapshot, keeper_id),
-                    "target": self._album_payload(snapshot, folder_id),
-                    "pairs": self._pair_payloads(
-                        snapshot,
-                        [
-                            pair_id
-                            for pair_id in cluster.pair_ids
-                            if self._pair_involves(snapshot, pair_id, keeper_id, folder_id)
-                        ]
-                        or cluster.pair_ids,
-                    ),
-                    "model_policy": self._model_policy_payload(),
-                }
-            )
+    def clear(self) -> FeedbackSummary:
+        with self._lock:
+            try:
+                self.feedback_file.unlink()
+            except FileNotFoundError:
+                pass
+        return self.summary()
 
     def log_delete_execution(
         self,

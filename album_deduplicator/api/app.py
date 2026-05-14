@@ -215,6 +215,16 @@ def create_app() -> FastAPI:
             filename=build_feedback_export_filename(),
         )
 
+    @app.delete("/api/ml-feedback", response_model=FeedbackSummaryResponse)
+    def clear_feedback_history() -> FeedbackSummaryResponse:
+        summary = store.feedback_logger.clear()
+        return FeedbackSummaryResponse(
+            feedback_file_path=str(summary.feedback_file_path),
+            event_count=summary.event_count,
+            size_bytes=summary.size_bytes,
+            export_url=summary.export_url,
+        )
+
     @app.post("/api/analysis-sessions/{session_id}/delete-executions", response_model=DeleteExecutionResponse)
     def execute_delete(session_id: str, payload: DeleteExecutionRequest) -> DeleteExecutionResponse:
         _get_session_or_404(session_id)

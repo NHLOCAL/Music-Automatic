@@ -264,7 +264,7 @@
 נוסף מנגנון איסוף החלטות משתמשים תחת `album_deduplicator`, כדי להתחיל לבנות evidence אמיתי מהשימוש במוצר:
 
 - מחיקה מוצלחת לסל המחזור נרשמת כ-`same_album_confirmed` עם `evidence_strength=strong`.
-- החלטת `שמור את כל העותקים` נרשמת כ-`not_safe_to_delete` עם `evidence_strength=medium`.
+- החלטות זמניות כמו `שמור את כל העותקים`, שינוי keeper או סימון מחיקה אינן נרשמות ל-dataset לפני מחיקה בפועל.
 - כל אירוע נשמר כ-`JSONL` וכולל את ציוני ה-pairs ואת מדיניות ה-scoring שהייתה בתוקף בזמן ההחלטה.
 
 תיעוד הפורמט והמיקום נמצא ב-[USER_FEEDBACK_DATASET.md](USER_FEEDBACK_DATASET.md).

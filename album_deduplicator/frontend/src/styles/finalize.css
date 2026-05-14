@@ -55,6 +55,12 @@
   color: var(--text-muted);
 }
 
+.feedback-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .data-table-wrapper {
   flex: 1;
   background: var(--bg-surface);

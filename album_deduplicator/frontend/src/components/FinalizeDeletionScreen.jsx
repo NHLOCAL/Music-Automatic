@@ -11,6 +11,7 @@ export function FinalizeDeletionScreen({
   onKeepAllCopies,
   feedbackSummary,
   onExportFeedback,
+  onClearFeedbackHistory,
 }) {
   const { pendingGroups, summary } = workflow;
   const feedbackCount = feedbackSummary?.event_count ?? 0;
@@ -26,14 +27,32 @@ export function FinalizeDeletionScreen({
           <div className="feedback-export-panel">
             <div className="feedback-export-count">{feedbackCount} אירועי אימון נשמרו</div>
             <div className="feedback-export-note">נתוני החלטות ומחיקות בפועל נשמרים לקובץ מקומי שאפשר לשתף לאימון מודל.</div>
-            <Button
-              size="small"
-              icon={<Icon name="download" size={14} />}
-              onClick={onExportFeedback}
-              disabled={!feedbackSummary?.export_url || feedbackCount === 0}
-            >
-              יצא נתונים לשיתוף
-            </Button>
+            <div className="feedback-export-actions">
+              <Button
+                size="small"
+                icon={<Icon name="download" size={14} />}
+                onClick={onExportFeedback}
+                disabled={!feedbackSummary?.export_url || feedbackCount === 0}
+              >
+                יצא נתונים לשיתוף
+              </Button>
+              <Popconfirm
+                title="לנקות את היסטוריית הזיהויים?"
+                description="פעולה זו תמחק את קובץ ה-JSONL המקומי. נתונים שכבר יוצאו לא יושפעו."
+                okText="כן, נקה"
+                cancelText="ביטול"
+                onConfirm={onClearFeedbackHistory}
+                disabled={feedbackCount === 0}
+              >
+                <Button
+                  size="small"
+                  icon={<Icon name="trash" size={14} />}
+                  disabled={feedbackCount === 0}
+                >
+                  נקה היסטוריה
+                </Button>
+              </Popconfirm>
+            </div>
           </div>
           <Popconfirm
             title="להעביר את הפריטים המסומנים לסל המחזור?"

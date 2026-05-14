@@ -202,6 +202,7 @@ python main.py "C:/Music" "D:/Archive" -p "C:/Music"
 - `POST /api/system/open-explorer`
 - `GET /api/ml-feedback/summary`
 - `GET /api/ml-feedback/export`
+- `DELETE /api/ml-feedback`
 
 ## בדיקות
 

@@ -114,7 +114,7 @@
 - `user_feedback_logger.py`
   - כותב אירועי החלטות משתמש לקובץ `JSONL` בנתיב user-data גלובלי שמתאים גם להתקנות ארוזות.
   - מתעד מחיקות מוצלחות כ-`same_album_confirmed` עם `evidence_strength=strong`.
-  - מתעד החלטת `שמור את כל העותקים` כ-`not_safe_to_delete` עם `evidence_strength=medium`.
+  - אינו מתעד סימוני keeper/מחיקה זמניים או החלטת `שמור את כל העותקים`, כדי להימנע מ-labels שהמשתמש עוד יכול לשנות.
   - שומר יחד עם כל אירוע את ה-cluster, ה-keeper, ה-target, ציוני הזוגות, וספי/משקלי ה-scoring שהיו בתוקף.
 - `dto.py`
   - אובייקטים יציבים לשכבות העליונות:
@@ -471,7 +471,11 @@ final_score = base_score
 
 ### `GET /api/ml-feedback/export`
 
-מחזיר את קובץ ה-`JSONL` להורדה כ-`album-deduplicator-user-feedback.jsonl`, כדי לאפשר שיתוף ידני של נתוני אימון.
+מחזיר את קובץ ה-`JSONL` להורדה בשם תמציתי שמכיל זמן, משתמש, מכונה ומזהה קצר, כדי לאפשר שיתוף ידני של נתוני אימון ולהבדיל בין סריקות שונות.
+
+### `DELETE /api/ml-feedback`
+
+מוחק את קובץ ה-feedback המקומי ומחזיר summary ריק. הפעולה זמינה גם מהממשק דרך `נקה היסטוריה`.
 
 ## Cache ו-persistence
 

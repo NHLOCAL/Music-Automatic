@@ -484,6 +484,58 @@ describe("App", () => {
     expect(openMock).not.toHaveBeenCalled();
   }, 15000);
 
+  it("clears feedback history from the finalize screen after confirmation", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    let feedbackSummary = feedbackSummaryResponse;
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).includes("/api/ml-feedback/summary")) {
+        return jsonResponse(feedbackSummary);
+      }
+      if (String(url).includes("/api/ml-feedback") && options.method === "DELETE") {
+        feedbackSummary = { ...feedbackSummaryResponse, event_count: 0, size_bytes: 0 };
+        return jsonResponse(feedbackSummary);
+      }
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse(clusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(previewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse(sessionSummary);
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("workflow-step-finalize"));
+
+    await waitFor(() => expect(screen.getByText("3 אירועי אימון נשמרו")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "נקה היסטוריה" }));
+
+    expect(await screen.findByText("לנקות את היסטוריית הזיהויים?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "כן, נקה" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:9900/api/ml-feedback", expect.objectContaining({ method: "DELETE" }));
+      expect(screen.getByText("0 אירועי אימון נשמרו")).toBeInTheDocument();
+    });
+  }, 15000);
+
   it("keeps the finalize screen stable when canceling a pending transfer for a cluster", async () => {
     window.albumDeduplicator = createDesktopBridge();
     let previewAfterDecision = previewResponse;

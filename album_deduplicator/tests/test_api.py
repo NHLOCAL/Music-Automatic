@@ -456,7 +456,7 @@ def test_successful_bulk_delete_writes_ml_feedback_event(monkeypatch, tmp_path):
     assert event["model_policy"]["base_score_ml_weight"] == config.BASE_SCORE_ML_WEIGHT
 
 
-def test_keep_all_decision_writes_not_safe_feedback_event(tmp_path):
+def test_keep_all_decision_does_not_write_ml_feedback_event(tmp_path):
     feedback_file = tmp_path / "feedback" / "user_feedback_events.jsonl"
     store.feedback_logger.feedback_file = feedback_file
     session = store.create_session(
@@ -474,15 +474,10 @@ def test_keep_all_decision_writes_not_safe_feedback_event(tmp_path):
 
     store.apply_decisions(session.session_id, {cluster.cluster_id: None}, {cluster.cluster_id: set()})
 
-    events = [json.loads(line) for line in feedback_file.read_text(encoding="utf-8").splitlines()]
-    assert len(events) == 1
-    assert events[0]["event_type"] == "decision_saved"
-    assert events[0]["label"] == "not_safe_to_delete"
-    assert events[0]["evidence_strength"] == "medium"
-    assert events[0]["cluster"]["cluster_id"] == cluster.cluster_id
+    assert not feedback_file.exists()
 
 
-def test_keeper_selection_writes_candidate_feedback_events(tmp_path):
+def test_keeper_selection_does_not_write_candidate_feedback_events(tmp_path):
     feedback_file = tmp_path / "feedback" / "user_feedback_events.jsonl"
     store.feedback_logger.feedback_file = feedback_file
     session = store.create_session(
@@ -502,15 +497,7 @@ def test_keeper_selection_writes_candidate_feedback_events(tmp_path):
         {cluster.cluster_id: {drop_id}},
     )
 
-    events = [json.loads(line) for line in feedback_file.read_text(encoding="utf-8").splitlines()]
-    assert len(events) == 1
-    event = events[0]
-    assert event["event_type"] == "decision_saved"
-    assert event["label"] == "user_selected_candidate"
-    assert event["evidence_strength"] == "medium"
-    assert event["keeper"]["folder_id"] == cluster.recommended_keeper_id
-    assert event["target"]["folder_id"] == drop_id
-    assert event["decision"]["delete_folder_ids"] == [drop_id]
+    assert not feedback_file.exists()
 
 
 def test_feedback_summary_and_export_endpoint(tmp_path):
@@ -536,6 +523,12 @@ def test_feedback_summary_and_export_endpoint(tmp_path):
     assert "ma-feedback_" in export_response.headers["content-disposition"]
     assert export_response.headers["content-disposition"].endswith(".jsonl\"")
     assert export_response.content == feedback_file.read_bytes()
+
+    clear_response = client.delete("/api/ml-feedback")
+    assert clear_response.status_code == 200
+    assert clear_response.json()["event_count"] == 0
+    assert clear_response.json()["size_bytes"] == 0
+    assert not feedback_file.exists()
 
 
 def test_api_delete_single_respects_explicit_keep_all():
