@@ -31,10 +31,28 @@
   width: 100%;
   display: flex;
   justify-content: flex-end;
+  padding: 2px;
+  background: #f6f7f9;
+  border: 1px solid var(--border-main);
+  border-radius: 6px;
 }
 
 .ide-sidebar-sort-button {
   flex: 0 0 auto;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ide-sidebar-sort-button:hover,
+.ide-sidebar-sort-button:focus-visible {
+  color: var(--color-primary);
+  background: var(--bg-surface);
 }
 
 .ide-sidebar-list {

@@ -85,13 +85,15 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
             <Button
               size="small"
               type="text"
-              className="ide-sidebar-sort-button"
-              icon={<Icon name="sort" size={14} />}
-              onClick={sortByReadiness}
-              aria-label="מיין לפי מוכנות"
-            />
-          </Tooltip>
-        </div>
+            className="ide-sidebar-sort-button"
+            icon={<Icon name="sort" size={14} />}
+            onClick={sortByReadiness}
+            aria-label="מיין לפי מוכנות"
+          >
+            מיין לפי מוכנות
+          </Button>
+        </Tooltip>
+      </div>
       </div>
       <div className="ide-sidebar-list" data-testid="cluster-scroll">
         {displayedClusters.map((cluster) => {
