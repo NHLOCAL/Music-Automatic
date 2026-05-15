@@ -1,5 +1,5 @@
-import React from "react";
-import { Segmented } from "antd";
+import React, { useEffect, useMemo, useState } from "react";
+import { Button, Segmented, Tooltip } from "antd";
 import { Icon, StatusTag } from "./UI";
 import {
   getClusterDisplayTitle,
@@ -25,17 +25,76 @@ const SEGMENT_OPTIONS = [
   },
 ];
 
+function getReadinessRank(cluster, decisions) {
+  const isResolved = hasExplicitKeeperDecision(cluster, decisions);
+  const statusMeta = getClusterStatusMeta(cluster, isResolved);
+  return statusMeta.tone === "success" ? 0 : 1;
+}
+
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
-  const filteredClusters = clusters
-    .filter((cluster) => clusterMatchesReviewTab(cluster, selectedTab));
+  const [manualOrderIds, setManualOrderIds] = useState([]);
+  const filteredClusters = useMemo(
+    () => clusters.filter((cluster) => clusterMatchesReviewTab(cluster, selectedTab)),
+    [clusters, selectedTab],
+  );
+  const displayedClusters = useMemo(() => {
+    if (!manualOrderIds.length) return filteredClusters;
+    const manualOrder = new Map(manualOrderIds.map((clusterId, index) => [clusterId, index]));
+    return filteredClusters
+      .map((cluster, index) => ({ cluster, index }))
+      .sort((left, right) => {
+        const leftOrder = manualOrder.get(left.cluster.cluster_id);
+        const rightOrder = manualOrder.get(right.cluster.cluster_id);
+        if (leftOrder !== undefined && rightOrder !== undefined) return leftOrder - rightOrder;
+        if (leftOrder !== undefined) return -1;
+        if (rightOrder !== undefined) return 1;
+        return left.index - right.index;
+      })
+      .map(({ cluster }) => cluster);
+  }, [filteredClusters, manualOrderIds]);
+
+  useEffect(() => {
+    setManualOrderIds([]);
+  }, [selectedTab]);
+
+  const sortByReadiness = () => {
+    setManualOrderIds(
+      filteredClusters
+        .map((cluster, index) => ({ cluster, index }))
+        .sort((left, right) => {
+          const rankDiff = getReadinessRank(left.cluster, decisions) - getReadinessRank(right.cluster, decisions);
+          return rankDiff || left.index - right.index;
+        })
+        .map(({ cluster }) => cluster.cluster_id),
+    );
+  };
 
   return (
     <div className="ide-sidebar">
       <div className="ide-sidebar-header">
-        <Segmented block size="small" value={selectedTab} options={SEGMENT_OPTIONS} onChange={setSelectedTab} />
+        <Segmented
+          block
+          size="small"
+          className="ide-sidebar-tabs"
+          value={selectedTab}
+          options={SEGMENT_OPTIONS}
+          onChange={setSelectedTab}
+        />
+        <div className="ide-sidebar-tools">
+          <Tooltip title="מיין לפי מוכנות">
+            <Button
+              size="small"
+              type="text"
+              className="ide-sidebar-sort-button"
+              icon={<Icon name="sort" size={14} />}
+              onClick={sortByReadiness}
+              aria-label="מיין לפי מוכנות"
+            />
+          </Tooltip>
+        </div>
       </div>
       <div className="ide-sidebar-list" data-testid="cluster-scroll">
-        {filteredClusters.map((cluster) => {
+        {displayedClusters.map((cluster) => {
           const isActive = cluster.cluster_id === selectedClusterId;
           const isResolved = hasExplicitKeeperDecision(cluster, decisions);
           const statusMeta = getClusterStatusMeta(cluster, isResolved);

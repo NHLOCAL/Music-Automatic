@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ClusterList } from "./ClusterList";
@@ -131,5 +131,40 @@ describe("ClusterList", () => {
 
     expect(container.querySelector(".anticon-safety-certificate")).toBeInTheDocument();
     expect(container.querySelector(".anticon-check-circle")).toBeInTheDocument();
+  });
+
+  it("sorts by readiness only when the user presses the sort button", () => {
+    const { container, rerender } = render(
+      <ClusterList
+        clusters={clusters}
+        selectedClusterId="cluster-pending"
+        setSelectedClusterId={vi.fn()}
+        decisions={{ "cluster-ready": "folder-c" }}
+        selectedTab="review"
+        setSelectedTab={vi.fn()}
+      />,
+    );
+    const getItems = () => Array.from(container.querySelectorAll(".ide-cluster-item"));
+
+    expect(getItems()[0].textContent).toContain("Pending Copy");
+
+    fireEvent.click(container.querySelector(".ide-sidebar-sort-button"));
+
+    expect(getItems()[0].textContent).toContain("Ready Copy");
+    expect(getItems()[1].textContent).toContain("Pending Copy");
+
+    rerender(
+      <ClusterList
+        clusters={clusters}
+        selectedClusterId="cluster-pending"
+        setSelectedClusterId={vi.fn()}
+        decisions={{ "cluster-ready": "folder-c", "cluster-pending": "folder-a" }}
+        selectedTab="review"
+        setSelectedTab={vi.fn()}
+      />,
+    );
+
+    expect(getItems()[0].textContent).toContain("Ready Copy");
+    expect(getItems()[1].textContent).toContain("Pending Copy");
   });
 });

@@ -17,6 +17,24 @@
 .ide-sidebar-header {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-main);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ide-sidebar-tabs {
+  width: 100%;
+  min-width: 0;
+}
+
+.ide-sidebar-tools {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ide-sidebar-sort-button {
+  flex: 0 0 auto;
 }
 
 .ide-sidebar-list {
