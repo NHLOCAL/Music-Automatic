@@ -116,4 +116,20 @@ describe("ClusterList", () => {
     expect(container.textContent).toContain("1 עותקים");
     expect(container.textContent).not.toContain("Pending Copy");
   });
+
+  it("uses distinct icons for safe and completed segments", () => {
+    const { container } = render(
+      <ClusterList
+        clusters={clusters}
+        selectedClusterId="cluster-pending"
+        setSelectedClusterId={vi.fn()}
+        decisions={{}}
+        selectedTab="safe"
+        setSelectedTab={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector(".anticon-safety-certificate")).toBeInTheDocument();
+    expect(container.querySelector(".anticon-check-circle")).toBeInTheDocument();
+  });
 });

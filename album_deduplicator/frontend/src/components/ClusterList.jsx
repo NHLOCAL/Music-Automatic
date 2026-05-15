@@ -13,7 +13,7 @@ import {
 
 const SEGMENT_OPTIONS = [
   {
-    label: <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="check-circle" size={13} />בטוחים</span>,
+    label: <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="shield" size={13} />בטוחים</span>,
     value: "safe",
   },
   {
