@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 class RecommendationService:
     def __init__(self, preferred_root: Optional[Path] = None):
         self.preferred_root = preferred_root
+        self._normalized_preferred_root = self._normalize_path(preferred_root) if preferred_root else None
 
     def build_album_summaries(self, folders: Dict[Path, FolderInfo]) -> Dict[str, AlbumSummary]:
         summaries: Dict[str, AlbumSummary] = {}
@@ -245,9 +247,19 @@ class RecommendationService:
         return all(folder_id == keeper_id or folder_id in safe_neighbors for folder_id in component)
 
     def _is_in_preferred_root(self, folder_path: Path) -> bool:
-        if not self.preferred_root:
+        if not self._normalized_preferred_root:
             return False
-        return folder_path == self.preferred_root or self.preferred_root in folder_path.parents
+        normalized_folder_path = self._normalize_path(folder_path)
+        if normalized_folder_path == self._normalized_preferred_root:
+            return True
+        try:
+            common_path = os.path.commonpath([normalized_folder_path, self._normalized_preferred_root])
+        except ValueError:
+            return False
+        return common_path == self._normalized_preferred_root
+
+    def _normalize_path(self, path: Path) -> str:
+        return os.path.normcase(os.path.normpath(str(path.resolve(strict=False))))
 
     def _build_human_summary(
         self,

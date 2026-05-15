@@ -77,6 +77,24 @@ def test_recommendation_prefers_preferred_root_and_marks_safe():
     assert cluster.resolution_state == "auto"
 
 
+def test_recommendation_prefers_equivalent_preferred_root_when_quality_ties():
+    keeper = make_folder("C:/library/../library/preferred/Album", 91.0)
+    duplicate = make_folder("D:/archive/Album", 91.0)
+    folders = {keeper.path: keeper, duplicate.path: duplicate}
+
+    service = RecommendationService(preferred_root=Path("C:/library/preferred"))
+    albums = service.build_album_summaries(folders)
+    pair = make_pair(keeper.path, duplicate.path, 100.0)
+
+    clusters = service.build_clusters(folders, {pair.pair_id: pair}, albums)
+    cluster = next(iter(clusters.values()))
+
+    assert cluster.recommended_keeper_id == stable_id("folder", str(keeper.path))
+    assert cluster.confidence_bucket == "safe"
+    assert "preferred_root_keeper" in cluster.reason_codes
+    assert "keeper_conflict" not in cluster.reason_codes
+
+
 def test_recommendation_marks_review_when_keeper_is_not_unique():
     folder1 = make_folder("C:/music/A", 90.0)
     folder2 = make_folder("D:/music/B", 90.0)
