@@ -61,7 +61,7 @@ const clusters = [
 ];
 
 describe("ClusterList", () => {
-  it("places reviewed-ready clusters before pending review clusters and shows the status tag", () => {
+  it("keeps the original cluster order after a cluster is marked ready", () => {
     const { container } = render(
       <ClusterList
         clusters={clusters}
@@ -76,11 +76,11 @@ describe("ClusterList", () => {
     const items = Array.from(container.querySelectorAll(".ide-cluster-item"));
 
     expect(items).toHaveLength(2);
-    expect(items[0].textContent).toContain("Ready Copy");
-    expect(items[0].textContent).toContain("נבדק ומוכן");
-    expect(items[0].textContent).toContain("התאמה: 95.6/100");
-    expect(items[1].textContent).toContain("Pending Copy");
-    expect(items[1].textContent).toContain("ממתין לסקירה");
+    expect(items[0].textContent).toContain("Pending Copy");
+    expect(items[0].textContent).toContain("ממתין לסקירה");
+    expect(items[1].textContent).toContain("Ready Copy");
+    expect(items[1].textContent).toContain("נבדק ומוכן");
+    expect(items[1].textContent).toContain("התאמה: 95.6/100");
     expect(screen.getByTestId("cluster-scroll")).toBeInTheDocument();
   });
 

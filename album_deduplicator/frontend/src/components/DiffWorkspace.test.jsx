@@ -228,4 +228,29 @@ describe("DiffWorkspace", () => {
     expect(screen.getByTestId("comparison-scroller")).toBeInTheDocument();
     expect(screen.getAllByText(/Acoustix/).length).toBeGreaterThan(0);
   });
+
+  it("renders the recommended folder as the first comparison pane", () => {
+    const reversedCluster = {
+      ...cluster,
+      albums: [...cluster.albums].reverse(),
+    };
+
+    const { container } = render(
+      <DiffWorkspace
+        cluster={reversedCluster}
+        currentKeeperId="folder-1"
+        hasExplicitDecision={false}
+        handleDecision={vi.fn()}
+        openExplorer={vi.fn()}
+        previewCount={0}
+      />,
+    );
+
+    const panes = Array.from(container.querySelectorAll(".ide-pane"));
+
+    expect(panes).toHaveLength(2);
+    expect(panes[0].textContent).toContain("C:/Music/Acoustix");
+    expect(panes[0].textContent).toContain("מומלץ");
+    expect(panes[1].textContent).toContain("D:/Archive/Acoustix");
+  });
 });

@@ -170,7 +170,17 @@ export function DiffWorkspace({
     );
   }
 
-  const visibleAlbums = useMemo(() => cluster.albums.filter((album) => !album.is_deleted), [cluster]);
+  const visibleAlbums = useMemo(() => (
+    cluster.albums
+      .filter((album) => !album.is_deleted)
+      .map((album, index) => ({ album, index }))
+      .sort((left, right) => {
+        if (left.album.folder_id === cluster.recommended_keeper_id) return -1;
+        if (right.album.folder_id === cluster.recommended_keeper_id) return 1;
+        return left.index - right.index;
+      })
+      .map(({ album }) => album)
+  ), [cluster]);
   const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
   const visibleAlbumIds = useMemo(() => visibleAlbums.map((album) => album.folder_id), [visibleAlbums]);
   const hasSuggestedKeeper = Boolean(currentKeeperId);

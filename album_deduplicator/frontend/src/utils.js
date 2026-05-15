@@ -172,14 +172,6 @@ export function getClusterStatusMeta(cluster, hasDecision) {
   return { label: "ממתין לסקירה", tone: "neutral" };
 }
 
-export function getClusterSortPriority(cluster, decisions = {}) {
-  if (!cluster) return 99;
-  const hasDecision = hasExplicitKeeperDecision(cluster, decisions);
-  const statusMeta = getClusterStatusMeta(cluster, hasDecision);
-  if (statusMeta.label === "נבדק ומוכן") return 0;
-  return 1;
-}
-
 export function getMetricWinners(albums) {
   const winners = {};
   METRICS.forEach((metric) => {

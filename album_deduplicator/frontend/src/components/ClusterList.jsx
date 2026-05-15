@@ -3,7 +3,6 @@ import { Segmented } from "antd";
 import { Icon, StatusTag } from "./UI";
 import {
   getClusterDisplayTitle,
-  getClusterSortPriority,
   getClusterStatusMeta,
   getVisibleAlbumCount,
   hasExplicitKeeperDecision,
@@ -28,8 +27,7 @@ const SEGMENT_OPTIONS = [
 
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
   const filteredClusters = clusters
-    .filter((cluster) => clusterMatchesReviewTab(cluster, selectedTab))
-    .sort((a, b) => getClusterSortPriority(a, decisions) - getClusterSortPriority(b, decisions));
+    .filter((cluster) => clusterMatchesReviewTab(cluster, selectedTab));
 
   return (
     <div className="ide-sidebar">
