@@ -91,7 +91,7 @@ describe("ClusterList", () => {
         selectedClusterId="cluster-pending"
         setSelectedClusterId={vi.fn()}
         decisions={{}}
-        selectedTab="all"
+        selectedTab="review"
         setSelectedTab={vi.fn()}
       />,
     );
@@ -99,6 +99,7 @@ describe("ClusterList", () => {
     expect(container.textContent).toContain("Pending Copy");
     expect(container.textContent).toContain("Ready Copy");
     expect(container.textContent).not.toContain("Completed Copy");
+    expect(container.textContent).not.toContain("הכל");
 
     rerender(
       <ClusterList

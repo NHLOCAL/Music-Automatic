@@ -21,10 +21,6 @@ const SEGMENT_OPTIONS = [
     value: "review",
   },
   {
-    label: <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="layers" size={13} />הכל</span>,
-    value: "all",
-  },
-  {
     label: <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="check-circle" size={13} />הושלם</span>,
     value: "completed",
   },
