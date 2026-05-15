@@ -15,6 +15,8 @@ from .file_processor import FileProcessor
 
 logger = logging.getLogger(__name__)
 
+RECYCLE_BIN_DIR_NAMES = frozenset({"$recycle.bin", "recycler", "recycled"})
+
 
 @dataclass(frozen=True)
 class FolderScanCandidate:
@@ -121,9 +123,18 @@ class FolderScanner:
             if not root.is_dir():
                 logger.warning(f"Provided path is not a directory, skipping: {root}")
                 continue
+            if self._is_inside_recycle_bin(root):
+                logger.info(f"Skipping recycle bin path: {root}")
+                continue
             logger.info(f"Scanning directory recursively: {root}")
             try:
                 for current_dir, subdirs, filenames in os.walk(root):
+                    subdirs[:] = [
+                        subdir for subdir in subdirs if not self._is_recycle_bin_dir_name(subdir)
+                    ]
+                    if self._is_inside_recycle_bin(Path(current_dir)):
+                        subdirs.clear()
+                        continue
                     if subdirs:
                         continue
                     candidate = self._build_folder_candidate(Path(current_dir), filenames)
@@ -131,6 +142,15 @@ class FolderScanner:
                         yield candidate
             except OSError as e:
                 logger.error(f"Error scanning directory {root}: {e}")
+
+    @staticmethod
+    def _is_recycle_bin_dir_name(name: str) -> bool:
+        lowered = name.lower()
+        return lowered in RECYCLE_BIN_DIR_NAMES or lowered.startswith(".trash-")
+
+    @classmethod
+    def _is_inside_recycle_bin(cls, path: Path) -> bool:
+        return any(cls._is_recycle_bin_dir_name(part) for part in path.parts)
 
     def _build_folder_candidate(self, folder_path: Path, filenames: Iterable[str]) -> Optional[FolderScanCandidate]:
         music_file_paths: List[Path] = []
