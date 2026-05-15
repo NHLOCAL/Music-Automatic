@@ -9,6 +9,7 @@ class AnalysisSessionCreateRequest(BaseModel):
     folders: List[str]
     preferred_root: Optional[str] = None
     preferred_roots: Optional[List[str]] = None
+    use_preferred_roots: bool = True
     force_rescan: bool = False
     clear_cache: bool = False
     full_hash_scan: bool = False

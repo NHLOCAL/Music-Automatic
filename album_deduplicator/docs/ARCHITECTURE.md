@@ -298,7 +298,7 @@ final_score = base_score
 
 בחירת `keeper` נעשית לפי:
 
-1. המיקום של האלבום תחת `preferred_roots`, לפי סדר ההעדפות שנשלח מה-UI.
+1. המיקום של האלבום תחת `preferred_roots`, לפי סדר ההעדפות שנשלח מה-UI, כאשר `use_preferred_roots` פעיל.
 2. אם שני אלבומים באותו root מועדף או ללא root מועדף, לפי `quality_score`
 3. אם עדיין יש תיקו מהותי, אין `keeper` ברור
 
@@ -379,6 +379,7 @@ final_score = base_score
 
 - `folders[]`
 - `preferred_roots` לפי סדר עדיפות, עם `preferred_root` legacy כערך הראשון
+- `use_preferred_roots`, פעיל כברירת מחדל; כאשר כבוי סדר ה-roots נשמר אך לא משפיע על בחירת keeper
 - `force_rescan`
 - `clear_cache`
 - `full_hash_scan`

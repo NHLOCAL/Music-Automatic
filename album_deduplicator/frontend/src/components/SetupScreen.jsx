@@ -8,7 +8,6 @@ import {
   PlayCircleOutlined,
   PlusOutlined,
   SettingOutlined,
-  StarOutlined,
 } from "@ant-design/icons";
 
 const ADVANCED_OPTIONS = [
@@ -31,11 +30,6 @@ const ADVANCED_OPTIONS = [
 
 export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFolder, runtimeInfo }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const activePreferenceRows = useMemo(
-    () => form.folders.filter((folder) => folder.path.trim()),
-    [form.folders],
-  );
-
   const handlePathChange = (id, path) => {
     setForm((prev) => ({
       ...prev,
@@ -156,18 +150,16 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
 
           <div className="setup-form-group">
             <label>סדר עדיפות לשמירה</label>
-            <div className="preference-order-preview" aria-label="סדר עדיפות לשמירה">
-              {activePreferenceRows.length ? (
-                activePreferenceRows.map((folder, index) => (
-                  <div key={folder.id} className="preference-order-item">
-                    <Tag className="preference-order-rank" icon={<StarOutlined />}>{index + 1}</Tag>
-                    <span className="preference-order-path">{folder.path.trim()}</span>
-                  </div>
-                ))
-              ) : (
-                <span className="preference-order-empty">הוסיפו תיקיות כדי לקבוע סדר עדיפות.</span>
-              )}
-            </div>
+            <Checkbox
+              checked={form.use_preferred_roots}
+              aria-label="הפעל סדר עדיפות לשמירה"
+              onChange={(event) => setForm((prev) => ({ ...prev, use_preferred_roots: event.target.checked }))}
+            >
+              <div className="setup-option-copy">
+                <span>הפעל סדר עדיפות לשמירה</span>
+                <small>כבוי: המערכת תבחר לפי איכות בלבד, בלי להעדיף root מסוים.</small>
+              </div>
+            </Checkbox>
             <div className="setup-helper-text">כאשר נמצאים עותקים זהים או באותה איכות, המערכת תשמור את העותק שנמצא תחת התיקייה שמופיעה מוקדם יותר בסדר.</div>
           </div>
 

@@ -308,6 +308,40 @@ def test_api_session_flow_accepts_preferred_root_order(monkeypatch, tmp_path):
     assert seen["preferred_root"] == root_2.resolve()
 
 
+def test_api_session_flow_can_disable_preferred_root_order(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_start_analysis(session_id: str):
+        session = store.get_session(session_id)
+        seen["use_preferred_roots"] = session.options.use_preferred_roots
+        seen["preferred_roots"] = session.options.preferred_roots
+        session.status = "completed"
+
+    monkeypatch.setattr(store, "start_analysis", fake_start_analysis)
+    root_1 = tmp_path / "root-1"
+    root_2 = tmp_path / "root-2"
+    root_1.mkdir()
+    root_2.mkdir()
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/analysis-sessions",
+        json={
+            "folders": [str(root_1), str(root_2)],
+            "preferred_roots": [str(root_2), str(root_1)],
+            "use_preferred_roots": False,
+            "force_rescan": False,
+            "clear_cache": False,
+            "bitrate_mode": "128",
+            "gemini_enabled": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen["use_preferred_roots"] is False
+    assert seen["preferred_roots"] == [root_2.resolve(), root_1.resolve()]
+
+
 def test_api_cluster_decisions_and_delete_execution(monkeypatch):
     session = store.create_session(
         AnalysisOptions(

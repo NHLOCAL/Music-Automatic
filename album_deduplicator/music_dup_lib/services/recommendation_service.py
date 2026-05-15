@@ -25,8 +25,10 @@ class RecommendationService:
         self,
         preferred_root: Optional[Path] = None,
         preferred_roots: Optional[List[Path]] = None,
+        use_preferred_roots: bool = True,
     ):
-        ordered_roots = preferred_roots or ([preferred_root] if preferred_root else [])
+        self.use_preferred_roots = use_preferred_roots
+        ordered_roots = (preferred_roots or ([preferred_root] if preferred_root else [])) if use_preferred_roots else []
         self.preferred_roots = self._dedupe_paths([root for root in ordered_roots if root is not None])
         self.preferred_root = self.preferred_roots[0] if self.preferred_roots else preferred_root
         self._normalized_preferred_roots = [self._normalize_path(root) for root in self.preferred_roots]

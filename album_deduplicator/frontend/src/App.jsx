@@ -41,6 +41,7 @@ function AppContent() {
   const [appView, setAppView] = useState("setup");
   const [form, setForm] = useState({
     folders: [{ id: "f1", path: "" }],
+    use_preferred_roots: true,
     force_rescan: false,
     clear_cache: false,
     full_hash_scan: false,
@@ -120,8 +121,8 @@ function AppContent() {
       const payload = {
         ...formPayload,
         folders: preferenceOrder,
-        preferred_root: preferenceOrder[0] || null,
-        preferred_roots: preferenceOrder,
+        preferred_root: form.use_preferred_roots ? preferenceOrder[0] || null : null,
+        preferred_roots: form.use_preferred_roots ? preferenceOrder : [],
       };
       const created = await api.createAnalysisSession(payload);
       d.setSessionId(created.session_id);

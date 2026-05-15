@@ -134,6 +134,29 @@ def test_recommendation_uses_preferred_root_order_between_multiple_roots():
     assert "keeper_conflict" not in cluster.reason_codes
 
 
+def test_recommendation_can_disable_preferred_root_order():
+    lower_quality_preferred = make_folder("D:/archive/Album", 88.0)
+    higher_quality_backup = make_folder("E:/backup/Album", 96.0)
+    folders = {
+        lower_quality_preferred.path: lower_quality_preferred,
+        higher_quality_backup.path: higher_quality_backup,
+    }
+
+    service = RecommendationService(
+        preferred_roots=[Path("D:/archive"), Path("E:/backup")],
+        use_preferred_roots=False,
+    )
+    albums = service.build_album_summaries(folders)
+    pair = make_pair(lower_quality_preferred.path, higher_quality_backup.path, 100.0)
+
+    clusters = service.build_clusters(folders, {pair.pair_id: pair}, albums)
+    cluster = next(iter(clusters.values()))
+
+    assert cluster.recommended_keeper_id == stable_id("folder", str(higher_quality_backup.path))
+    assert "quality_keeper" in cluster.reason_codes
+    assert "preferred_root_keeper" not in cluster.reason_codes
+
+
 def test_recommendation_marks_review_when_keeper_is_not_unique():
     folder1 = make_folder("C:/music/A", 90.0)
     folder2 = make_folder("D:/music/B", 90.0)

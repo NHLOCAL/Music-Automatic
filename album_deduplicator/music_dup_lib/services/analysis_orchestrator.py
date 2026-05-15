@@ -23,6 +23,7 @@ class AnalysisOptions:
     folders: List[Path]
     preferred_root: Optional[Path] = None
     preferred_roots: List[Path] = field(default_factory=list)
+    use_preferred_roots: bool = True
     bitrate_mode: str = "128"
     force_rescan: bool = False
     clear_cache: bool = False
@@ -114,6 +115,7 @@ class AnalysisOrchestrator:
         recommendation_service = RecommendationService(
             preferred_root=options.preferred_root,
             preferred_roots=options.preferred_roots,
+            use_preferred_roots=options.use_preferred_roots,
         )
         album_summaries = recommendation_service.build_album_summaries(scanned_folders)
         clusters = recommendation_service.build_clusters(

@@ -225,8 +225,7 @@ describe("App", () => {
     expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "בחר תיקייה עבור שורה 1" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "תיקייה לסריקה 2" })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("סדר עדיפות לשמירה")).toBeInTheDocument();
-    expect(screen.getByText("הוסיפו תיקיות כדי לקבוע סדר עדיפות.")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "הפעל סדר עדיפות לשמירה" })).toBeChecked();
     expect(screen.getByText("סדר השורות הוא סדר ההעדפה: תיקייה עליונה עדיפה על זו שמתחתיה, גם עבור תתי-תיקיות שנמצאות בתוכה.")).toBeInTheDocument();
     fireEvent.click(screen.getByText("הגדרות מתקדמות"));
     expect(screen.getByRole("checkbox", { name: "רענון מלא מהדיסק" })).toBeInTheDocument();
@@ -379,6 +378,59 @@ describe("App", () => {
       expect(JSON.parse(createRequest[1].body)).toMatchObject({
         preferred_root: "D:\\Archive",
         preferred_roots: ["D:\\Archive", "C:\\Music", "E:\\Backup"],
+        use_preferred_roots: true,
+      });
+    });
+  });
+
+  it("can submit a scan with preference order disabled", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse({ clusters: [] });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(emptyPreviewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse({
+          ...sessionSummary,
+          counts: {
+            ...sessionSummary.counts,
+            safe_clusters: 0,
+            review_clusters: 0,
+          },
+        });
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /הוסף תיקייה נוספת/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" }), {
+      target: { value: "D:\\Archive" },
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "הפעל סדר עדיפות לשמירה" }));
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => {
+      const createRequest = fetchMock.mock.calls.find(([url, options]) =>
+        String(url).endsWith("/api/analysis-sessions") && options?.method === "POST",
+      );
+      expect(createRequest).toBeTruthy();
+      expect(JSON.parse(createRequest[1].body)).toMatchObject({
+        preferred_root: null,
+        preferred_roots: [],
+        use_preferred_roots: false,
       });
     });
   });
