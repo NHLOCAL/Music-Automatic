@@ -103,10 +103,6 @@ export function FinalizeDeletionScreen({
                               <div style={{fontSize: 11, color: '#666', marginTop: 4}}>{group.cluster.human_summary}</div>
                             </div>
                             <div className="finalize-cluster-reset">
-                              <div className="finalize-cluster-reset-copy">
-                                <strong>התחרטת?</strong>
-                                <span>אפשר לבטל את ההעברה לקבוצה הזו ולהשאיר את כל העותקים.</span>
-                              </div>
                               <Button
                                 size="small"
                                 className="finalize-reset-button"

@@ -129,7 +129,6 @@ describe("Workflow screens", () => {
     expect(screen.getByText("הפריטים יסומנו לסל המחזור בלבד, ללא מחיקה לצמיתות.")).toBeInTheDocument();
     expect(screen.getByText("Archive Copy")).toBeInTheDocument();
     expect(screen.getByText("Best")).toBeInTheDocument();
-    expect(screen.getByText("אפשר לבטל את ההעברה לקבוצה הזו ולהשאיר את כל העותקים.")).toBeInTheDocument();
     expect(screen.getByText("7 אירועי אימון נשמרו")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "יצא נתונים לשיתוף" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "בטל העברה ושמור הכל" })).toBeInTheDocument();

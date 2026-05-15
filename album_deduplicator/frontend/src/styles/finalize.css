@@ -114,31 +114,12 @@
 .finalize-cluster-reset {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid #f3d19c;
-  background: #fff7e8;
-  border-radius: 10px;
-}
-
-.finalize-cluster-reset-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.finalize-cluster-reset-copy strong {
-  font-size: 12px;
-  color: #7a4300;
-}
-
-.finalize-cluster-reset-copy span {
-  font-size: 11px;
-  color: #8c5b18;
+  justify-content: flex-start;
 }
 
 .finalize-reset-button.ant-btn {
+  height: 24px;
+  padding-inline: 8px;
   white-space: nowrap;
 }
 
@@ -150,7 +131,6 @@
   }
 
   .finalize-cluster-reset {
-    flex-direction: column;
-    align-items: stretch;
+    justify-content: flex-start;
   }
 }
