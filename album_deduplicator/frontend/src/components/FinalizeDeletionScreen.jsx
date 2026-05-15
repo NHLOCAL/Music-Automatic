@@ -22,13 +22,15 @@ export function FinalizeDeletionScreen({
         <div>
           <h2>אישור העברה לסל המחזור ({summary.pendingCount} תיקיות)</h2>
           <div className="finalize-header-note">הפריטים יסומנו לסל המחזור בלבד, ללא מחיקה לצמיתות.</div>
-        </div>
-        <div className="finalize-header-actions">
-          <div className="feedback-export-panel">
-            <div className="feedback-export-count">{feedbackCount} אירועי אימון נשמרו</div>
-            <div className="feedback-export-note">נתוני החלטות ומחיקות בפועל נשמרים לקובץ מקומי שאפשר לשתף לאימון מודל.</div>
+          <div className="feedback-export-strip">
+            <span className="feedback-export-count">
+              <Icon name="database" size={13} />
+              {feedbackCount} אירועי אימון נשמרו
+            </span>
+            <span className="feedback-export-note">החלטות ומחיקות בפועל נשמרות מקומית לשיפור המודל.</span>
             <div className="feedback-export-actions">
               <Button
+                type="text"
                 size="small"
                 icon={<Icon name="download" size={14} />}
                 onClick={onExportFeedback}
@@ -45,6 +47,7 @@ export function FinalizeDeletionScreen({
                 disabled={feedbackCount === 0}
               >
                 <Button
+                  type="text"
                   size="small"
                   icon={<Icon name="trash" size={14} />}
                   disabled={feedbackCount === 0}
@@ -54,6 +57,8 @@ export function FinalizeDeletionScreen({
               </Popconfirm>
             </div>
           </div>
+        </div>
+        <div className="finalize-header-actions">
           <Popconfirm
             title="להעביר את הפריטים המסומנים לסל המחזור?"
             description="אפשר לחזור דרך ה-workflow rail אם צריך לשנות keeper או סימון מחיקה."

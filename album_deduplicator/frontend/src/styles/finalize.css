@@ -9,7 +9,8 @@
 .data-table-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 20px;
   background: var(--bg-surface);
   padding: 16px 20px;
   border: 1px solid var(--border-main);
@@ -31,34 +32,42 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  padding-top: 2px;
 }
 
-.feedback-export-panel {
-  display: grid;
-  gap: 4px;
-  min-width: 220px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-main);
-  border-radius: 4px;
-  background: var(--bg-panel);
+.feedback-export-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  color: var(--text-muted);
 }
 
 .feedback-export-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-main);
 }
 
 .feedback-export-note {
-  max-width: 280px;
   font-size: 11px;
   color: var(--text-muted);
 }
 
 .feedback-export-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
+}
+
+.feedback-export-actions .ant-btn {
+  height: 24px;
+  padding-inline: 6px;
+  color: var(--text-muted);
 }
 
 .data-table-wrapper {
@@ -128,6 +137,12 @@
   .finalize-header-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .feedback-export-strip {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .finalize-cluster-reset {
