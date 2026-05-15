@@ -27,6 +27,18 @@ const baseReviewCluster = {
   ],
 };
 
+const completedCluster = {
+  cluster_id: "cluster-completed-1",
+  confidence_bucket: "review",
+  resolution_state: "deleted",
+  recommended_keeper_id: "folder-3",
+  selected_delete_folder_ids: [],
+  albums: [
+    { folder_id: "folder-3", is_deleted: false },
+    { folder_id: "folder-4", is_deleted: true },
+  ],
+};
+
 const sessionResponse = {
   progress: {
     step: "completed",
@@ -92,6 +104,11 @@ describe("useDeduplicator", () => {
   it("restores the last completed session from local storage", async () => {
     window.localStorage.setItem("albumDeduplicator.activeSessionId", "session-1");
     api.getAnalysisSession.mockResolvedValue({ ...sessionResponse, status: "completed" });
+    api.getClusters.mockImplementation(async (_sid, bucket) => ({
+      clusters: bucket === "safe"
+        ? [{ ...baseReviewCluster, cluster_id: "cluster-safe-1", confidence_bucket: "safe" }]
+        : [baseReviewCluster],
+    }));
 
     const { result } = renderHook(() => useDeduplicator());
 
@@ -151,6 +168,27 @@ describe("useDeduplicator", () => {
 
     await waitFor(() => {
       expect(result.current.decisions["cluster-review-1"]).toBeUndefined();
+    });
+  });
+
+  it("loads completed clusters from the all bucket and keeps active clusters out of that tab", async () => {
+    api.getClusters.mockImplementation(async (_sid, bucket) => ({
+      clusters: bucket === "all" ? [baseReviewCluster, completedCluster] : [baseReviewCluster],
+    }));
+    api.getDeletePreview.mockResolvedValue(emptyPreviewResponse);
+
+    const { result } = renderHook(() => useDeduplicator());
+
+    act(() => {
+      result.current.setSessionId("session-1");
+      result.current.setStatus("completed");
+      result.current.setSelectedTab("completed");
+    });
+
+    await waitFor(() => {
+      expect(api.getClusters).toHaveBeenCalledWith("session-1", "all");
+      expect(result.current.clusters.map((cluster) => cluster.cluster_id)).toEqual(["cluster-completed-1"]);
+      expect(result.current.selectedClusterId).toBe("cluster-completed-1");
     });
   });
 

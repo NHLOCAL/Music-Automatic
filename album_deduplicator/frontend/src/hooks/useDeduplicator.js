@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, startTransition } from "react";
 import * as api from "../api";
-import { getActiveKeeperId, hasExplicitKeeperDecision } from "../utils";
+import { clusterMatchesReviewTab, getActiveKeeperId, hasExplicitKeeperDecision } from "../utils";
 
 const INITIAL_PROGRESS = {
   step: "queued",
@@ -84,20 +84,22 @@ export function useDeduplicator() {
   }, []);
   const refreshData = useCallback(async (sid, tab) => {
     try {
-      const clusterRequests = tab === "all"
+      const apiBucket = tab === "completed" ? "all" : tab;
+      const clusterRequests = apiBucket === "all"
         ? [api.getClusters(sid, "all"), Promise.resolve(null)]
-        : [api.getClusters(sid, tab), api.getClusters(sid, "all")];
+        : [api.getClusters(sid, apiBucket), api.getClusters(sid, "all")];
       const [sessionData, clustersData, previewData, allClustersData] = await Promise.all([
         api.getAnalysisSession(sid),
         clusterRequests[0],
         api.getDeletePreview(sid),
         clusterRequests[1],
       ]);
-      const fullClusters = tab === "all" ? clustersData.clusters : (allClustersData?.clusters ?? []);
+      const fullClusters = apiBucket === "all" ? clustersData.clusters : (allClustersData?.clusters ?? []);
+      const visibleClusters = (clustersData.clusters ?? []).filter((cluster) => clusterMatchesReviewTab(cluster, tab));
       startTransition(() => {
         setSummary(sessionData);
         setProgress(sessionData.progress);
-        setClusters(clustersData.clusters);
+        setClusters(visibleClusters);
         setAllClusters(fullClusters);
         setPreview(previewData);
         setDecisions(() => {
@@ -116,7 +118,7 @@ export function useDeduplicator() {
           });
           return next;
         });
-        setSelectedClusterId(prev => clustersData.clusters.some(c => c.cluster_id === prev) ? prev : clustersData.clusters[0]?.cluster_id ?? null);
+        setSelectedClusterId(prev => visibleClusters.some(c => c.cluster_id === prev) ? prev : visibleClusters[0]?.cluster_id ?? null);
       });
     } catch (err) {
       setError(err.message);

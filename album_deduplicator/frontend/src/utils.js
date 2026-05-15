@@ -68,6 +68,22 @@ export function getActiveKeeperId(cluster, decisions = {}) {
   return cluster.recommended_keeper_id ?? null;
 }
 
+export function getVisibleAlbumCount(cluster) {
+  return cluster?.albums?.filter((album) => !album.is_deleted).length ?? 0;
+}
+
+export function isClusterCompleted(cluster) {
+  return getVisibleAlbumCount(cluster) < 2;
+}
+
+export function clusterMatchesReviewTab(cluster, selectedTab) {
+  const isCompleted = isClusterCompleted(cluster);
+  if (selectedTab === "completed") return isCompleted;
+  if (isCompleted) return false;
+  if (selectedTab === "all") return true;
+  return cluster?.confidence_bucket === selectedTab;
+}
+
 export function getClusterDisplayTitle(cluster) {
   if (!cluster?.albums?.length) return "קבוצת השוואה";
   const names = Array.from(
@@ -85,7 +101,7 @@ export function getClusterDisplayTitle(cluster) {
 }
 
 export function getClusterListSubtitle(cluster) {
-  const albumCount = cluster?.albums?.filter((album) => !album.is_deleted).length ?? 0;
+  const albumCount = getVisibleAlbumCount(cluster);
   return `${albumCount} עותקים להשוואה`;
 }
 
@@ -141,6 +157,9 @@ export function getAlbumOrdinalLabel(index) {
 export function getClusterStatusMeta(cluster, hasDecision) {
   if (!cluster) {
     return { label: "ממתין לסקירה", tone: "neutral" };
+  }
+  if (isClusterCompleted(cluster)) {
+    return { label: "הושלם", tone: "success" };
   }
   if (cluster.confidence_bucket === "safe") {
     return cluster.resolution_state === "auto" || hasDecision

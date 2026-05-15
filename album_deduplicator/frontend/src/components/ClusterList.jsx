@@ -5,8 +5,10 @@ import {
   getClusterDisplayTitle,
   getClusterSortPriority,
   getClusterStatusMeta,
+  getVisibleAlbumCount,
   hasExplicitKeeperDecision,
   formatPercent,
+  clusterMatchesReviewTab,
 } from "../utils";
 
 const SEGMENT_OPTIONS = [
@@ -22,11 +24,15 @@ const SEGMENT_OPTIONS = [
     label: <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="layers" size={13} />הכל</span>,
     value: "all",
   },
+  {
+    label: <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="check-circle" size={13} />הושלם</span>,
+    value: "completed",
+  },
 ];
 
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
   const filteredClusters = clusters
-    .filter((cluster) => selectedTab === "all" || cluster.confidence_bucket === selectedTab)
+    .filter((cluster) => clusterMatchesReviewTab(cluster, selectedTab))
     .sort((a, b) => getClusterSortPriority(a, decisions) - getClusterSortPriority(b, decisions));
 
   return (
@@ -51,7 +57,7 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
                 {isResolved ? "✓ " : ""}{getClusterDisplayTitle(cluster)}
               </div>
               <div className="ide-cluster-meta">
-                <span>{cluster.albums.filter(a => !a.is_deleted).length} עותקים</span>
+                <span>{getVisibleAlbumCount(cluster)} עותקים</span>
                 <span>התאמה: {score}</span>
               </div>
               <div className="ide-cluster-status">

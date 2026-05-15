@@ -40,6 +40,24 @@ const clusters = [
       { folder_id: "folder-d", name: "Ready Copy", is_deleted: false },
     ],
   },
+  {
+    cluster_id: "cluster-completed",
+    confidence_bucket: "review",
+    recommended_keeper_id: "folder-e",
+    resolution_state: "deleted",
+    pairs: [
+      {
+        pair_id: "pair-completed",
+        folder1_id: "folder-e",
+        folder2_id: "folder-f",
+        final_score: 91.2,
+      },
+    ],
+    albums: [
+      { folder_id: "folder-e", name: "Completed Copy", is_deleted: false },
+      { folder_id: "folder-f", name: "Completed Copy", is_deleted: true },
+    ],
+  },
 ];
 
 describe("ClusterList", () => {
@@ -64,5 +82,37 @@ describe("ClusterList", () => {
     expect(items[1].textContent).toContain("Pending Copy");
     expect(items[1].textContent).toContain("ממתין לסקירה");
     expect(screen.getByTestId("cluster-scroll")).toBeInTheDocument();
+  });
+
+  it("moves clusters with fewer than two visible albums into the completed segment", () => {
+    const { container, rerender } = render(
+      <ClusterList
+        clusters={clusters}
+        selectedClusterId="cluster-pending"
+        setSelectedClusterId={vi.fn()}
+        decisions={{}}
+        selectedTab="all"
+        setSelectedTab={vi.fn()}
+      />,
+    );
+
+    expect(container.textContent).toContain("Pending Copy");
+    expect(container.textContent).toContain("Ready Copy");
+    expect(container.textContent).not.toContain("Completed Copy");
+
+    rerender(
+      <ClusterList
+        clusters={clusters}
+        selectedClusterId="cluster-completed"
+        setSelectedClusterId={vi.fn()}
+        decisions={{}}
+        selectedTab="completed"
+        setSelectedTab={vi.fn()}
+      />,
+    );
+
+    expect(container.textContent).toContain("Completed Copy");
+    expect(container.textContent).toContain("1 עותקים");
+    expect(container.textContent).not.toContain("Pending Copy");
   });
 });
