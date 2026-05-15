@@ -229,13 +229,16 @@ class SessionStore:
                 excluded_folder_ids=session.deleted_folder_ids,
             )
             for cluster_id, keeper_id in decisions.items():
-                self._decision_store.save_decision(
-                    snapshot=session.snapshot,
-                    cluster_id=cluster_id,
-                    keeper_id=keeper_id,
-                    delete_folder_ids=session.delete_selections.get(cluster_id, set()),
-                    resolution_state=session.resolution_states.get(cluster_id, "skipped"),
-                )
+                if keeper_id:
+                    self._decision_store.save_decision(
+                        snapshot=session.snapshot,
+                        cluster_id=cluster_id,
+                        keeper_id=keeper_id,
+                        delete_folder_ids=session.delete_selections.get(cluster_id, set()),
+                        resolution_state=session.resolution_states.get(cluster_id, "user_selected"),
+                    )
+                else:
+                    self._decision_store.clear_decision(cluster_id)
             return session.preview
 
     def get_preview(self, session_id: str) -> DeletePreview:

@@ -72,11 +72,13 @@ describe("useDeduplicator", () => {
       clusters: bucket === "safe" ? [currentCluster] : [currentCluster],
     }));
     api.getDeletePreview.mockResolvedValue(previewResponse);
-    api.updateDecisions.mockImplementation(async () => {
+    api.updateDecisions.mockImplementation(async (_sid, payload) => {
+      const decision = payload?.decisions?.find((item) => item.cluster_id === currentCluster.cluster_id);
       currentCluster = {
         ...currentCluster,
-        resolution_state: "user_selected",
-        selected_delete_folder_ids: ["folder-2"],
+        resolution_state: decision?.keeper_id ? "user_selected" : "skipped",
+        selected_keeper_id: decision?.keeper_id ?? null,
+        selected_delete_folder_ids: decision?.delete_folder_ids ?? [],
       };
       return previewResponse;
     });
@@ -126,6 +128,29 @@ describe("useDeduplicator", () => {
     await waitFor(() => {
       expect(result.current.decisions["cluster-review-1"]).toBe("folder-2");
       expect(result.current.deleteSelections["cluster-review-1"]).toEqual(["folder-1"]);
+    });
+  });
+
+  it("does not treat a null selected keeper as an explicit decision", async () => {
+    const suggestedCluster = {
+      ...baseReviewCluster,
+      resolution_state: "skipped",
+      recommended_keeper_id: "folder-1",
+      selected_keeper_id: null,
+      selected_delete_folder_ids: [],
+    };
+    api.getClusters.mockResolvedValue({ clusters: [suggestedCluster] });
+    api.getDeletePreview.mockResolvedValue(emptyPreviewResponse);
+
+    const { result } = renderHook(() => useDeduplicator());
+
+    act(() => {
+      result.current.setSessionId("session-1");
+      result.current.setStatus("completed");
+    });
+
+    await waitFor(() => {
+      expect(result.current.decisions["cluster-review-1"]).toBeUndefined();
     });
   });
 
@@ -193,7 +218,7 @@ describe("useDeduplicator", () => {
     await waitFor(() => {
       expect(result.current.preview.total_count).toBe(0);
       expect(result.current.deleteSelections["cluster-review-1"]).toEqual([]);
-      expect(result.current.decisions["cluster-review-1"]).toBeNull();
+      expect(result.current.decisions["cluster-review-1"]).toBeUndefined();
     });
   });
 });

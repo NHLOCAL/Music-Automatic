@@ -639,6 +639,72 @@ def test_saved_user_decision_is_reapplied_after_rescan(tmp_path):
     assert next_session.preview.total_count == 1
 
 
+def test_saved_null_decision_does_not_override_safe_auto_selection(tmp_path):
+    decision_store = UserDecisionStore(tmp_path / "decisions" / "album_decisions.json")
+    snapshot = build_snapshot()
+    cluster = next(iter(snapshot.clusters.values()))
+    decision_store.decision_file.parent.mkdir(parents=True)
+    decision_store.decision_file.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "decisions": {
+                    cluster.cluster_id: {
+                        "cluster_id": cluster.cluster_id,
+                        "folder_ids": sorted(cluster.folder_ids),
+                        "keeper_id": None,
+                        "delete_folder_ids": [],
+                    }
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    rescanned_store = SessionStore(decision_store=decision_store)
+    rescanned_store._orchestrator.run = lambda options, progress_handler=None: snapshot
+    next_session = rescanned_store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+
+    rescanned_store.run_analysis_sync(next_session.session_id)
+
+    assert next_session.status == "completed"
+    assert next_session.decisions[cluster.cluster_id] == cluster.recommended_keeper_id
+    assert next_session.resolution_states[cluster.cluster_id] == "auto"
+    assert next_session.preview.total_count == 1
+
+
+def test_keep_all_clears_saved_user_decision(tmp_path):
+    decision_store = UserDecisionStore(tmp_path / "decisions" / "album_decisions.json")
+    local_store = SessionStore(decision_store=decision_store)
+    session = local_store.create_session(
+        AnalysisOptions(
+            folders=[Path("C:/music"), Path("D:/archive")],
+            preferred_root=Path("C:/music"),
+            bitrate_mode="128",
+        )
+    )
+    session.snapshot = build_snapshot()
+    cluster = next(iter(session.snapshot.clusters.values()))
+    drop_id = cluster.deletable_folder_ids[0]
+
+    local_store.apply_decisions(
+        session.session_id,
+        {cluster.cluster_id: cluster.recommended_keeper_id},
+        {cluster.cluster_id: {drop_id}},
+    )
+    local_store.apply_decisions(session.session_id, {cluster.cluster_id: None}, {cluster.cluster_id: set()})
+
+    saved = json.loads(decision_store.decision_file.read_text(encoding="utf-8"))
+    assert cluster.cluster_id not in saved["decisions"]
+
+
 def test_restored_non_recommended_keeper_is_exposed_in_cluster_response(tmp_path):
     decision_store = UserDecisionStore(tmp_path / "decisions" / "album_decisions.json")
     local_store = SessionStore(decision_store=decision_store)

@@ -86,6 +86,17 @@ class UserDecisionStore:
             data["updated_at"] = record["updated_at"]
             self._write_data_unlocked(data)
 
+    def clear_decision(self, cluster_id: str) -> None:
+        with self._lock:
+            data = self._read_data_unlocked()
+            decisions = data.setdefault("decisions", {})
+            if cluster_id not in decisions:
+                return
+            del decisions[cluster_id]
+            data["schema_version"] = USER_DECISIONS_SCHEMA_VERSION
+            data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._write_data_unlocked(data)
+
     def decisions_for_snapshot(self, snapshot: AnalysisSnapshot) -> Dict[str, StoredUserDecision]:
         with self._lock:
             data = self._read_data_unlocked()
@@ -103,13 +114,15 @@ class UserDecisionStore:
                 continue
 
             keeper_id = record.get("keeper_id")
-            if keeper_id is not None and keeper_id not in cluster.folder_ids:
+            if keeper_id is None:
+                continue
+            if keeper_id not in cluster.folder_ids:
                 continue
 
             allowed_delete_folder_ids = {
                 folder_id
                 for folder_id in cluster.folder_ids
-                if keeper_id and folder_id != keeper_id
+                if folder_id != keeper_id
             }
             restored[cluster_id] = StoredUserDecision(
                 cluster_id=cluster_id,

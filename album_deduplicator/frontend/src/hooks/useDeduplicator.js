@@ -100,13 +100,11 @@ export function useDeduplicator() {
         setClusters(clustersData.clusters);
         setAllClusters(fullClusters);
         setPreview(previewData);
-        setDecisions((prev) => {
-          const next = { ...prev };
+        setDecisions(() => {
+          const next = {};
           fullClusters.forEach(c => {
-            if (c.selected_keeper_id !== undefined) {
+            if (c.resolution_state === "user_selected" && c.selected_keeper_id) {
               next[c.cluster_id] = c.selected_keeper_id;
-            } else if (!(c.cluster_id in next) && c.resolution_state === "auto" && c.recommended_keeper_id) {
-              next[c.cluster_id] = c.recommended_keeper_id;
             }
           });
           return next;
