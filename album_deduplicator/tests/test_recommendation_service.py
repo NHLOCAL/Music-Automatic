@@ -95,6 +95,45 @@ def test_recommendation_prefers_equivalent_preferred_root_when_quality_ties():
     assert "keeper_conflict" not in cluster.reason_codes
 
 
+def test_recommendation_uses_preferred_root_order_between_multiple_roots():
+    higher_priority = make_folder("D:/archive/Album", 88.0)
+    lower_priority = make_folder("E:/backup/Album", 96.0)
+    unrelated = make_folder("F:/old/Album", 99.0)
+    folders = {
+        higher_priority.path: higher_priority,
+        lower_priority.path: lower_priority,
+        unrelated.path: unrelated,
+    }
+
+    service = RecommendationService(
+        preferred_roots=[
+            Path("C:/primary"),
+            Path("D:/archive"),
+            Path("E:/backup"),
+        ]
+    )
+    albums = service.build_album_summaries(folders)
+    pair_ab = make_pair(higher_priority.path, lower_priority.path, 100.0)
+    pair_ac = make_pair(higher_priority.path, unrelated.path, 100.0)
+    pair_bc = make_pair(lower_priority.path, unrelated.path, 100.0)
+
+    clusters = service.build_clusters(
+        folders,
+        {
+            pair_ab.pair_id: pair_ab,
+            pair_ac.pair_id: pair_ac,
+            pair_bc.pair_id: pair_bc,
+        },
+        albums,
+    )
+    cluster = next(iter(clusters.values()))
+
+    assert cluster.recommended_keeper_id == stable_id("folder", str(higher_priority.path))
+    assert cluster.confidence_bucket == "safe"
+    assert "preferred_root_keeper" in cluster.reason_codes
+    assert "keeper_conflict" not in cluster.reason_codes
+
+
 def test_recommendation_marks_review_when_keeper_is_not_unique():
     folder1 = make_folder("C:/music/A", 90.0)
     folder2 = make_folder("D:/music/B", 90.0)

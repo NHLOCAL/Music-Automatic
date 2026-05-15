@@ -273,6 +273,41 @@ def test_api_session_flow_accepts_full_hash_scan(monkeypatch, tmp_path):
     assert seen == {"full_hash_scan": True, "disable_hash": False}
 
 
+def test_api_session_flow_accepts_preferred_root_order(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_start_analysis(session_id: str):
+        session = store.get_session(session_id)
+        seen["preferred_roots"] = session.options.preferred_roots
+        seen["preferred_root"] = session.options.preferred_root
+        session.status = "completed"
+
+    monkeypatch.setattr(store, "start_analysis", fake_start_analysis)
+    root_1 = tmp_path / "root-1"
+    root_2 = tmp_path / "root-2"
+    root_3 = tmp_path / "root-3"
+    root_1.mkdir()
+    root_2.mkdir()
+    root_3.mkdir()
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/analysis-sessions",
+        json={
+            "folders": [str(root_1), str(root_2), str(root_3)],
+            "preferred_roots": [str(root_2), str(root_3), str(root_1)],
+            "force_rescan": False,
+            "clear_cache": False,
+            "bitrate_mode": "128",
+            "gemini_enabled": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen["preferred_roots"] == [root_2.resolve(), root_3.resolve(), root_1.resolve()]
+    assert seen["preferred_root"] == root_2.resolve()
+
+
 def test_api_cluster_decisions_and_delete_execution(monkeypatch):
     session = store.create_session(
         AnalysisOptions(

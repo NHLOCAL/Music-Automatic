@@ -97,14 +97,19 @@ def create_app() -> FastAPI:
         if invalid_paths:
             raise HTTPException(status_code=400, detail=f"Invalid folder paths: {', '.join(invalid_paths)}")
 
-        preferred_root = Path(payload.preferred_root).resolve() if payload.preferred_root else None
-        if preferred_root and preferred_root not in folders:
-            raise HTTPException(status_code=400, detail="preferred_root must be one of the input folders.")
+        preferred_roots = [Path(root).resolve() for root in (payload.preferred_roots or []) if root]
+        if not preferred_roots and payload.preferred_root:
+            preferred_roots = [Path(payload.preferred_root).resolve()]
+        invalid_preferred_roots = [root for root in preferred_roots if root not in folders]
+        if invalid_preferred_roots:
+            raise HTTPException(status_code=400, detail="preferred_roots must be selected from the input folders.")
+        preferred_root = preferred_roots[0] if preferred_roots else None
 
         session = store.create_session(
             AnalysisOptions(
                 folders=folders,
                 preferred_root=preferred_root,
+                preferred_roots=preferred_roots,
                 bitrate_mode=payload.bitrate_mode,
                 force_rescan=payload.force_rescan,
                 clear_cache=payload.clear_cache,

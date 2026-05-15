@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { Button, Checkbox, Collapse, Input, Select, Tag } from "antd";
+import { Button, Checkbox, Collapse, Input, Tag } from "antd";
 import {
+  ArrowDownOutlined,
+  ArrowUpOutlined,
   CloseOutlined,
   FolderOpenOutlined,
   PlayCircleOutlined,
@@ -29,13 +31,8 @@ const ADVANCED_OPTIONS = [
 
 export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFolder, runtimeInfo }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const preferredFolderOptions = useMemo(
-    () => form.folders
-      .filter((folder) => folder.path.trim())
-      .map((folder, index) => ({
-        value: folder.id,
-        label: `תיקייה ${index + 1} - ${folder.path.trim()}`,
-      })),
+  const activePreferenceRows = useMemo(
+    () => form.folders.filter((folder) => folder.path.trim()),
     [form.folders],
   );
 
@@ -52,6 +49,17 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
 
   const removeFolder = (id) => {
     setForm((prev) => ({ ...prev, folders: prev.folders.filter((folder) => folder.id !== id) }));
+  };
+
+  const moveFolder = (id, direction) => {
+    setForm((prev) => {
+      const currentIndex = prev.folders.findIndex((folder) => folder.id === id);
+      const nextIndex = currentIndex + direction;
+      if (currentIndex < 0 || nextIndex < 0 || nextIndex >= prev.folders.length) return prev;
+      const folders = [...prev.folders];
+      [folders[currentIndex], folders[nextIndex]] = [folders[nextIndex], folders[currentIndex]];
+      return { ...prev, folders };
+    });
   };
 
   const hasValidPath = useMemo(
@@ -81,6 +89,7 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
             <div className="folder-list-box">
               {form.folders.map((folder, index) => (
                 <div key={folder.id} className="folder-list-item">
+                  <div className="preference-rank-badge" aria-hidden="true">{index + 1}</div>
                   <Input
                     aria-label={`תיקייה לסריקה ${index + 1}`}
                     variant="borderless"
@@ -101,6 +110,24 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
                       בחר תיקייה
                     </Button>
                   ) : null}
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<ArrowUpOutlined />}
+                    className="folder-row-action folder-row-action--order"
+                    onClick={() => moveFolder(folder.id, -1)}
+                    disabled={index === 0}
+                    aria-label={`העלה את תיקייה ${index + 1} בסדר ההעדפה`}
+                  />
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<ArrowDownOutlined />}
+                    className="folder-row-action folder-row-action--order"
+                    onClick={() => moveFolder(folder.id, 1)}
+                    disabled={index === form.folders.length - 1}
+                    aria-label={`הורד את תיקייה ${index + 1} בסדר ההעדפה`}
+                  />
                   {form.folders.length > 1 ? (
                     <Button
                       type="text"
@@ -114,7 +141,7 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
                 </div>
               ))}
             </div>
-            <div className="setup-helper-text">התחילו עם תיקייה אחת, והוסיפו עוד שורות רק אם יש עוד מקורות שחשוב להשוות.</div>
+            <div className="setup-helper-text">סדר השורות הוא סדר ההעדפה: תיקייה עליונה עדיפה על זו שמתחתיה, גם עבור תתי-תיקיות שנמצאות בתוכה.</div>
             <div className="setup-inline-actions">
               {runtimeInfo?.isElectron ? (
                 <Button size="small" icon={<FolderOpenOutlined />} onClick={onPickFolders} aria-label="הוספת כמה תיקיות">
@@ -128,23 +155,20 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
           </div>
 
           <div className="setup-form-group">
-            <label>תיקייה מועדפת לשמירה</label>
-            <div className="setup-preferred-row">
-              <Select
-                aria-label="תיקייה מועדפת לשמירה"
-                size="small"
-                allowClear
-                className="setup-preferred-select"
-                placeholder="ללא העדפה"
-                value={form.preferred_folder_id || undefined}
-                options={preferredFolderOptions}
-                suffixIcon={<StarOutlined />}
-                notFoundContent="הוסיפו קודם תיקיות פעילות לבחירה"
-                optionFilterProp="label"
-                onChange={(value) => setForm((prev) => ({ ...prev, preferred_folder_id: value ?? "" }))}
-              />
+            <label>סדר עדיפות לשמירה</label>
+            <div className="preference-order-preview" aria-label="סדר עדיפות לשמירה">
+              {activePreferenceRows.length ? (
+                activePreferenceRows.map((folder, index) => (
+                  <div key={folder.id} className="preference-order-item">
+                    <Tag className="preference-order-rank" icon={<StarOutlined />}>{index + 1}</Tag>
+                    <span className="preference-order-path">{folder.path.trim()}</span>
+                  </div>
+                ))
+              ) : (
+                <span className="preference-order-empty">הוסיפו תיקיות כדי לקבוע סדר עדיפות.</span>
+              )}
             </div>
-            <div className="setup-helper-text">הבחירה כאן עוזרת למערכת להעדיף איזו תיקייה לשמור כאשר נמצאות תיקיות כפולות או כמעט זהות.</div>
+            <div className="setup-helper-text">כאשר נמצאים עותקים זהים או באותה איכות, המערכת תשמור את העותק שנמצא תחת התיקייה שמופיעה מוקדם יותר בסדר.</div>
           </div>
 
           <div className="setup-form-group">

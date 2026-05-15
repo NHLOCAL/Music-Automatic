@@ -45,6 +45,7 @@ class AlbumSummary:
     lossless_ratio: float
     lyrics_ratio: float
     total_size_mb: float
+    preferred_root_rank: Optional[int] = None
 
 
 @dataclass

@@ -225,8 +225,9 @@ describe("App", () => {
     expect(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "בחר תיקייה עבור שורה 1" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "תיקייה לסריקה 2" })).not.toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "תיקייה מועדפת לשמירה" })).toBeInTheDocument();
-    expect(screen.getByText("הבחירה כאן עוזרת למערכת להעדיף איזו תיקייה לשמור כאשר נמצאות תיקיות כפולות או כמעט זהות.")).toBeInTheDocument();
+    expect(screen.getByLabelText("סדר עדיפות לשמירה")).toBeInTheDocument();
+    expect(screen.getByText("הוסיפו תיקיות כדי לקבוע סדר עדיפות.")).toBeInTheDocument();
+    expect(screen.getByText("סדר השורות הוא סדר ההעדפה: תיקייה עליונה עדיפה על זו שמתחתיה, גם עבור תתי-תיקיות שנמצאות בתוכה.")).toBeInTheDocument();
     fireEvent.click(screen.getByText("הגדרות מתקדמות"));
     expect(screen.getByRole("checkbox", { name: "רענון מלא מהדיסק" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "בדיקת Hash מלאה" })).toBeInTheDocument();
@@ -277,7 +278,8 @@ describe("App", () => {
       expect(createRequest).toBeTruthy();
       expect(JSON.parse(createRequest[1].body)).toMatchObject({
         folders: ["C:\\Music", "D:\\Archive"],
-        preferred_root: null,
+        preferred_root: "C:\\Music",
+        preferred_roots: ["C:\\Music", "D:\\Archive"],
         full_hash_scan: true,
       });
     });
@@ -326,7 +328,7 @@ describe("App", () => {
     expect(selectScanFolders).toHaveBeenCalledWith({ allowMultiple: false, defaultPath: undefined });
   });
 
-  it("submits the preferred keep folder from the existing scan rows", async () => {
+  it("submits the configured preference order from the existing scan rows", async () => {
     window.albumDeduplicator = createDesktopBridge();
     const fetchMock = vi.fn(async (url, options = {}) => {
       if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
@@ -361,9 +363,12 @@ describe("App", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 2" }), {
       target: { value: "D:\\Archive" },
     });
+    fireEvent.click(screen.getByRole("button", { name: /הוסף תיקייה נוספת/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 3" }), {
+      target: { value: "E:\\Backup" },
+    });
 
-    fireEvent.mouseDown(screen.getByRole("combobox", { name: "תיקייה מועדפת לשמירה" }));
-    fireEvent.click(await screen.findByText("תיקייה 2 - D:\\Archive"));
+    fireEvent.click(screen.getByRole("button", { name: "העלה את תיקייה 2 בסדר ההעדפה" }));
     fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
 
     await waitFor(() => {
@@ -373,6 +378,7 @@ describe("App", () => {
       expect(createRequest).toBeTruthy();
       expect(JSON.parse(createRequest[1].body)).toMatchObject({
         preferred_root: "D:\\Archive",
+        preferred_roots: ["D:\\Archive", "C:\\Music", "E:\\Backup"],
       });
     });
   });

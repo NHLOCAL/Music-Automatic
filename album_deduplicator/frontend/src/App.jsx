@@ -41,7 +41,6 @@ function AppContent() {
   const [appView, setAppView] = useState("setup");
   const [form, setForm] = useState({
     folders: [{ id: "f1", path: "" }],
-    preferred_folder_id: "",
     force_rescan: false,
     clear_cache: false,
     full_hash_scan: false,
@@ -88,15 +87,6 @@ function AppContent() {
   }, [d.selectedClusterId, d.selectedTab]);
 
   useEffect(() => {
-    if (!form.preferred_folder_id) return;
-    const preferredStillExists = form.folders.some(
-      (folder) => folder.id === form.preferred_folder_id && folder.path.trim(),
-    );
-    if (preferredStillExists) return;
-    setForm((prev) => (prev.preferred_folder_id ? { ...prev, preferred_folder_id: "" } : prev));
-  }, [form.folders, form.preferred_folder_id]);
-
-  useEffect(() => {
     if (!d.error) return;
     antContext.notification.error({ message: "שגיאה", description: d.error, placement: "topLeft" });
     d.setError("");
@@ -125,11 +115,13 @@ function AppContent() {
     d.setError("");
     d.setSuccessSummary(null);
     try {
-      const { preferred_folder_id, ...formPayload } = form;
+      const formPayload = form;
+      const preferenceOrder = normalizeFolderPaths(form.folders);
       const payload = {
         ...formPayload,
-        folders: normalizeFolderPaths(form.folders),
-        preferred_root: form.folders.find((folder) => folder.id === preferred_folder_id)?.path.trim() || null,
+        folders: preferenceOrder,
+        preferred_root: preferenceOrder[0] || null,
+        preferred_roots: preferenceOrder,
       };
       const created = await api.createAnalysisSession(payload);
       d.setSessionId(created.session_id);

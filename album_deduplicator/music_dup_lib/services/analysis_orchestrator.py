@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 class AnalysisOptions:
     folders: List[Path]
     preferred_root: Optional[Path] = None
+    preferred_roots: List[Path] = field(default_factory=list)
     bitrate_mode: str = "128"
     force_rescan: bool = False
     clear_cache: bool = False
@@ -110,7 +111,10 @@ class AnalysisOrchestrator:
                 existing_results_map=cached_results_map,
             )
 
-        recommendation_service = RecommendationService(preferred_root=options.preferred_root)
+        recommendation_service = RecommendationService(
+            preferred_root=options.preferred_root,
+            preferred_roots=options.preferred_roots,
+        )
         album_summaries = recommendation_service.build_album_summaries(scanned_folders)
         clusters = recommendation_service.build_clusters(
             folders=scanned_folders,

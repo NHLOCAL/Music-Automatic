@@ -21,9 +21,15 @@ logger = logging.getLogger(__name__)
 
 
 class RecommendationService:
-    def __init__(self, preferred_root: Optional[Path] = None):
-        self.preferred_root = preferred_root
-        self._normalized_preferred_root = self._normalize_path(preferred_root) if preferred_root else None
+    def __init__(
+        self,
+        preferred_root: Optional[Path] = None,
+        preferred_roots: Optional[List[Path]] = None,
+    ):
+        ordered_roots = preferred_roots or ([preferred_root] if preferred_root else [])
+        self.preferred_roots = self._dedupe_paths([root for root in ordered_roots if root is not None])
+        self.preferred_root = self.preferred_roots[0] if self.preferred_roots else preferred_root
+        self._normalized_preferred_roots = [self._normalize_path(root) for root in self.preferred_roots]
 
     def build_album_summaries(self, folders: Dict[Path, FolderInfo]) -> Dict[str, AlbumSummary]:
         summaries: Dict[str, AlbumSummary] = {}
@@ -41,6 +47,7 @@ class RecommendationService:
                 lossless_ratio=folder_info.lossless_ratio,
                 lyrics_ratio=folder_info.lyrics_ratio,
                 total_size_mb=round(sum(file.size_mb for file in folder_info.files), 2),
+                preferred_root_rank=self._preferred_root_rank(folder_path),
             )
         return summaries
 
@@ -191,20 +198,27 @@ class RecommendationService:
         component: Set[str],
         albums: Dict[str, AlbumSummary],
     ) -> tuple[Optional[str], List[RecommendationReason], List[str], bool]:
+        no_preference_rank = len(self._normalized_preferred_roots) + 1
         ranked: List[tuple[int, float, str, str]] = []
         reasons: List[RecommendationReason] = []
         reason_codes: List[str] = []
         for folder_id in component:
             album = albums[folder_id]
+            preference_rank = (
+                album.preferred_root_rank
+                if album.preferred_root_rank is not None
+                else no_preference_rank
+            )
+            quality_score = album.quality_score if album.quality_score is not None else -1.0
             ranked.append(
                 (
-                    1 if album.in_preferred_root else 0,
-                    album.quality_score if album.quality_score is not None else -1.0,
+                    preference_rank,
+                    -quality_score,
                     album.path.as_posix().lower(),
                     folder_id,
                 )
             )
-        ranked.sort(reverse=True)
+        ranked.sort()
         if not ranked:
             reasons.append(RecommendationReason("no_keeper", "לא נמצא אלבום מומלץ לשמירה."))
             reason_codes.append("no_keeper")
@@ -247,16 +261,31 @@ class RecommendationService:
         return all(folder_id == keeper_id or folder_id in safe_neighbors for folder_id in component)
 
     def _is_in_preferred_root(self, folder_path: Path) -> bool:
-        if not self._normalized_preferred_root:
-            return False
+        return self._preferred_root_rank(folder_path) is not None
+
+    def _preferred_root_rank(self, folder_path: Path) -> Optional[int]:
         normalized_folder_path = self._normalize_path(folder_path)
-        if normalized_folder_path == self._normalized_preferred_root:
-            return True
-        try:
-            common_path = os.path.commonpath([normalized_folder_path, self._normalized_preferred_root])
-        except ValueError:
-            return False
-        return common_path == self._normalized_preferred_root
+        for rank, normalized_root in enumerate(self._normalized_preferred_roots):
+            if normalized_folder_path == normalized_root:
+                return rank
+            try:
+                common_path = os.path.commonpath([normalized_folder_path, normalized_root])
+            except ValueError:
+                continue
+            if common_path == normalized_root:
+                return rank
+        return None
+
+    def _dedupe_paths(self, paths: List[Path]) -> List[Path]:
+        seen: Set[str] = set()
+        deduped: List[Path] = []
+        for path in paths:
+            normalized = self._normalize_path(path)
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            deduped.append(path)
+        return deduped
 
     def _normalize_path(self, path: Path) -> str:
         return os.path.normcase(os.path.normpath(str(path.resolve(strict=False))))
