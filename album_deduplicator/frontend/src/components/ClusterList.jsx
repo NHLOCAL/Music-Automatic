@@ -31,6 +31,10 @@ function getReadinessRank(cluster, decisions) {
   return statusMeta.tone === "success" ? 0 : 1;
 }
 
+function formatClusterListCount(count) {
+  return count === 1 ? "פריט אחד" : `${count} פריטים`;
+}
+
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
   const [manualOrderIds, setManualOrderIds] = useState([]);
   const filteredClusters = useMemo(
@@ -81,18 +85,21 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
           onChange={setSelectedTab}
         />
         <div className="ide-sidebar-tools">
+          <span className="ide-sidebar-count" aria-live="polite">
+            {formatClusterListCount(filteredClusters.length)}
+          </span>
           <Tooltip title="מיין לפי מוכנות">
             <Button
-            size="small"
-            className="ide-sidebar-sort-button"
-            icon={<Icon name="sort" size={14} />}
-            onClick={sortByReadiness}
-            aria-label="מיין לפי מוכנות"
-          >
-            מוכנים תחילה
-          </Button>
-        </Tooltip>
-      </div>
+              size="small"
+              className="ide-sidebar-sort-button"
+              icon={<Icon name="sort" size={14} />}
+              onClick={sortByReadiness}
+              aria-label="מיין לפי מוכנות"
+            >
+              מוכנים תחילה
+            </Button>
+          </Tooltip>
+        </div>
       </div>
       <div className="ide-sidebar-list" data-testid="cluster-scroll">
         {displayedClusters.map((cluster) => {

@@ -100,6 +100,7 @@ describe("ClusterList", () => {
     expect(container.textContent).toContain("Ready Copy");
     expect(container.textContent).not.toContain("Completed Copy");
     expect(container.textContent).not.toContain("הכל");
+    expect(container.querySelector(".ide-sidebar-count").textContent).toBe("2 פריטים");
 
     rerender(
       <ClusterList
@@ -115,6 +116,7 @@ describe("ClusterList", () => {
     expect(container.textContent).toContain("Completed Copy");
     expect(container.textContent).toContain("1 עותקים");
     expect(container.textContent).not.toContain("Pending Copy");
+    expect(container.querySelector(".ide-sidebar-count").textContent).toBe("פריט אחד");
   });
 
   it("uses distinct icons for safe and completed segments", () => {
