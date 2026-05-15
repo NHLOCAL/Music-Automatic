@@ -83,14 +83,13 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
         <div className="ide-sidebar-tools">
           <Tooltip title="מיין לפי מוכנות">
             <Button
-              size="small"
-              type="text"
+            size="small"
             className="ide-sidebar-sort-button"
             icon={<Icon name="sort" size={14} />}
             onClick={sortByReadiness}
             aria-label="מיין לפי מוכנות"
           >
-            מיין לפי מוכנות
+            מוכנים תחילה
           </Button>
         </Tooltip>
       </div>
