@@ -495,6 +495,120 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "כן, להעביר" })).toBeInTheDocument();
   }, 15000);
 
+  it("selects the matching folder immediately from numeric review shortcuts", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/decisions") && options.method === "POST") {
+        return jsonResponse({
+          ...previewResponse,
+          items: [{ ...previewResponse.items[0], folder_id: "folder-keep", keeper_folder_id: "folder-drop" }],
+          manual_selected_count: 1,
+        });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse(clusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(previewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse(sessionSummary);
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "פתח סביבת עבודה" }));
+
+    await waitFor(() => expect(screen.getByTestId("review-workspace")).toBeInTheDocument());
+    fireEvent.keyDown(window, { key: "2" });
+
+    await waitFor(() => {
+      const decisionRequest = fetchMock.mock.calls.find(([url, options = {}]) =>
+        String(url).includes("/api/analysis-sessions/session-1/decisions") && options.method === "POST"
+      );
+      expect(decisionRequest).toBeTruthy();
+      expect(JSON.parse(decisionRequest[1].body)).toEqual({
+        decisions: [
+          {
+            cluster_id: "cluster-1",
+            keeper_id: "folder-drop",
+            delete_folder_ids: ["folder-keep"],
+          },
+        ],
+      });
+    });
+  }, 15000);
+
+  it("clears the review decision from the space key shortcut", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/decisions") && options.method === "POST") {
+        return jsonResponse(emptyPreviewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse(clusterResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(previewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse(sessionSummary);
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1));
+    MockEventSource.instances[0].emit("completed", { status: "completed" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "פתח סביבת עבודה" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "פתח סביבת עבודה" }));
+
+    await waitFor(() => expect(screen.getByTestId("review-workspace")).toBeInTheDocument());
+    fireEvent.keyDown(window, { key: " " });
+
+    await waitFor(() => {
+      const decisionRequest = fetchMock.mock.calls.find(([url, options = {}]) =>
+        String(url).includes("/api/analysis-sessions/session-1/decisions") && options.method === "POST"
+      );
+      expect(decisionRequest).toBeTruthy();
+      expect(JSON.parse(decisionRequest[1].body)).toEqual({
+        decisions: [
+          {
+            cluster_id: "cluster-1",
+            keeper_id: null,
+            delete_folder_ids: [],
+          },
+        ],
+      });
+    });
+  }, 15000);
+
   it("exports feedback through the Electron bridge without opening a blank child window", async () => {
     const exportFeedback = vi.fn(async () => ({ ok: true, filePath: "C:\\Exports\\feedback.jsonl" }));
     window.albumDeduplicator = createDesktopBridge({ exportFeedback });

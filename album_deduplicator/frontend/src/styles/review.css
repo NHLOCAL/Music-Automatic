@@ -176,6 +176,13 @@
   justify-content: flex-end;
 }
 
+.ide-fast-review-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .ide-diff-container {
   display: flex;
   overflow: auto;
@@ -225,6 +232,56 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+
+.ide-pane-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ide-pane-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ide-copy-number-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #bcc8d6;
+  background: #f7f9fc;
+  color: #213547;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ide-copy-number-button:hover,
+.ide-copy-number-button:focus-visible {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: #eef5ff;
+  outline: none;
+}
+
+.ide-copy-number-button.is-keeper {
+  border-color: #2f9e55;
+  background: #e9f8ee;
+  color: #1e7e3e;
+}
+
+.ide-copy-number-button.is-trash {
+  border-color: #e46b6c;
+  background: #fff1f1;
+  color: #b42324;
 }
 
 .ide-pane-topline-actions {

@@ -162,25 +162,18 @@ export function DiffWorkspace({
     setIsAudioPlaying(false);
   }, [cluster?.cluster_id, currentKeeperId]);
 
-  if (!cluster) {
-    return (
-      <div className="ide-main" data-testid="diff-shell" style={{ alignItems: "center", justifyContent: "center", color: "#888" }}>
-        בחר קבוצה מהרשימה
-      </div>
-    );
-  }
-
   const visibleAlbums = useMemo(() => (
-    cluster.albums
+    (cluster?.albums ?? [])
       .filter((album) => !album.is_deleted)
       .map((album, index) => ({ album, index }))
       .sort((left, right) => {
-        if (left.album.folder_id === cluster.recommended_keeper_id) return -1;
-        if (right.album.folder_id === cluster.recommended_keeper_id) return 1;
+        if (left.album.folder_id === cluster?.recommended_keeper_id) return -1;
+        if (right.album.folder_id === cluster?.recommended_keeper_id) return 1;
         return left.index - right.index;
       })
       .map(({ album }) => album)
   ), [cluster]);
+
   const trackRows = useMemo(() => buildTrackComparisonRows(visibleAlbums), [visibleAlbums]);
   const visibleAlbumIds = useMemo(() => visibleAlbums.map((album) => album.folder_id), [visibleAlbums]);
   const hasSuggestedKeeper = Boolean(currentKeeperId);
@@ -191,6 +184,14 @@ export function DiffWorkspace({
     ? visibleAlbums.find((album) => album.folder_id === currentKeeperId) ?? null
     : null;
   const deleteCount = hasExplicitDecision && currentKeeperId ? Math.max(visibleAlbums.length - 1, 0) : 0;
+
+  if (!cluster) {
+    return (
+      <div className="ide-main" data-testid="diff-shell" style={{ alignItems: "center", justifyContent: "center", color: "#888" }}>
+        בחר קבוצה מהרשימה
+      </div>
+    );
+  }
 
   const handleTrackPreview = (album, entry) => {
     if (!entry?.stream_url) return;
@@ -232,6 +233,7 @@ export function DiffWorkspace({
             </StatusTag>
           ) : null}
           <StatusTag tone={deleteCount > 0 ? "warning" : "neutral"} icon="trash">למחיקה: {deleteCount}</StatusTag>
+          <span className="ide-fast-review-hint">בחירה מהירה: 1-9 בוחרים עותק, רווח שומר הכל</span>
           {previewCount > 0 ? (
             <>
               <Button size="small" icon={<Icon name="arrow-left" size={14} />} onClick={onOpenFinalize}>
@@ -263,6 +265,7 @@ export function DiffWorkspace({
               {deleteCount > 0
                 ? `${deleteCount} עותקים יסומנו למחיקה אם תמשיך לשלב ההעברה.`
                 : "כרגע אין פריטים שמסומנים למחיקה, אבל עדיין קיימת הכרעה פעילה לקבוצה."}
+              {" "}אפשר ללחוץ רווח כדי לבטל הכרעה ולשמור את כל העותקים.
             </span>
           </div>
           <Button icon={<Icon name="undo" size={14} />} onClick={() => clearDecision?.(cluster.cluster_id)}>
@@ -274,6 +277,7 @@ export function DiffWorkspace({
       <div className={`ide-review-scroll-shell ${audioPreview ? "has-audio-preview" : ""}`} data-testid="review-scroll-shell">
         <div className="ide-diff-container" data-testid="comparison-scroller">
         {visibleAlbums.map((album, index) => {
+          const copyNumber = index + 1;
           const isSuggestedKeeper = currentKeeperId === album.folder_id;
           const isKeeper = hasExplicitDecision && isSuggestedKeeper;
           const isTrash = hasExplicitDecision && Boolean(currentKeeperId) && !isKeeper;
@@ -282,9 +286,20 @@ export function DiffWorkspace({
             <div key={album.folder_id} className={`ide-pane ${isKeeper ? "is-keeper" : isTrash ? "is-trash" : ""}`}>
               <div className="ide-pane-header">
                 <div className="ide-pane-topline">
-                  <strong style={{ fontSize: 13 }}>
-                    {album.name || `עותק ${index + 1}`}
-                  </strong>
+                  <div className="ide-pane-title">
+                    <button
+                      type="button"
+                      className={`ide-copy-number-button ${isKeeper ? "is-keeper" : isTrash ? "is-trash" : ""}`}
+                      onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}
+                      aria-label={`בחר עותק ${copyNumber} לשמירה`}
+                      title={`בחר עותק ${copyNumber} לשמירה`}
+                    >
+                      {copyNumber}
+                    </button>
+                    <strong style={{ fontSize: 13 }}>
+                      {album.name || `עותק ${copyNumber}`}
+                    </strong>
+                  </div>
                   <div className="ide-pane-topline-actions">
                     {cluster.recommended_keeper_id === album.folder_id ? <StatusTag tone="primary">מומלץ</StatusTag> : null}
                     <Tooltip title="פתח בתיקייה">
@@ -302,7 +317,7 @@ export function DiffWorkspace({
                 <div className="ide-pane-media">
                   <AlbumArtPreview album={album} />
                   <div className="ide-pane-meta">
-                    <div className="ide-pane-copy-index">עותק {index + 1}</div>
+                    <div className="ide-pane-copy-index">עותק {copyNumber} · לחיצה על {copyNumber} בוחרת מיד לשמירה</div>
                     <div className="ide-pane-path" title={album.path}>{album.path}</div>
                     <div className="ide-pane-metrics">
                       <span>ביטרייט: <strong>{formatBitrate(album.avg_bitrate)}</strong></span>
@@ -354,7 +369,7 @@ export function DiffWorkspace({
                   style={{ width: "100%" }}
                   onClick={() => handleDecision(cluster.cluster_id, album.folder_id)}
                 >
-                  {isKeeper ? "נבחר לשמירה" : isTrash ? "יסומן למחיקה" : isSuggestedKeeper ? "בחר עותק זה לשמירה" : "שמור עותק זה"}
+                  {isKeeper ? `עותק ${copyNumber} נבחר לשמירה` : isTrash ? `עותק ${copyNumber} יסומן למחיקה` : isSuggestedKeeper ? `בחר עותק ${copyNumber} לשמירה` : `שמור עותק ${copyNumber}`}
                 </Button>
               </div>
             </div>

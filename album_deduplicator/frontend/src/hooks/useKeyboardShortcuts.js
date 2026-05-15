@@ -39,6 +39,24 @@ export function useKeyboardShortcuts({
         handleDecision(selectedCluster.cluster_id, nextAlbumId);
         return;
       }
+      if (/^\d$/.test(event.key)) {
+        const visibleAlbums = selectedCluster.albums
+          .filter(a => !a.is_deleted)
+          .map((album, index) => ({ album, index }))
+          .sort((left, right) => {
+            if (left.album.folder_id === selectedCluster.recommended_keeper_id) return -1;
+            if (right.album.folder_id === selectedCluster.recommended_keeper_id) return 1;
+            return left.index - right.index;
+          })
+          .map(({ album }) => album);
+        const requestedIndex = event.key === "0" ? 9 : Number(event.key) - 1;
+        const selectedAlbum = visibleAlbums[requestedIndex];
+        if (!selectedAlbum) return;
+        event.preventDefault();
+        setFocusedAlbumId(selectedAlbum.folder_id);
+        handleDecision(selectedCluster.cluster_id, selectedAlbum.folder_id);
+        return;
+      }
       if (event.key === " ") {
         event.preventDefault();
         handleDecision(selectedCluster.cluster_id, null, []);

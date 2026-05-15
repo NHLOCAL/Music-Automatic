@@ -162,10 +162,29 @@ describe("DiffWorkspace", () => {
       />,
     );
 
-    expect(screen.getAllByRole("button", { name: "שמור עותק זה" })).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "שמור עותק 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "שמור עותק 2" })).toBeInTheDocument();
     expect(screen.getByText("נשמר: לא נבחר")).toBeInTheDocument();
     expect(screen.getByText("למחיקה: 0")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "בטל הכרעה ושמור את כל העותקים" })).not.toBeInTheDocument();
+  });
+
+  it("selects a keeper immediately from the numbered copy button", () => {
+    const handleDecision = vi.fn();
+
+    render(
+      <DiffWorkspace
+        cluster={cluster}
+        currentKeeperId={null}
+        handleDecision={handleDecision}
+        openExplorer={vi.fn()}
+        previewCount={0}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "בחר עותק 2 לשמירה" }));
+
+    expect(handleDecision).toHaveBeenCalledWith("cluster-1", "folder-2");
   });
 
   it("shows a recommended keeper in review without presenting it as a manual selection", () => {
@@ -183,7 +202,7 @@ describe("DiffWorkspace", () => {
 
     expect(screen.getByText("נשמר: לא נבחר")).toBeInTheDocument();
     expect(screen.getByText("מומלץ לשמירה: Acoustix")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "בחר עותק זה לשמירה" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "בחר עותק 1 לשמירה" }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("decision-reset-bar")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "בטל הכרעה ושמור את כל העותקים" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "נבחר לשמירה" })).not.toBeInTheDocument();
