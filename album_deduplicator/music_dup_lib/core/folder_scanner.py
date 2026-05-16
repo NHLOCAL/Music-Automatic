@@ -135,6 +135,8 @@ class FolderScanner:
                     if self._is_inside_recycle_bin(Path(current_dir)):
                         subdirs.clear()
                         continue
+                    if subdirs:
+                        continue
                     candidate = self._build_folder_candidate(Path(current_dir), filenames)
                     if candidate is not None:
                         yield candidate

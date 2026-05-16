@@ -31,7 +31,7 @@ def test_folder_scanner_skips_recycle_bin_descendants(tmp_path):
     assert [candidate.path for candidate in candidates] == [music_album]
 
 
-def test_folder_scanner_includes_music_folder_with_non_music_subdirectory(tmp_path):
+def test_folder_scanner_skips_music_folder_with_subdirectory_until_delete_flow_is_safe(tmp_path):
     music_album = tmp_path / "Music" / "Album"
     create_album(music_album)
     (music_album / "Scans").mkdir()
@@ -41,4 +41,4 @@ def test_folder_scanner_includes_music_folder_with_non_music_subdirectory(tmp_pa
 
     candidates = list(scanner._iter_folder_candidates([tmp_path]))
 
-    assert [candidate.path for candidate in candidates] == [music_album]
+    assert [candidate.path for candidate in candidates] == []
