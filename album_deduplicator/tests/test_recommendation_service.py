@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from music_dup_lib import config
 from music_dup_lib.models import FileInfo, FolderInfo
 from music_dup_lib.services.dto import PairAnalysis, stable_id
 from music_dup_lib.services.recommendation_service import RecommendationService
@@ -190,6 +191,23 @@ def test_recommendation_marks_review_for_borderline_scores():
     assert cluster.recommended_keeper_id == stable_id("folder", str(folder1.path))
     assert cluster.confidence_bucket == "review"
     assert "cluster_review" in cluster.reason_codes
+
+
+def test_recommendation_marks_ui_safe_tab_for_scores_above_90():
+    folder1 = make_folder("C:/music/A", 90.0)
+    folder2 = make_folder("D:/music/B", 88.0)
+    folders = {folder1.path: folder1, folder2.path: folder2}
+
+    service = RecommendationService()
+    albums = service.build_album_summaries(folders)
+    pair = make_pair(folder1.path, folder2.path, config.SAFE_DELETE_MIN_SIMILARITY + 0.01)
+
+    clusters = service.build_clusters(folders, {pair.pair_id: pair}, albums)
+    cluster = next(iter(clusters.values()))
+
+    assert cluster.recommended_keeper_id == stable_id("folder", str(folder1.path))
+    assert cluster.confidence_bucket == "safe"
+    assert "cluster_safe" in cluster.reason_codes
 
 
 def test_recommendation_excludes_exact_review_threshold_from_clusters():

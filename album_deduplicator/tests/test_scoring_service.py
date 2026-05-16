@@ -169,7 +169,7 @@ def test_scoring_service_keeps_exact_safe_threshold_in_review():
 
 
 def test_scoring_service_marks_scores_above_90_as_safe_delete():
-    assert config.DEFAULT_MIN_SIMILARITY_FOR_DELETE == 90.0
+    assert config.SAFE_DELETE_MIN_SIMILARITY == 90.0
     assert not config.is_safe_delete_candidate(90.0)
     assert config.is_safe_delete_candidate(90.01)
 
