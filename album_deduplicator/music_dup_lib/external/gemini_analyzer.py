@@ -169,7 +169,10 @@ class GeminiAnalyzer:
                     "reason": {"type": "STRING", "description": "Short explanation in Hebrew"}
                 }
             },
-            system_instruction=SYSTEM_INST
+            system_instruction=SYSTEM_INST,
+            thinking_config=types.ThinkingConfig(
+                thinking_level=config.GEMINI_THINKING_LEVEL
+            )
         )
         max_retries = 2
         for attempt in range(max_retries):

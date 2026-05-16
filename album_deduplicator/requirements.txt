@@ -11,3 +11,4 @@ fastapi
 uvicorn
 pytest
 httpx
+google-genai>=2.3.0
