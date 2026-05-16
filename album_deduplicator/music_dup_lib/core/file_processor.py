@@ -10,7 +10,8 @@ class _DummyPillowError(Exception):
 
 class _DummyPillowImage: # More complete dummy for type checking
     def __init__(self, *args, **kwargs): pass
-    def open(self, *args, **kwargs): return self # Allow 'with' statement
+    @staticmethod
+    def open(*args, **kwargs): return _DummyPillowImage() # Allow 'with' statement
     def __enter__(self): return self
     def __exit__(self, exc_type, exc_val, exc_tb): pass
     def resize(self, *args, **kwargs): raise _DummyPillowError("Pillow Image is not available")

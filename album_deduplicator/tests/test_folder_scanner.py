@@ -29,3 +29,16 @@ def test_folder_scanner_skips_recycle_bin_descendants(tmp_path):
     candidates = list(scanner._iter_folder_candidates([tmp_path]))
 
     assert [candidate.path for candidate in candidates] == [music_album]
+
+
+def test_folder_scanner_includes_music_folder_with_non_music_subdirectory(tmp_path):
+    music_album = tmp_path / "Music" / "Album"
+    create_album(music_album)
+    (music_album / "Scans").mkdir()
+    (music_album / "Scans" / "cover.jpg").write_bytes(b"")
+
+    scanner = FolderScanner(DummyFileProcessor(), DummyDataStore())
+
+    candidates = list(scanner._iter_folder_candidates([tmp_path]))
+
+    assert [candidate.path for candidate in candidates] == [music_album]
