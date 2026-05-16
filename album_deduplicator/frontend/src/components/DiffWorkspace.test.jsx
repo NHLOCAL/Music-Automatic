@@ -64,6 +64,8 @@ const cluster = {
       base_score: 93.1,
       gemini_score: 90,
       final_score: 92.6,
+      gemini_verdict: "duplicate",
+      gemini_reason: "Gemini זיהה התאמה גבוהה לפי שמות הרצועות והעטיפה.",
       is_identical_by_hash: false,
     },
   ],
@@ -101,6 +103,9 @@ describe("DiffWorkspace", () => {
     expect(screen.getByLabelText("אין עטיפה זמינה")).toBeInTheDocument();
     expect(screen.getByText("נשמר: Acoustix")).toBeInTheDocument();
     expect(screen.getByText("למחיקה: 1")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "פירוט ציונים ונימוק" })).toBeInTheDocument();
+    expect(screen.getByText("Gemini זיהה התאמה גבוהה לפי שמות הרצועות והעטיפה.")).toBeInTheDocument();
+    expect(screen.getByText("92.6/100")).toBeInTheDocument();
   });
 
   it("starts an in-app audio preview and allows pausing from the same track button", () => {

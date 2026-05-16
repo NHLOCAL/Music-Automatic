@@ -4,7 +4,7 @@ import { Button, Image, Popconfirm, Tooltip } from "antd";
 import { buildApiUrl } from "../api";
 import { buildTrackComparisonRows, formatBitrate, formatDuration, formatSizeMb, getTrackRowTone } from "../utils";
 import { Icon, StatusTag } from "./UI";
-import { ScoreTransparencyPanel } from "./ScoreTransparencyPanel";
+import { ScoreDetails, ScoreTransparencyPanel } from "./ScoreTransparencyPanel";
 
 function AlbumArtPreview({ album }) {
   if (album.album_art_preview_url) {
@@ -273,6 +273,10 @@ export function DiffWorkspace({
           </Button>
         </div>
       ) : null}
+
+      <section className="ide-score-details-panel" aria-label="פירוט ציונים ונימוק">
+        <ScoreDetails cluster={cluster} currentKeeperId={currentKeeperId} />
+      </section>
 
       <div className={`ide-review-scroll-shell ${audioPreview ? "has-audio-preview" : ""}`} data-testid="review-scroll-shell">
         <div className="ide-diff-container" data-testid="comparison-scroller">

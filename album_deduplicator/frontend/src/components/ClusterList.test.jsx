@@ -15,6 +15,12 @@ const clusters = [
         folder1_id: "folder-a",
         folder2_id: "folder-b",
         final_score: 88.1,
+        algorithmic_score: 82,
+        ml_score: 87,
+        base_score: 85.2,
+        gemini_score: 90,
+        gemini_verdict: "uncertain",
+        gemini_reason: "שמות האלבומים דומים אבל חסר מידע ודאי על סדר הרצועות.",
       },
     ],
     albums: [
@@ -33,6 +39,12 @@ const clusters = [
         folder1_id: "folder-c",
         folder2_id: "folder-d",
         final_score: 95.6,
+        algorithmic_score: 94,
+        ml_score: 96,
+        base_score: 95.3,
+        gemini_score: 97,
+        gemini_verdict: "duplicate",
+        gemini_reason: "אותו אלבום לפי שם, אמן ורשימת רצועות.",
       },
     ],
     albums: [
@@ -168,5 +180,27 @@ describe("ClusterList", () => {
 
     expect(getItems()[0].textContent).toContain("Ready Copy");
     expect(getItems()[1].textContent).toContain("Pending Copy");
+  });
+
+  it("opens score details from the info button without selecting the cluster", async () => {
+    const setSelectedClusterId = vi.fn();
+    const { container } = render(
+      <ClusterList
+        clusters={clusters}
+        selectedClusterId="cluster-ready"
+        setSelectedClusterId={setSelectedClusterId}
+        decisions={{}}
+        selectedTab="review"
+        setSelectedTab={vi.fn()}
+      />,
+    );
+
+    const pendingItem = Array.from(container.querySelectorAll(".ide-cluster-item"))
+      .find((item) => item.textContent.includes("Pending Copy"));
+    fireEvent.click(pendingItem.querySelector(".score-info-button"));
+
+    expect(setSelectedClusterId).not.toHaveBeenCalled();
+    expect(await screen.findByText("שמות האלבומים דומים אבל חסר מידע ודאי על סדר הרצועות.")).toBeInTheDocument();
+    expect(screen.getByText("88.1/100")).toBeInTheDocument();
   });
 });

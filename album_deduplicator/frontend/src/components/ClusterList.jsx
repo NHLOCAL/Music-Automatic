@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button, Segmented, Tooltip } from "antd";
 import { Icon, StatusTag } from "./UI";
+import { ScoreInfoButton } from "./ScoreTransparencyPanel";
 import {
   getClusterDisplayTitle,
   getClusterStatusMeta,
@@ -114,8 +115,15 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
               className={`ide-cluster-item ${isActive ? 'active' : ''}`}
               onClick={() => setSelectedClusterId(cluster.cluster_id)}
             >
-              <div className="ide-cluster-title">
-                {isResolved ? "✓ " : ""}{getClusterDisplayTitle(cluster)}
+              <div className="ide-cluster-title-row">
+                <div className="ide-cluster-title">
+                  {isResolved ? "✓ " : ""}{getClusterDisplayTitle(cluster)}
+                </div>
+                <ScoreInfoButton
+                  cluster={cluster}
+                  label={`הצג ציונים ונימוק עבור ${getClusterDisplayTitle(cluster)}`}
+                  placement="leftTop"
+                />
               </div>
               <div className="ide-cluster-meta">
                 <span>{getVisibleAlbumCount(cluster)} עותקים</span>
