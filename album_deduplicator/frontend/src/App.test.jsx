@@ -229,6 +229,7 @@ describe("App", () => {
     expect(screen.queryByRole("textbox", { name: "תיקייה לסריקה 2" })).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "הפעל סדר עדיפות לשמירה" })).toBeChecked();
     expect(screen.getByText("סדר השורות הוא סדר ההעדפה: תיקייה עליונה עדיפה על זו שמתחתיה, גם עבור תתי-תיקיות שנמצאות בתוכה.")).toBeInTheDocument();
+    expect(screen.queryByText("כאשר נמצאים עותקים זהים או באותה איכות, המערכת תשמור את העותק שנמצא תחת התיקייה שמופיעה מוקדם יותר בסדר.")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("הגדרות מתקדמות"));
     expect(screen.getByRole("checkbox", { name: "רענון מלא מהדיסק" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "בדיקת Hash מלאה" })).toBeInTheDocument();

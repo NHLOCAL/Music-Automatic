@@ -162,7 +162,6 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
                 <small>כבוי: המערכת תבחר לפי איכות בלבד, בלי להעדיף root מסוים.</small>
               </div>
             </Checkbox>
-            <div className="setup-helper-text">כאשר נמצאים עותקים זהים או באותה איכות, המערכת תשמור את העותק שנמצא תחת התיקייה שמופיעה מוקדם יותר בסדר.</div>
           </div>
 
           <div className="setup-form-group">
