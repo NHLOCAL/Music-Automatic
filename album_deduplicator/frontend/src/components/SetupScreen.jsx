@@ -5,6 +5,7 @@ import {
   ArrowUpOutlined,
   CloseOutlined,
   FolderOpenOutlined,
+  KeyOutlined,
   PlayCircleOutlined,
   PlusOutlined,
   SettingOutlined,
@@ -28,7 +29,7 @@ const ADVANCED_OPTIONS = [
   },
 ];
 
-export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFolder, runtimeInfo }) {
+export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFolder, runtimeInfo, geminiSettings }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const handlePathChange = (id, path) => {
     setForm((prev) => ({
@@ -61,6 +62,7 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
     [form.folders],
   );
   const runtimeLabel = runtimeInfo?.isElectron ? "אפליקציית Windows" : "גרסת דפדפן";
+  const hasSavedGeminiKey = Boolean(geminiSettings?.has_api_key);
 
   return (
     <div className="modal-backdrop">
@@ -192,6 +194,27 @@ export function SetupScreen({ form, setForm, onSubmit, onPickFolders, onPickFold
                           </div>
                         </Checkbox>
                       ))}
+                      <div className="gemini-key-panel">
+                        <div className="gemini-key-label">
+                          <KeyOutlined />
+                          <label htmlFor="gemini-api-key">מפתח API של Gemini</label>
+                        </div>
+                        <Input.Password
+                          id="gemini-api-key"
+                          aria-label="מפתח API של Gemini"
+                          autoComplete="off"
+                          size="small"
+                          placeholder={hasSavedGeminiKey ? "נשמר מפתח קיים" : "AIza..."}
+                          value={form.gemini_api_key}
+                          disabled={!form.gemini_enabled}
+                          onChange={(event) => setForm((prev) => ({ ...prev, gemini_api_key: event.target.value }))}
+                        />
+                        <div className="setup-helper-text">
+                          {hasSavedGeminiKey
+                            ? "מפתח Gemini שמור במחשב הזה. אפשר להשאיר ריק כדי להשתמש בו."
+                            : "המפתח יישמר במחשב הזה לשימוש בסריקות הבאות."}
+                        </div>
+                      </div>
                     </div>
                   ),
                 },

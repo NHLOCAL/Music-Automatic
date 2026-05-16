@@ -110,6 +110,28 @@
   gap: 8px;
 }
 
+.gemini-key-panel {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 10px;
+  border: 1px solid rgba(34, 85, 85, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 253, 246, 0.62);
+}
+
+.gemini-key-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-main);
+}
+
+.gemini-key-label label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .setup-inline-actions {
   display: flex;
   gap: 8px;

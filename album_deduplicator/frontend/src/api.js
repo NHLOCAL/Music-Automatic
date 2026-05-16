@@ -43,6 +43,9 @@ export function getDeletePreview(sessionId) {
 export function getFeedbackSummary() {
   return requestJson("/api/ml-feedback/summary");
 }
+export function getGeminiSettings() {
+  return requestJson("/api/settings/gemini");
+}
 export function clearFeedbackHistory() {
   return requestJson("/api/ml-feedback", { method: "DELETE" });
 }

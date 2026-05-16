@@ -273,6 +273,70 @@ def test_api_session_flow_accepts_full_hash_scan(monkeypatch, tmp_path):
     assert seen == {"full_hash_scan": True, "disable_hash": False}
 
 
+def test_api_session_flow_saves_and_uses_gemini_api_key(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_start_analysis(session_id: str):
+        session = store.get_session(session_id)
+        seen["gemini_enabled"] = session.options.gemini_enabled
+        seen["gemini_api_key"] = session.options.gemini_api_key
+        session.status = "completed"
+
+    monkeypatch.setattr(store, "start_analysis", fake_start_analysis)
+    monkeypatch.setattr(store.gemini_settings_store, "settings_file", tmp_path / "gemini_settings.json")
+    music_root = tmp_path / "music"
+    music_root.mkdir()
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/analysis-sessions",
+        json={
+            "folders": [str(music_root)],
+            "force_rescan": False,
+            "clear_cache": False,
+            "bitrate_mode": "128",
+            "gemini_enabled": True,
+            "gemini_api_key": "gemini-secret",
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen == {"gemini_enabled": True, "gemini_api_key": "gemini-secret"}
+    settings_response = client.get("/api/settings/gemini")
+    assert settings_response.status_code == 200
+    assert settings_response.json() == {"has_api_key": True}
+
+
+def test_api_session_flow_reuses_saved_gemini_api_key(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_start_analysis(session_id: str):
+        session = store.get_session(session_id)
+        seen["gemini_api_key"] = session.options.gemini_api_key
+        session.status = "completed"
+
+    monkeypatch.setattr(store, "start_analysis", fake_start_analysis)
+    monkeypatch.setattr(store.gemini_settings_store, "settings_file", tmp_path / "gemini_settings.json")
+    store.gemini_settings_store.save_api_key("saved-secret")
+    music_root = tmp_path / "music"
+    music_root.mkdir()
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/analysis-sessions",
+        json={
+            "folders": [str(music_root)],
+            "force_rescan": False,
+            "clear_cache": False,
+            "bitrate_mode": "128",
+            "gemini_enabled": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen == {"gemini_api_key": "saved-secret"}
+
+
 def test_api_session_flow_accepts_preferred_root_order(monkeypatch, tmp_path):
     seen = {}
 

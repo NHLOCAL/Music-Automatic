@@ -15,6 +15,11 @@ class AnalysisSessionCreateRequest(BaseModel):
     full_hash_scan: bool = False
     bitrate_mode: Literal["128", "high"] = "128"
     gemini_enabled: bool = False
+    gemini_api_key: Optional[str] = None
+
+
+class GeminiSettingsResponse(BaseModel):
+    has_api_key: bool = False
 
 
 class AnalysisSessionCreatedResponse(BaseModel):

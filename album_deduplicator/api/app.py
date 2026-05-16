@@ -36,6 +36,7 @@ from api.schemas import (
     DegradedFlags,
     FeedbackSummaryResponse,
     FolderSummaryModel,
+    GeminiSettingsResponse,
     ModeSummary,
     OpenExplorerRequest,
     PairScoreBreakdownModel,
@@ -88,6 +89,10 @@ def create_app() -> FastAPI:
     def healthcheck() -> dict:
         return {"status": "ok", "app": app.title, "version": app.version}
 
+    @app.get("/api/settings/gemini", response_model=GeminiSettingsResponse)
+    def get_gemini_settings() -> GeminiSettingsResponse:
+        return GeminiSettingsResponse(has_api_key=store.gemini_settings_store.has_api_key())
+
     @app.post("/api/analysis-sessions", response_model=AnalysisSessionCreatedResponse)
     def create_analysis_session(payload: AnalysisSessionCreateRequest) -> AnalysisSessionCreatedResponse:
         folders = [Path(folder).resolve() for folder in payload.folders]
@@ -104,6 +109,11 @@ def create_app() -> FastAPI:
         if invalid_preferred_roots:
             raise HTTPException(status_code=400, detail="preferred_roots must be selected from the input folders.")
         preferred_root = preferred_roots[0] if payload.use_preferred_roots and preferred_roots else None
+        gemini_api_key = payload.gemini_api_key.strip() if payload.gemini_api_key else None
+        if gemini_api_key:
+            store.gemini_settings_store.save_api_key(gemini_api_key)
+        elif payload.gemini_enabled:
+            gemini_api_key = store.gemini_settings_store.get_api_key()
 
         session = store.create_session(
             AnalysisOptions(
@@ -115,6 +125,7 @@ def create_app() -> FastAPI:
                 force_rescan=payload.force_rescan,
                 clear_cache=payload.clear_cache,
                 gemini_enabled=payload.gemini_enabled,
+                gemini_api_key=gemini_api_key,
                 full_hash_scan=payload.full_hash_scan,
             )
         )

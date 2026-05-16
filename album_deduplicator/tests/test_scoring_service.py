@@ -78,6 +78,36 @@ def test_scoring_service_blends_algorithmic_ml_and_gemini(monkeypatch):
     assert "gemini_reviewed" in pair.reason_codes
 
 
+def test_scoring_service_initializes_gemini_with_session_api_key(monkeypatch):
+    initialized_with = {}
+
+    class FakeGeminiAnalyzer:
+        def __init__(self, api_key=None):
+            initialized_with["api_key"] = api_key
+
+        def analyze_pair(self, *_args, **_kwargs):
+            return "duplicate", 95.0, "ok"
+
+    monkeypatch.setattr("music_dup_lib.services.scoring_service.GeminiAnalyzer", FakeGeminiAnalyzer)
+    monkeypatch.setattr("music_dup_lib.services.scoring_service.GEMINI_RUNTIME_AVAILABLE", False)
+    folder1 = make_folder("C:/music/A")
+    folder2 = make_folder("D:/music/B")
+    comparison = FolderComparisonResult(folder1_path=folder1.path, folder2_path=folder2.path, weighted_score=75.0)
+
+    service = ScoringService(use_gemini=True, gemini_api_key="session-secret")
+    service.ml_model.model_loaded = False
+    pairs, warnings = service.apply_scores(
+        comparison_results=[comparison],
+        all_folders={folder1.path: folder1, folder2.path: folder2},
+        cached_results_map={},
+    )
+
+    pair = next(iter(pairs.values()))
+    assert initialized_with == {"api_key": "session-secret"}
+    assert warnings.gemini_unavailable is False
+    assert pair.gemini_score == 95.0
+
+
 def test_scoring_service_falls_back_to_algorithmic_when_ml_missing():
     folder1 = make_folder("C:/music/A")
     folder2 = make_folder("D:/music/B")

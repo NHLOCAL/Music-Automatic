@@ -18,5 +18,6 @@ from .dto import (
 )
 from .recommendation_service import RecommendationService
 from .scoring_service import ScoringService
+from .gemini_settings_store import GeminiSettingsStore
 from .user_decision_store import UserDecisionStore
 from .user_feedback_logger import FeedbackSummary, UserFeedbackLogger

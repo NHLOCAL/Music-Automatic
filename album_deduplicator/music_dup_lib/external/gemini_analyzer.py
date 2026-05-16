@@ -54,10 +54,11 @@ if not API_KEY:
 MODEL_NAME = config.GEMINI_MODEL_NAME
 
 class GeminiAnalyzer:
-    def __init__(self):
-        if not API_KEY:
+    def __init__(self, api_key: Optional[str] = None):
+        effective_api_key = (api_key or API_KEY or "").strip()
+        if not effective_api_key:
             raise ValueError(f"Gemini API Key not found in environment variables: {config.GEMINI_API_KEY_ENV_VAR}")
-        self.client = genai.Client(api_key=API_KEY)
+        self.client = genai.Client(api_key=effective_api_key)
         self.model = MODEL_NAME
         self.conversation = []
         logger.info(f"Gemini Analyzer initialized for model: {MODEL_NAME}")

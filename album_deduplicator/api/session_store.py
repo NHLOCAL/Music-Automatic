@@ -18,6 +18,7 @@ from music_dup_lib.services import (
     DeletePreview,
     UserDecisionStore,
     UserFeedbackLogger,
+    GeminiSettingsStore,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,7 @@ class SessionStore:
         self._orchestrator = AnalysisOrchestrator()
         self._deletion_service = DeletionService()
         self._decision_store = decision_store or UserDecisionStore()
+        self.gemini_settings_store = GeminiSettingsStore()
         self.feedback_logger = UserFeedbackLogger()
         self._lock = threading.Lock()
 

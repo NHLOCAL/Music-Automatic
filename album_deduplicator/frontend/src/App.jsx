@@ -47,12 +47,14 @@ function AppContent() {
     full_hash_scan: false,
     bitrate_mode: "128",
     gemini_enabled: false,
+    gemini_api_key: "",
   });
   const [executingDelete, setExecutingDelete] = useState(false);
   const [focusedAlbumId, setFocusedAlbumId] = useState(null);
   const [runtimeInfo, setRuntimeInfo] = useState(getRuntimeSnapshot());
   const [deleteAttemptResults, setDeleteAttemptResults] = useState({});
   const [feedbackSummary, setFeedbackSummary] = useState(null);
+  const [geminiSettings, setGeminiSettings] = useState({ has_api_key: false });
   const d = useDeduplicator();
 
   const selectedCluster = d.clusters.find((cluster) => cluster.cluster_id === d.selectedClusterId) || null;
@@ -112,6 +114,18 @@ function AppContent() {
     refreshFeedbackSummary();
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    api.getGeminiSettings()
+      .then((settings) => {
+        if (active) setGeminiSettings(settings);
+      })
+      .catch(() => {
+        if (active) setGeminiSettings({ has_api_key: false });
+      });
+    return () => { active = false; };
+  }, []);
+
   const submitScan = async () => {
     d.setError("");
     d.setSuccessSummary(null);
@@ -123,6 +137,7 @@ function AppContent() {
         folders: preferenceOrder,
         preferred_root: form.use_preferred_roots ? preferenceOrder[0] || null : null,
         preferred_roots: form.use_preferred_roots ? preferenceOrder : [],
+        gemini_api_key: form.gemini_api_key.trim() || null,
       };
       const created = await api.createAnalysisSession(payload);
       d.setSessionId(created.session_id);
@@ -312,6 +327,7 @@ function AppContent() {
                 onPickFolders={handlePickFolders}
                 onPickFolder={handlePickFolder}
                 runtimeInfo={runtimeInfo}
+                geminiSettings={geminiSettings}
               />
             )}
             {appView === "scanning" && <ScanningScreen progress={d.progress} />}

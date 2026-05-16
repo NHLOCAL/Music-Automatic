@@ -199,6 +199,8 @@ describe("App", () => {
   beforeEach(() => {
     MockEventSource.instances = [];
     vi.stubGlobal("EventSource", MockEventSource);
+    window.localStorage.clear();
+    window.sessionStorage.clear();
     delete window.albumDeduplicator;
   });
 
@@ -280,6 +282,61 @@ describe("App", () => {
         preferred_root: "C:\\Music",
         preferred_roots: ["C:\\Music", "D:\\Archive"],
         full_hash_scan: true,
+      });
+    });
+  });
+
+  it("loads saved Gemini key status and submits a new key with the scan", async () => {
+    window.albumDeduplicator = createDesktopBridge();
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith("/api/settings/gemini")) {
+        return jsonResponse({ has_api_key: true });
+      }
+      if (String(url).endsWith("/api/analysis-sessions") && options.method === "POST") {
+        return jsonResponse({ session_id: "session-1", status: "queued" });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/clusters")) {
+        return jsonResponse({ clusters: [] });
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1/delete-preview")) {
+        return jsonResponse(emptyPreviewResponse);
+      }
+      if (String(url).includes("/api/analysis-sessions/session-1")) {
+        return jsonResponse({
+          ...sessionSummary,
+          counts: {
+            ...sessionSummary.counts,
+            safe_clusters: 0,
+            review_clusters: 0,
+          },
+        });
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "תיקייה לסריקה 1" }), {
+      target: { value: "C:\\Music" },
+    });
+    fireEvent.click(screen.getByText("הגדרות מתקדמות"));
+
+    expect(await screen.findByText("מפתח Gemini שמור במחשב הזה. אפשר להשאיר ריק כדי להשתמש בו.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "אימות AI למקרים גבוליים" }));
+    fireEvent.change(screen.getByLabelText("מפתח API של Gemini"), {
+      target: { value: "new-gemini-key" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "התחל סריקה" }));
+
+    await waitFor(() => {
+      const createRequest = fetchMock.mock.calls.find(([url, options]) =>
+        String(url).endsWith("/api/analysis-sessions") && options?.method === "POST",
+      );
+      expect(createRequest).toBeTruthy();
+      expect(JSON.parse(createRequest[1].body)).toMatchObject({
+        gemini_enabled: true,
+        gemini_api_key: "new-gemini-key",
       });
     });
   });

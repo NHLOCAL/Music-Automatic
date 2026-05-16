@@ -28,6 +28,7 @@ class AnalysisOptions:
     force_rescan: bool = False
     clear_cache: bool = False
     gemini_enabled: bool = False
+    gemini_api_key: Optional[str] = None
     disable_hash: bool = False
     full_hash_scan: bool = False
 
@@ -93,6 +94,7 @@ class AnalysisOrchestrator:
         scoring_service = ScoringService(
             preferred_bitrate=options.bitrate_mode,
             use_gemini=options.gemini_enabled,
+            gemini_api_key=options.gemini_api_key,
         )
         cache_updates = []
         pair_analyses, warnings = scoring_service.apply_scores(

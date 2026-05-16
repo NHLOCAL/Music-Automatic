@@ -30,9 +30,10 @@ except ImportError:
 
 
 class ScoringService:
-    def __init__(self, preferred_bitrate: str = "128", use_gemini: bool = False):
+    def __init__(self, preferred_bitrate: str = "128", use_gemini: bool = False, gemini_api_key: Optional[str] = None):
         self.preferred_bitrate = preferred_bitrate
         self.use_gemini = use_gemini
+        self.gemini_api_key = gemini_api_key.strip() if isinstance(gemini_api_key, str) else None
         self.quality_analyzer = QualityAnalyzer(preferred_bitrate=preferred_bitrate)
         self.ml_model = MLSimilarityModel()
 
@@ -55,9 +56,9 @@ class ScoringService:
 
         gemini_analyzer = None
         if self.use_gemini:
-            if GEMINI_RUNTIME_AVAILABLE and GeminiAnalyzer is not None:
+            if (self.gemini_api_key or GEMINI_RUNTIME_AVAILABLE) and GeminiAnalyzer is not None:
                 try:
-                    gemini_analyzer = GeminiAnalyzer()
+                    gemini_analyzer = GeminiAnalyzer(api_key=self.gemini_api_key)
                 except Exception as exc:
                     warnings.gemini_unavailable = True
                     warnings.warnings.append(
