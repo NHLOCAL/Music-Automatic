@@ -1,6 +1,7 @@
 # quality_analyzer.py
 import logging
-from typing import Tuple, Dict
+import re
+from typing import Tuple, Dict, Iterable
 
 # ייבואים יחסיים: .. עולה רמה אחת למעלה ל- music_dup_lib
 from .. import config
@@ -8,6 +9,34 @@ from ..models import FolderInfo
 from ..utils import contains_hebrew # Already calculated in FolderInfo, but keep check logic here too
 
 logger = logging.getLogger(__name__)
+
+UNKNOWN_METADATA_VALUES = {
+    "",
+    "unknown",
+    "unknown artist",
+    "unknown album",
+    "unknown albumartist",
+    "unknown album artist",
+    "unk",
+    "n a",
+    "na",
+    "none",
+    "null",
+    "untitled",
+    "various unknown",
+    "לא ידוע",
+    "אמן לא ידוע",
+    "אלבום לא ידוע",
+    "יוצר לא ידוע",
+    "מבצע לא ידוע",
+    "לא מוגדר",
+    "ללא שם",
+}
+
+UNKNOWN_METADATA_PHRASES = (
+    "לא ידוע",
+    "לא מוגדר",
+)
 
 class QualityAnalyzer:
     """Calculates a quality score for a given FolderInfo object."""
@@ -46,16 +75,19 @@ class QualityAnalyzer:
         max_generic_score = max(folder_info.generic_filename_score, folder_info.generic_title_score)
         scores['non_repetitive_names'] = 1.0 - max_generic_score # Higher score for less generic names
 
-        # 6. Consistent Artist Score (Binary: 1 if only one artist, 0 otherwise)
-        scores['consistent_artist'] = 1.0 if len(folder_info.unique_artists) == 1 else 0.0
+        # 6. Known Metadata Values Score (Unknown placeholders are worse than real metadata)
+        scores['known_metadata_values'] = self._calculate_known_metadata_score(folder_info)
 
-        # 7. Consistent Album Score (Binary: 1 if only one album, 0 otherwise)
-        scores['consistent_album'] = 1.0 if len(folder_info.unique_albums) == 1 else 0.0
+        # 7. Consistent Artist Score (Binary: 1 if only one known artist, 0 otherwise)
+        scores['consistent_artist'] = 1.0 if self._has_single_known_value(folder_info.unique_artists) else 0.0
 
-        # 8. Lossless Format Score (Use pre-calculated ratio)
+        # 8. Consistent Album Score (Binary: 1 if only one known album, 0 otherwise)
+        scores['consistent_album'] = 1.0 if self._has_single_known_value(folder_info.unique_albums) else 0.0
+
+        # 9. Lossless Format Score (Use pre-calculated ratio)
         scores['lossless_format'] = folder_info.lossless_ratio
 
-        # 9. Lyrics Score (Use pre-calculated ratio)
+        # 10. Lyrics Score (Use pre-calculated ratio)
         scores['has_lyrics'] = folder_info.lyrics_ratio
 
 
@@ -78,6 +110,42 @@ class QualityAnalyzer:
 
 
         return final_quality_score, quality_breakdown_percent
+
+    def _calculate_known_metadata_score(self, folder_info: FolderInfo) -> float:
+        """Scores artist/album metadata lower when it is an unknown placeholder."""
+        values = [
+            value
+            for file_info in folder_info.files
+            for value in (file_info.artist, file_info.album, file_info.albumartist)
+            if value
+        ]
+        if not values:
+            values = list(folder_info.unique_artists) + list(folder_info.unique_albums)
+        if not values:
+            return 1.0
+
+        known_count = sum(1 for value in values if not self._is_unknown_metadata_value(value))
+        return known_count / len(values)
+
+    def _has_single_known_value(self, values: Iterable[str]) -> bool:
+        normalized_values = {
+            self._normalize_metadata_value(value)
+            for value in values
+            if value and not self._is_unknown_metadata_value(value)
+        }
+        return len(normalized_values) == 1
+
+    def _is_unknown_metadata_value(self, value: str) -> bool:
+        normalized = self._normalize_metadata_value(value)
+        return normalized in UNKNOWN_METADATA_VALUES or any(
+            phrase in normalized for phrase in UNKNOWN_METADATA_PHRASES
+        )
+
+    def _normalize_metadata_value(self, value: str) -> str:
+        normalized = value.casefold().strip()
+        normalized = re.sub(r"[_./\\\-]+", " ", normalized)
+        normalized = re.sub(r"\s+", " ", normalized)
+        return normalized.strip()
 
     def _calculate_bitrate_score(self, avg_bitrate: float) -> float:
         """Calculates a bitrate score based on preference."""

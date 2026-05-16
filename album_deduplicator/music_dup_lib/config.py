@@ -62,6 +62,7 @@ QUALITY_WEIGHTS = {
     'has_album_art': 1.0,
     'bitrate_score': 2.0,
     'non_repetitive_names': 1.0,
+    'known_metadata_values': 1.5,
     'consistent_artist': 1.5,
     'consistent_album': 1.5,
     'lossless_format': 2.0, # Score based on lossless_ratio
