@@ -2,6 +2,7 @@ mutagen
 jibrish_to_hebrew
 rapidfuzz
 joblib
+lightgbm
 pandas
 numpy
 Pillow

@@ -583,6 +583,8 @@ cd album_deduplicator/frontend
 npm run dev:electron
 ```
 
+ב־Windows אפשר להריץ גם `album_deduplicator/run.bat`. הסקריפט מריץ בדיקת preflight לתלויות `Python` מתוך `requirements.txt`, מריץ `pip check`, ומוודא שתלויות ה־frontend זמינות לפני פתיחת `Electron`.
+
 ### Frontend בלבד
 
 ```bash

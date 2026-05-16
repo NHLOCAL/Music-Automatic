@@ -8,10 +8,12 @@
 
 ### Fixed
 
+- `run.bat` בודק כעת תלויות `Python` ו־frontend לפני פתיחת אפליקציית ה־desktop, כדי לעצור מוקדם כאשר חסרה תלות כמו `lightgbm`.
 - אריזת ה־desktop כוללת כעת את מודל ה־`ML`, כך שגרסאות Windows ארוזות לא נופלות ל־scoring אלגוריתמי בלבד.
 
 ### Documentation
 
+- תועד ש־`lightgbm` נדרש ב־`album_deduplicator/requirements.txt` עבור טעינת מודל ה־`ML` המקומי.
 - נוקה `README.md` מסעיף "מה חדש" ומרשימת עדכונים מצטברת.
 - נוסף קובץ `CHANGELOG.md` שישמש מכאן ואילך לתיעוד שינויי קוד ועדכוני מוצר.
 

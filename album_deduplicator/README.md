@@ -33,6 +33,8 @@ cd album_deduplicator
 pip install -r requirements.txt
 ```
 
+`requirements.txt` כולל גם את `lightgbm`, שנדרש לטעינת מודל ה־`ML` המקומי `lgbm_regressor_model.joblib`. ללא התלות הזו היישום ממשיך לעבוד במצב degraded, אך ציון ה־`ML` מושבת.
+
 ### Frontend / Desktop
 
 ```bash
@@ -50,6 +52,7 @@ npm run dev:electron
 ```
 
 הפקודה מריצה את `Vite`, פותחת חלון `Electron`, מעלה backend מקומי של `FastAPI` ומחברת את ה־renderer לשרת המקומי.
+ב־Windows ניתן להריץ גם את `run.bat` מתוך `album_deduplicator`; הקובץ מבצע בדיקת תלויות ל־Python ול־frontend לפני פתיחת אפליקציית ה־desktop.
 
 ### API בלבד
 
