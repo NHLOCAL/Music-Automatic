@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from music_dup_lib import config
 from music_dup_lib.models import FileInfo, FolderComparisonResult, FolderInfo
 from music_dup_lib.services.scoring_service import ScoringService
 
@@ -165,6 +166,12 @@ def test_scoring_service_keeps_exact_safe_threshold_in_review():
     assert pair.final_score == 90.0
     assert "review_threshold" in pair.reason_codes
     assert "safe_threshold" not in pair.reason_codes
+
+
+def test_scoring_service_marks_scores_above_90_as_safe_delete():
+    assert config.DEFAULT_MIN_SIMILARITY_FOR_DELETE == 90.0
+    assert not config.is_safe_delete_candidate(90.0)
+    assert config.is_safe_delete_candidate(90.01)
 
 
 def test_scoring_service_skips_gemini_outside_review_band(monkeypatch):
