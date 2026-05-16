@@ -78,7 +78,7 @@ export function ScoreInfoButton({ cluster, currentKeeperId, label = "פירוט 
       content={<ScoreDetails cluster={cluster} currentKeeperId={currentKeeperId} compact />}
       title="ציונים ונימוק"
       placement={placement}
-      trigger={["click"]}
+      trigger={["hover", "focus"]}
     >
       <button
         type="button"
@@ -102,7 +102,7 @@ export function ScoreTransparencyPanel({ cluster, currentKeeperId }) {
       content={<ScoreDetails cluster={cluster} currentKeeperId={currentKeeperId} compact />}
       title="ציונים ונימוק"
       placement="bottomRight"
-      trigger={["click"]}
+      trigger={["hover", "focus"]}
     >
       <div className="ide-transparency-inline" style={{cursor: 'pointer'}}>
         <Icon name="info" size={14} /> נתוני השוואה

@@ -197,7 +197,7 @@ describe("ClusterList", () => {
 
     const pendingItem = Array.from(container.querySelectorAll(".ide-cluster-item"))
       .find((item) => item.textContent.includes("Pending Copy"));
-    fireEvent.click(pendingItem.querySelector(".score-info-button"));
+    fireEvent.mouseEnter(pendingItem.querySelector(".score-info-button"));
 
     expect(setSelectedClusterId).not.toHaveBeenCalled();
     expect(await screen.findByText("שמות האלבומים דומים אבל חסר מידע ודאי על סדר הרצועות.")).toBeInTheDocument();

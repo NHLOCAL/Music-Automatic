@@ -149,12 +149,6 @@
   padding-bottom: 112px;
 }
 
-.ide-score-details-panel {
-  padding: 10px 16px;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border-main);
-}
-
 .ide-toolbar {
   min-height: 52px;
   background: var(--bg-surface);

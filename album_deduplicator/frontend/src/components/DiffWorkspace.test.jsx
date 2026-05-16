@@ -103,9 +103,7 @@ describe("DiffWorkspace", () => {
     expect(screen.getByLabelText("אין עטיפה זמינה")).toBeInTheDocument();
     expect(screen.getByText("נשמר: Acoustix")).toBeInTheDocument();
     expect(screen.getByText("למחיקה: 1")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "פירוט ציונים ונימוק" })).toBeInTheDocument();
-    expect(screen.getByText("Gemini זיהה התאמה גבוהה לפי שמות הרצועות והעטיפה.")).toBeInTheDocument();
-    expect(screen.getByText("92.6/100")).toBeInTheDocument();
+    expect(screen.getByText("נתוני השוואה")).toBeInTheDocument();
   });
 
   it("starts an in-app audio preview and allows pausing from the same track button", () => {
