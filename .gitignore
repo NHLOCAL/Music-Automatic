@@ -154,3 +154,9 @@ cython_debug/
 # pesonal
 o1_project/RecycleBin
 music_data.json
+**/logs/**
+**/repomix-output.*
+.vscode/settings.json
+**/node_modules/
+album_deduplicator/frontend/dist/
+album_deduplicator/frontend/desktop-dist/

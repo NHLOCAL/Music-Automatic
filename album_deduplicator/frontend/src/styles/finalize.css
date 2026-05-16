@@ -1,0 +1,151 @@
+.data-table-container {
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.data-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  background: var(--bg-surface);
+  padding: 16px 20px;
+  border: 1px solid var(--border-main);
+  border-radius: 4px;
+}
+
+.data-table-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.finalize-header-note {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.finalize-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.feedback-export-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  color: var(--text-muted);
+}
+
+.feedback-export-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.feedback-export-note {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.feedback-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.feedback-export-actions .ant-btn {
+  height: 24px;
+  padding-inline: 6px;
+  color: var(--text-muted);
+}
+
+.data-table-wrapper {
+  flex: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-main);
+  border-radius: 4px;
+  overflow: auto;
+}
+
+.pro-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: right;
+  font-size: 12px;
+}
+
+.pro-table th {
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-main);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.pro-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: top;
+}
+
+.pro-table tr:hover {
+  background: var(--bg-hover);
+}
+
+.pro-table .path-cell {
+  font-family: var(--font-mono);
+  direction: ltr;
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.finalize-cluster-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.finalize-cluster-reset {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.finalize-reset-button.ant-btn {
+  height: 24px;
+  padding-inline: 8px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .data-table-header,
+  .finalize-header-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .feedback-export-strip {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .finalize-cluster-reset {
+    justify-content: flex-start;
+  }
+}

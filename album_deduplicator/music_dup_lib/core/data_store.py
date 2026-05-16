@@ -1,0 +1,157 @@
+import datetime
+import json
+import logging
+import pickle
+from pathlib import Path
+import shutil
+from typing import Dict, Any, List, Union, FrozenSet
+from .. import config
+from ..models import FolderComparisonResult
+logger = logging.getLogger(__name__)
+class DataStore:
+    def __init__(self,
+                 music_cache_file: Path = config.MUSIC_DATA_CACHE_FILE,
+                 comparison_cache_file: Path = config.COMPARISON_RESULTS_CACHE_FILE):
+        self.music_cache_file = music_cache_file
+        self.comparison_cache_file = comparison_cache_file
+    def load_data(self) -> Dict[str, Any]:
+        if self.music_cache_file.exists():
+            logger.info(f"Loading music data cache from: {self.music_cache_file}")
+            try:
+                with open(self.music_cache_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        logger.info(f"Successfully loaded data for {len(data)} folders from music cache.")
+                        return data
+                    else:
+                        logger.error(f"Music cache file {self.music_cache_file} does not contain a valid JSON dictionary. Using empty cache.")
+                        self._backup_corrupted_file(self.music_cache_file)
+                        return {}
+            except json.JSONDecodeError as e:
+                logger.error(f"Error decoding JSON from music cache file {self.music_cache_file}: {e}. Using empty cache.")
+                self._backup_corrupted_file(self.music_cache_file)
+                return {}
+            except Exception as e:
+                logger.error(f"Unexpected error loading music cache file {self.music_cache_file}: {e}", exc_info=True)
+                return {}
+        else:
+            logger.info("Music data cache file not found. Starting with an empty cache.")
+            return {}
+    def save_data(self, data_to_update: Dict[str, Any], merge: bool = True):
+        logger.info(f"Attempting to save/update music data cache to: {self.music_cache_file}")
+        if merge:
+            existing_music_data = self.load_data()
+            logger.info(f"Loaded {len(existing_music_data)} existing music data entries. Merging with {len(data_to_update)} new/updated entries.")
+            existing_music_data.update(data_to_update)
+            data_to_write = existing_music_data
+        else:
+            data_to_write = data_to_update
+            logger.info(f"Writing {len(data_to_write)} music data entries without reloading existing cache.")
+        logger.info(f"Total music data entries after merge: {len(data_to_write)}")
+        try:
+            self.music_cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.music_cache_file, 'w', encoding='utf-8') as f:
+                json.dump(data_to_write, f, ensure_ascii=False, separators=(',', ':'))
+            logger.info(f"Music data cache successfully updated and saved with {len(data_to_write)} total entries.")
+        except TypeError as e:
+             logger.error(f"Error serializing updated music data to JSON: {e}. Data might contain non-serializable types.", exc_info=True)
+        except OSError as e:
+             logger.error(f"OS error saving updated music data cache file {self.music_cache_file}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error saving updated music data cache file {self.music_cache_file}: {e}", exc_info=True)
+    def _backup_corrupted_file(self, file_path: Path):
+        if file_path.exists() and file_path.stat().st_size > 0:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            backup_name = f"{file_path.stem}.corrupted_{timestamp}{file_path.suffix}"
+            backup_path = file_path.with_name(backup_name)
+            try:
+                shutil.move(str(file_path), str(backup_path))
+                logger.warning(f"Backed up corrupted/invalid file {file_path} to: {backup_path}")
+            except Exception as e:
+                logger.error(f"Could not back up corrupted/invalid file {file_path}: {e}")
+        elif not file_path.exists():
+            logger.debug(f"File {file_path} does not exist, no backup needed.")
+        else:
+            logger.debug(f"File {file_path} is empty, no backup needed. It will be overwritten or created.")
+    def load_comparison_results(self, cache_profile: str = "partial") -> Dict[FrozenSet[str], FolderComparisonResult]:
+        if not self.comparison_cache_file.exists():
+            logger.info("Comparison results cache file (.pkl) not found. Returning empty map.")
+            return {}
+        logger.info(f"Loading comparison results from Pickle file: {self.comparison_cache_file}")
+        try:
+            with open(self.comparison_cache_file, 'rb') as f:
+                data = pickle.load(f)
+            metadata = {"cache_profile": "partial"}
+            results = data
+            if isinstance(data, dict) and "results" in data and isinstance(data.get("metadata"), dict):
+                metadata = data.get("metadata", metadata)
+                results = data.get("results", {})
+            if not isinstance(results, dict):
+                logger.error(f"Comparison cache file {self.comparison_cache_file} does not contain a valid dictionary. Using empty cache.")
+                self._backup_corrupted_file(self.comparison_cache_file)
+                return {}
+            stored_profile = metadata.get("cache_profile", "partial")
+            if stored_profile != cache_profile:
+                logger.info(
+                    "Ignoring comparison cache because profile %s does not match requested %s.",
+                    stored_profile,
+                    cache_profile,
+                )
+                return {}
+            logger.info(f"Successfully loaded {len(results)} comparison results into map from Pickle cache.")
+            return results
+        except pickle.UnpicklingError as e:
+            logger.error(f"Error unpickling from comparison cache file {self.comparison_cache_file}: {e}. Using empty cache.")
+            self._backup_corrupted_file(self.comparison_cache_file)
+            return {}
+        except Exception as e:
+            logger.error(f"Unexpected error loading comparison cache file {self.comparison_cache_file}: {e}", exc_info=True)
+            return {}
+    def save_comparison_results(self,
+                                results_to_update: Union[List[FolderComparisonResult], Dict[FrozenSet[Path], FolderComparisonResult], Dict[FrozenSet[str], FolderComparisonResult]],
+                                cache_profile: str = "partial",
+                                existing_results_map: Union[Dict[FrozenSet[str], FolderComparisonResult], None] = None):
+        logger.info(f"Attempting to save/update comparison results to Pickle file: {self.comparison_cache_file}")
+        if existing_results_map is None:
+            existing_results_map = self.load_comparison_results(cache_profile=cache_profile)
+            logger.info(f"Loaded {len(existing_results_map)} existing comparison results. Merging with {len(results_to_update) if isinstance(results_to_update, (list, dict)) else 'N/A'} new/updated results.")
+        else:
+            existing_results_map = dict(existing_results_map)
+            logger.info(
+                f"Reusing in-memory comparison cache with {len(existing_results_map)} existing entries. "
+                f"Merging with {len(results_to_update) if isinstance(results_to_update, (list, dict)) else 'N/A'} new/updated results."
+            )
+        update_map_str_keys: Dict[FrozenSet[str], FolderComparisonResult] = {}
+        if isinstance(results_to_update, list):
+            for res in results_to_update:
+                key = frozenset({str(res.folder1_path), str(res.folder2_path)})
+                update_map_str_keys[key] = res
+        elif isinstance(results_to_update, dict):
+            for key_set, res_val in results_to_update.items():
+                if not key_set: continue
+                # --- START OF FIX ---
+                # This conversion correctly handles both FrozenSet[Path] and FrozenSet[str]
+                # by ensuring all items become strings, satisfying the dictionary's key type.
+                str_key_set = frozenset(str(item) for item in key_set)
+                update_map_str_keys[str_key_set] = res_val
+                # --- END OF FIX ---
+        
+        existing_results_map.update(update_map_str_keys)
+        logger.info(f"Total comparison results after merge: {len(existing_results_map)}")
+        try:
+            self.comparison_cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.comparison_cache_file, 'wb') as f:
+                pickle.dump(
+                    {
+                        "metadata": {"cache_profile": cache_profile},
+                        "results": existing_results_map,
+                    },
+                    f,
+                )
+            logger.info(f"Comparison results cache successfully updated and saved with {len(existing_results_map)} total entries.")
+        except pickle.PicklingError as e:
+            logger.error(f"Error pickling updated comparison results: {e}. Results might contain non-serializable types.", exc_info=True)
+        except OSError as e:
+            logger.error(f"OS error saving updated comparison cache file {self.comparison_cache_file}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error saving updated comparison cache file {self.comparison_cache_file}: {e}", exc_info=True)

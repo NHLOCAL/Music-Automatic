@@ -1,0 +1,25 @@
+# Changelog
+
+כל שינוי משמעותי ב־`album_deduplicator` יתועד בקובץ זה.
+
+הפורמט מבוסס על עקרונות `Keep a Changelog`, עם חלוקה לפי גרסאות או לפי `Unreleased` כאשר עדיין לא נוצר release רשמי.
+
+## Unreleased
+
+### Fixed
+
+- אריזת ה־desktop כוללת כעת את מודל ה־`ML`, כך שגרסאות Windows ארוזות לא נופלות ל־scoring אלגוריתמי בלבד.
+
+### Documentation
+
+- נוקה `README.md` מסעיף "מה חדש" ומרשימת עדכונים מצטברת.
+- נוסף קובץ `CHANGELOG.md` שישמש מכאן ואילך לתיעוד שינויי קוד ועדכוני מוצר.
+
+### Current Baseline
+
+- היישום הראשי הוא desktop app מבוסס `Electron + React`, עם backend מקומי מבוסס `FastAPI`.
+- ה־frontend משתמש ב־`Ant Design 6`, תמיכת RTL וזרימת עבודה למסכי בחירה, סריקה, סיכום, סקירה והעברה.
+- מנוע הניתוח משלב scoring אלגוריתמי, מודל `ML` מקומי ו־`Gemini` אופציונלי לזוגות גבוליים.
+- מחיקות מתבצעות דרך `send2trash` אל סל המחזור בלבד, לאחר אישור משתמש.
+- קיימת תמיכה ב־sessions, אירועי `SSE`, שמירת החלטות משתמש, עטיפות אלבומים והשמעת שירים לצורך השוואה.
+- קיימת תשתית CI/CD ל־Windows builds ול־GitHub Releases דרך tag מהצורה `album-deduplicator-vX.Y.Z`.

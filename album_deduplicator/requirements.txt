@@ -1,0 +1,12 @@
+mutagen
+jibrish_to_hebrew
+rapidfuzz
+joblib
+pandas
+numpy
+Pillow
+Send2Trash
+fastapi
+uvicorn
+pytest
+httpx
