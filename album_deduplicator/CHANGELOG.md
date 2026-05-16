@@ -12,6 +12,7 @@
 - `run.bat` בודק כעת תלויות `Python` ו־frontend לפני פתיחת אפליקציית ה־desktop, כדי לעצור מוקדם כאשר חסרה תלות כמו `lightgbm`.
 - אריזת ה־desktop כוללת כעת את מודל ה־`ML`, כך שגרסאות Windows ארוזות לא נופלות ל־scoring אלגוריתמי בלבד.
 - קריאות `Gemini` מוגדרות כעת עם `thinking_level="medium"` עבור מודל `Gemini 3.1 Flash-Lite`.
+- בדיקת התלויות של `run.bat` מזהה כעת נכון את חבילת `google-genai` דרך import בשם `google.genai`.
 
 ### Documentation
 

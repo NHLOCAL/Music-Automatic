@@ -14,6 +14,7 @@ REQUIREMENTS_PATH = PROJECT_ROOT / "requirements.txt"
 NPM_COMMAND = "npm.cmd" if sys.platform == "win32" else "npm"
 
 IMPORT_NAMES = {
+    "google-genai": "google.genai",
     "pillow": "PIL",
     "send2trash": "send2trash",
 }
