@@ -83,7 +83,7 @@ JIBRISH_FIX_LANGUAGE = "heb"
 GEMINI_API_KEY_ENV_VAR = "GEMINI_API_KEY" # שם משתנה הסביבה
 # קובץ ההנחיות ל-Gemini, נמצא יחסית למיקום קובץ זה, בתיקיית 'external' של music_dup_lib
 GEMINI_SYSTEM_INST_FILE = MUSIC_DUP_LIB_ROOT / "external" / "gemini_system_instruction.txt"
-GEMINI_MODEL_NAME = "gemini-2.5-flash" # "gemini-2.5-flash-preview-05-20" # "gemini-2.0-flash-lite"
+GEMINI_MODEL_NAME = "gemini-3.1-flash-lite" # "gemini-3-flash-preview"
 DEFAULT_GEMINI_SIMILARITY_RANGE = "60-90" # Min-Max % for sending pairs to Gemini
 GEMINI_API_DELAY_SECONDS = 0.5 # Delay between API calls (seconds)
 GEMINI_HIGH_SIMILARITY_THRESHOLD_FOR_REPRESENTATIVE = 95.0
