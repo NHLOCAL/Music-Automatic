@@ -24,6 +24,10 @@ module.exports = {
       to: "backend-source/music_dup_lib",
     },
     {
+      from: "../data/lgbm_regressor_model.joblib",
+      to: "backend-source/data/lgbm_regressor_model.joblib",
+    },
+    {
       from: "../frontend/dist",
       to: "backend-source/frontend/dist",
     },
