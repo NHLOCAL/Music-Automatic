@@ -343,8 +343,11 @@ class FolderScanner:
         if len(names) < 2:
             return 0.0
 
-        cleaned_names = [re.sub(r'\d', '', Path(name).stem).strip() for name in names]
+        stems = [Path(name).stem for name in names]
+        cleaned_names = [re.sub(r'\d', '', stem).strip() for stem in stems]
         cleaned_names = [name for name in cleaned_names if name]
+        if not cleaned_names and all(self._is_number_only_track_name(stem) for stem in stems):
+            return 1.0
         if len(cleaned_names) < 2:
             return 0.0
 
@@ -355,6 +358,9 @@ class FolderScanner:
             pair_count += 1
 
         return total_similarity / pair_count if pair_count > 0 else 0.0
+
+    def _is_number_only_track_name(self, stem: str) -> bool:
+        return bool(stem.strip()) and not re.search(r"[^\W\d_]", stem, flags=re.UNICODE)
 
     def _folder_info_to_dict(self, folder_info: FolderInfo) -> Dict[str, Any]:
         return {
