@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -76,20 +77,36 @@ class AnalysisOrchestrator:
 
         cached_results_map = {}
         if not options.force_rescan and not options.clear_cache:
-            cached_results_map = self.data_store.load_comparison_results(cache_profile=hash_strategy)
+            cached_results_map = self.data_store.load_comparison_results(
+                cache_profile=hash_strategy, folder_signatures=folder_scanner.cache_signatures,
+                scoring_profile=options.bitrate_mode,
+            )
 
-        comparison_results = comparison_engine.find_similar_folders(
+        folder_counts = Counter(len(folder.files) for folder in scanned_folders.values() if folder.files)
+        candidate_pairs_total = sum(count * (count - 1) // 2 for count in folder_counts.values())
+        quality_folder_paths = {
+            path for path, folder in scanned_folders.items()
+            if folder.files and folder_counts[len(folder.files)] > 1
+        }
+        matching_current = 0
+        last_reported_matching = -1
+
+        def report_matching(current: int, total: int, message: str = "מאתר התאמות בין אלבומים") -> None:
+            nonlocal matching_current, last_reported_matching
+            matching_current = max(matching_current, current)
+            interval = max(1, (total + 999) // 1000)
+            if matching_current == last_reported_matching:
+                return
+            if matching_current != total and last_reported_matching >= 0 and matching_current - last_reported_matching < interval:
+                return
+            last_reported_matching = matching_current
+            self._emit(progress_handler, "matching", message, matching_current, total)
+
+        comparison_results = comparison_engine.iter_similar_folders(
             scanned_folders,
-            progress_callback=lambda current, total: self._emit(
-                progress_handler,
-                "matching",
-                "מאתר התאמות בין אלבומים",
-                current,
-                total,
-            ),
+            progress_callback=report_matching,
             cached_results_map=cached_results_map,
         )
-        compared_pairs_total = len(comparison_results)
 
         scoring_service = ScoringService(
             preferred_bitrate=options.bitrate_mode,
@@ -101,17 +118,23 @@ class AnalysisOrchestrator:
             comparison_results=comparison_results,
             all_folders=scanned_folders,
             cached_results_map=cached_results_map,
-            progress_callback=lambda step, message, current, total: self._emit(
-                progress_handler, step, message, current, total
+            progress_callback=lambda step, message, current, total: report_matching(
+                current if step == "scoring" else 0, candidate_pairs_total, message
             ),
             cache_result_callback=cache_updates.append,
+            total_pairs=candidate_pairs_total,
+            quality_folder_paths=quality_folder_paths,
         )
+        compared_pairs_total = scoring_service.compared_pairs_count
+        self._emit(progress_handler, "scoring", "השוואת האלבומים הושלמה", compared_pairs_total, compared_pairs_total or 1)
 
         if cache_updates:
             self.data_store.save_comparison_results(
                 cache_updates,
                 cache_profile=hash_strategy,
                 existing_results_map=cached_results_map,
+                folder_signatures=folder_scanner.cache_signatures,
+                scoring_profile=options.bitrate_mode,
             )
 
         recommendation_service = RecommendationService(

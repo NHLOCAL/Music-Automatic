@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from itertools import islice
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Sequence, Tuple
 
 from .. import config
 from ..core.quality_analyzer import QualityAnalyzer
@@ -39,14 +40,27 @@ class ScoringService:
 
     def apply_scores(
         self,
-        comparison_results: List[FolderComparisonResult],
+        comparison_results: Iterable[FolderComparisonResult],
         all_folders: Dict[Path, FolderInfo],
         cached_results_map: Dict[FrozenSet[str], FolderComparisonResult],
         progress_callback: Optional[ProgressCallback] = None,
         cache_result_callback: Optional[CacheResultCallback] = None,
+        *,
+        total_pairs: Optional[int] = None,
+        quality_folder_paths: Optional[Iterable[Path]] = None,
     ) -> tuple[Dict[str, PairAnalysis], AnalysisWarnings]:
         warnings = AnalysisWarnings()
-        self._calculate_quality_scores(comparison_results, all_folders, progress_callback)
+        if total_pairs is None:
+            if not isinstance(comparison_results, list):
+                raise ValueError("Streaming comparisons require total_pairs and quality_folder_paths")
+            total_pairs = len(comparison_results)
+        if quality_folder_paths is None:
+            if not isinstance(comparison_results, list):
+                raise ValueError("Streaming comparisons require quality_folder_paths")
+            self._calculate_quality_scores(comparison_results, all_folders, progress_callback)
+        else:
+            self._calculate_quality_for_paths(quality_folder_paths, all_folders, progress_callback)
+        self.compared_pairs_count = 0
 
         if not self.ml_model.model_loaded:
             warnings.ml_unavailable = True
@@ -71,11 +85,17 @@ class ScoringService:
                     "Gemini לא זמין. זוגות גבוליים עדיין יוצגו, אבל ההחלטה תתבסס רק על scoring פנימי."
                 )
 
-        total_pairs = len(comparison_results)
         pairs: Dict[str, PairAnalysis] = {}
+        folder_ids = {path: stable_id("folder", str(path)) for path in all_folders}
+        results_iterator = iter(comparison_results)
+        batch_size = max(1, self.ml_model.prediction_batch_size)
 
-        for chunk_start in range(0, total_pairs, self.ml_model.prediction_batch_size):
-            chunk = comparison_results[chunk_start:chunk_start + self.ml_model.prediction_batch_size]
+        while True:
+            chunk = list(islice(results_iterator, batch_size))
+            if not chunk:
+                break
+            chunk_start = self.compared_pairs_count
+            self.compared_pairs_count += len(chunk)
             self._populate_ml_scores_for_chunk(
                 chunk_results=chunk,
                 all_folders=all_folders,
@@ -87,8 +107,10 @@ class ScoringService:
                 if progress_callback:
                     progress_callback("scoring", "מחשב ציוני דמיון", offset, total_pairs)
 
-                cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
-                cached_result = cached_results_map.get(cache_key)
+                cached_result = None
+                if cached_results_map:
+                    cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
+                    cached_result = cached_results_map.get(cache_key)
                 folder1_info = all_folders.get(result.folder1_path)
                 folder2_info = all_folders.get(result.folder2_path)
                 if not folder1_info or not folder2_info:
@@ -142,21 +164,21 @@ class ScoringService:
 
                 if self._should_cache_result(result, final_score):
                     cache_entry = self._build_cache_entry(result)
-                    if cache_result_callback is not None:
+                    if cache_result_callback is not None and cache_entry != cached_result:
                         cache_result_callback(cache_entry)
 
                 if self._should_retain_pair(result, final_score):
                     folder_ids_sorted = sorted(
                         [
-                            stable_id("folder", str(result.folder1_path)),
-                            stable_id("folder", str(result.folder2_path)),
+                            folder_ids[result.folder1_path],
+                            folder_ids[result.folder2_path],
                         ]
                     )
                     pair_id = stable_id("pair", "|".join(folder_ids_sorted))
                     pairs[pair_id] = PairAnalysis(
                         pair_id=pair_id,
-                        folder1_id=stable_id("folder", str(result.folder1_path)),
-                        folder2_id=stable_id("folder", str(result.folder2_path)),
+                        folder1_id=folder_ids[result.folder1_path],
+                        folder2_id=folder_ids[result.folder2_path],
                         folder1_path=result.folder1_path,
                         folder2_path=result.folder2_path,
                         algorithmic_score=round(algorithmic_score, 4),
@@ -173,7 +195,8 @@ class ScoringService:
                     )
 
                 self._release_processed_result(result)
-                comparison_results[offset - 1] = None  # type: ignore[list-item]
+                if isinstance(comparison_results, list):
+                    comparison_results[offset - 1] = None  # type: ignore[list-item]
 
         return pairs, warnings
 
@@ -241,8 +264,10 @@ class ScoringService:
             if result.ml_similarity_score is not None:
                 continue
 
-            cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
-            cached_result = cached_results_map.get(cache_key)
+            cached_result = None
+            if cached_results_map:
+                cache_key = frozenset({str(result.folder1_path), str(result.folder2_path)})
+                cached_result = cached_results_map.get(cache_key)
             cached_ml_score = getattr(cached_result, "ml_similarity_score", None) if cached_result else None
             if cached_ml_score is not None:
                 result.ml_similarity_score = float(cached_ml_score)
@@ -276,6 +301,15 @@ class ScoringService:
             for path in (result.folder1_path, result.folder2_path)
             if path in all_folders
         }
+        self._calculate_quality_for_paths(folders_for_quality, all_folders, progress_callback)
+
+    def _calculate_quality_for_paths(
+        self,
+        folder_paths: Iterable[Path],
+        all_folders: Dict[Path, FolderInfo],
+        progress_callback: Optional[ProgressCallback],
+    ) -> None:
+        folders_for_quality = sorted(set(folder_paths).intersection(all_folders))
         total = len(folders_for_quality)
         for index, folder_path in enumerate(sorted(folders_for_quality), start=1):
             if progress_callback:

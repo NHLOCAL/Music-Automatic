@@ -8,7 +8,7 @@
 
 ### Performance
 
-- Reduced redundant file-stat calls, disabled-log formatting and folder-cache copies during scanning; repeated generic track names keep the same score with a direct exact-match path
+- טעינה, סריקה והשוואה צורכות פחות זיכרון ועבודה חוזרת; השוואת הזוגות והכנת נתוני ML נעשות באצוות מוגבלות ללא שינוי בציוני הזיהוי
 
 ### Fixed
 

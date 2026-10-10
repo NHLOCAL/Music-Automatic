@@ -55,6 +55,26 @@ def test_benchmark_recorder_sorts_stage_metrics_descending():
     assert metrics[0].call_count == 2
 
 
+def test_benchmark_progress_does_not_retain_every_pair():
+    event = type("Event", (), {"step": "matching", "current": 1, "total": 10000})()
+    recorder = BenchmarkRecorder()
+    for _ in range(10000):
+        recorder.record_progress_event(event)
+    assert len(recorder.progress_metrics) <= 256
+
+
+def test_iterator_timing_records_consumed_work():
+    from music_dup_lib.performance_benchmark import _make_timed_iterator
+
+    recorder = BenchmarkRecorder()
+    wrapped = _make_timed_iterator("comparison", recorder, lambda: iter([1, 2]))
+    assert list(wrapped()) == [1, 2]
+    metrics = recorder.build_stage_metrics()
+    assert metrics[0].label == "comparison"
+    assert metrics[0].call_count == 1
+    assert metrics[0].duration_seconds >= 0
+
+
 def test_format_seconds_handles_minutes():
     assert format_seconds(12.34) == "12.34s"
     assert format_seconds(65.2) == "1m 05.20s"

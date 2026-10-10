@@ -9,10 +9,10 @@ class DummyStore:
     def __init__(self):
         self.saved_results = None
 
-    def load_comparison_results(self, cache_profile: str = "partial"):
+    def load_comparison_results(self, cache_profile: str = "partial", folder_signatures=None, scoring_profile="128"):
         return {}
 
-    def save_comparison_results(self, results_to_update, cache_profile: str = "partial", existing_results_map=None):
+    def save_comparison_results(self, results_to_update, cache_profile: str = "partial", existing_results_map=None, folder_signatures=None, scoring_profile="128"):
         self.saved_results = list(results_to_update)
 
 
@@ -43,7 +43,7 @@ def test_analysis_orchestrator_counts_all_compared_pairs(monkeypatch):
         lambda self, folders: {folder_a.path: folder_a, folder_b.path: folder_b},
     )
     monkeypatch.setattr(
-        "music_dup_lib.services.analysis_orchestrator.ComparisonEngine.find_similar_folders",
+        "music_dup_lib.services.analysis_orchestrator.ComparisonEngine.iter_similar_folders",
         lambda self, folders, progress_callback=None, cached_results_map=None: [comparison],
     )
     monkeypatch.setattr(
@@ -101,7 +101,7 @@ def test_analysis_orchestrator_emits_matching_progress(monkeypatch):
         return [comparison]
 
     monkeypatch.setattr(
-        "music_dup_lib.services.analysis_orchestrator.ComparisonEngine.find_similar_folders",
+        "music_dup_lib.services.analysis_orchestrator.ComparisonEngine.iter_similar_folders",
         fake_find_similar_folders,
     )
     monkeypatch.setattr(
@@ -138,11 +138,11 @@ def test_analysis_orchestrator_reuses_loaded_comparison_cache_for_compare_and_sa
             self.load_calls = 0
             self.save_existing_map = None
 
-        def load_comparison_results(self, cache_profile: str = "partial"):
+        def load_comparison_results(self, cache_profile: str = "partial", folder_signatures=None, scoring_profile="128"):
             self.load_calls += 1
             return cache_map
 
-        def save_comparison_results(self, results_to_update, cache_profile: str = "partial", existing_results_map=None):
+        def save_comparison_results(self, results_to_update, cache_profile: str = "partial", existing_results_map=None, folder_signatures=None, scoring_profile="128"):
             self.saved_results = list(results_to_update)
             self.save_existing_map = existing_results_map
 
@@ -176,7 +176,7 @@ def test_analysis_orchestrator_reuses_loaded_comparison_cache_for_compare_and_sa
         ]
 
     monkeypatch.setattr(
-        "music_dup_lib.services.analysis_orchestrator.ComparisonEngine.find_similar_folders",
+        "music_dup_lib.services.analysis_orchestrator.ComparisonEngine.iter_similar_folders",
         fake_find_similar_folders,
     )
     monkeypatch.setattr(

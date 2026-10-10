@@ -367,39 +367,43 @@ class MLSimilarityModel:
         feature_rows: List[List[float]] = []
         feature_indexes: List[int] = []
 
-        for index, (folder1_info, folder2_info, comparison_result) in enumerate(pair_inputs):
-            feature_vector = self._build_feature_vector(folder1_info, folder2_info, comparison_result)
-            if feature_vector is None:
-                logger.warning(
-                    "Feature preparation failed for ML prediction for pair: %s and %s. Skipping.",
-                    folder1_info.path.name,
-                    folder2_info.path.name,
-                )
-                continue
-            feature_rows.append(feature_vector)
-            feature_indexes.append(index)
-
-        if not feature_rows:
-            return scores
-
-        features_matrix = np.asarray(feature_rows, dtype=np.float64)
-        if not np.isfinite(features_matrix).all():
-            logger.warning("Non-finite values found in ML features. Replacing them with 0.0 before prediction.")
-            features_matrix = np.nan_to_num(features_matrix, nan=0.0, posinf=0.0, neginf=0.0)
-
         try:
-            for start in range(0, len(feature_indexes), self.prediction_batch_size):
-                stop = start + self.prediction_batch_size
-                batch_indexes = feature_indexes[start:stop]
-                batch_matrix = features_matrix[start:stop]
-                batch_predictions = np.asarray(self.model.predict(batch_matrix), dtype=np.float64)
-                batch_predictions = np.clip(batch_predictions, 0.0, 100.0)
-                for row_index, predicted_score in zip(batch_indexes, batch_predictions.tolist()):
-                    scores[row_index] = float(predicted_score)
+            for index, (folder1_info, folder2_info, comparison_result) in enumerate(pair_inputs):
+                feature_vector = self._build_feature_vector(folder1_info, folder2_info, comparison_result)
+                if feature_vector is None:
+                    logger.warning(
+                        "Feature preparation failed for ML prediction for pair: %s and %s. Skipping.",
+                        folder1_info.path.name,
+                        folder2_info.path.name,
+                    )
+                    continue
+                feature_rows.append(feature_vector)
+                feature_indexes.append(index)
+                if len(feature_rows) >= self.prediction_batch_size:
+                    self._predict_feature_batch(feature_rows, feature_indexes, scores)
+                    feature_rows.clear()
+                    feature_indexes.clear()
+            if feature_rows:
+                self._predict_feature_batch(feature_rows, feature_indexes, scores)
         except Exception as e:
             logger.error("Error during ML batch prediction: %s", e, exc_info=True)
 
         return scores
+
+    def _predict_feature_batch(
+        self,
+        feature_rows: List[List[float]],
+        feature_indexes: List[int],
+        scores: List[Optional[float]],
+    ) -> None:
+        features_matrix = np.asarray(feature_rows, dtype=np.float64)
+        if not np.isfinite(features_matrix).all():
+            logger.warning("Non-finite values found in ML features. Replacing them with 0.0 before prediction.")
+            features_matrix = np.nan_to_num(features_matrix, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+        predictions = np.asarray(self.model.predict(features_matrix), dtype=np.float64)
+        predictions = np.clip(predictions, 0.0, 100.0)
+        for row_index, predicted_score in zip(feature_indexes, predictions.tolist()):
+            scores[row_index] = float(predicted_score)
 
     def predict_similarity_for_pair(self,
                                    folder1_info: FolderInfo,

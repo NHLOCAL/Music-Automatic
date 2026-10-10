@@ -140,3 +140,25 @@ def test_comparison_engine_reuses_cached_pair_results_without_recomputing():
     assert results[0].ml_similarity_score == 93.0
     assert engine.last_run_stats.cached_pairs == 1
     assert engine.last_run_stats.computed_pairs == 0
+
+
+def test_comparison_iterator_produces_pairs_lazily_in_existing_order():
+    engine = ComparisonEngine(enable_hashing=False)
+    folders = [make_folder(f"C:/music/{name}", count) for name, count in
+               [("A", 3), ("B", 2), ("C", 3), ("D", 2), ("E", 3)]]
+    progress_events = []
+    pairs = engine.iter_similar_folders(
+        {folder.path: folder for folder in folders},
+        progress_callback=lambda current, total: progress_events.append((current, total)),
+    )
+
+    first = next(pairs)
+    assert (first.folder1_path.name, first.folder2_path.name) == ("B", "D")
+    assert progress_events == [(1, 4)]
+    remaining = list(pairs)
+    assert [(pair.folder1_path.name, pair.folder2_path.name) for pair in remaining] == [
+        ("A", "C"), ("A", "E"), ("C", "E"),
+    ]
+    assert progress_events == [(1, 4), (2, 4), (3, 4), (4, 4)]
+    assert engine.last_run_stats.total_pairs == 4
+    assert engine.last_run_stats.computed_pairs == 4

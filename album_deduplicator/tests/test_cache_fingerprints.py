@@ -117,6 +117,33 @@ def test_comparison_cache_without_fingerprints_is_ignored_when_validation_reques
     assert store.load_comparison_results(folder_signatures={"a": "current-a", "b": "current-b"}) == {}
 
 
+@pytest.mark.parametrize("changed_input", ["weights", "model", "prompt", "quality", "bitrate"])
+def test_comparison_cache_invalidates_changed_scoring_inputs(monkeypatch, tmp_path, changed_input):
+    model = tmp_path / "model.joblib"
+    prompt = tmp_path / "prompt.txt"
+    model.write_bytes(b"model-v1")
+    prompt.write_text("prompt-v1", encoding="utf-8")
+    monkeypatch.setattr(config, "ML_MODEL_FILE", model)
+    monkeypatch.setattr(config, "GEMINI_SYSTEM_INST_FILE", prompt)
+    store = DataStore(tmp_path / "music.json", tmp_path / "comparisons.pkl")
+    signatures = {"a": "1", "b": "1"}
+    pair = FolderComparisonResult(Path("a"), Path("b"), weighted_score=90, ml_similarity_score=95)
+    store.save_comparison_results([pair], folder_signatures=signatures)
+    assert len(store.load_comparison_results(folder_signatures=signatures)) == 1
+    if changed_input == "weights":
+        monkeypatch.setattr(config, "SIMILARITY_WEIGHTS", {"file_hash": 1.0})
+    elif changed_input == "model":
+        model.write_bytes(b"model-v2-with-different-size")
+    elif changed_input == "prompt":
+        prompt.write_text("a new prompt", encoding="utf-8")
+    elif changed_input == "quality":
+        monkeypatch.setattr(config, "QUALITY_WEIGHTS", {"bitrate_score": 1.0})
+    if changed_input == "bitrate":
+        assert store.load_comparison_results(folder_signatures=signatures, scoring_profile="high") == {}
+    else:
+        assert store.load_comparison_results(folder_signatures=signatures) == {}
+
+
 def test_comparison_cache_merge_retains_only_pairs_valid_for_new_signatures(tmp_path):
     store = DataStore(tmp_path / "music.json", tmp_path / "comparisons.pkl")
     ab = FolderComparisonResult(Path("a"), Path("b"), weighted_score=90)

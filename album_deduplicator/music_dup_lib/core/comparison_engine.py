@@ -3,7 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Tuple
+from typing import Any, Callable, Dict, FrozenSet, Iterator, List, Optional, Tuple
 
 from .. import config
 from ..models import FileInfo, FolderComparisonResult, FolderInfo
@@ -170,9 +170,18 @@ class ComparisonEngine:
         progress_callback: Optional[ComparisonProgressCallback] = None,
         cached_results_map: Optional[Dict[FrozenSet[str], FolderComparisonResult]] = None,
     ) -> List[FolderComparisonResult]:
+        return list(self.iter_similar_folders(all_folders, progress_callback, cached_results_map))
+
+    def iter_similar_folders(
+        self,
+        all_folders: Dict[Path, FolderInfo],
+        progress_callback: Optional[ComparisonProgressCallback] = None,
+        cached_results_map: Optional[Dict[FrozenSet[str], FolderComparisonResult]] = None,
+    ) -> Iterator[FolderComparisonResult]:
+        """Yield every eligible pair in the same order without retaining all results."""
         logger.info(f"Starting comparison of {len(all_folders)} folders.")
-        comparison_results: List[FolderComparisonResult] = []
         cached_results_map = cached_results_map or {}
+        path_strings = {folder.path: str(folder.path) for folder in all_folders.values()} if cached_results_map else {}
         folders_by_file_count: Dict[int, List[FolderInfo]] = defaultdict(list)
         for folder in all_folders.values():
             if folder.files:
@@ -185,6 +194,7 @@ class ComparisonEngine:
         )
         cached_pairs = 0
         computed_pairs = 0
+        result_count = 0
 
         current_index = 0
         for file_count in sorted(folders_by_file_count):
@@ -194,28 +204,30 @@ class ComparisonEngine:
 
             for folder1, folder2 in combinations(group, 2):
                 current_index += 1
-                cache_key = frozenset({str(folder1.path), str(folder2.path)})
-                cached_result = cached_results_map.get(cache_key)
+                cached_result = None
+                if cached_results_map:
+                    cache_key = frozenset({path_strings[folder1.path], path_strings[folder2.path]})
+                    cached_result = cached_results_map.get(cache_key)
                 if cached_result is not None:
                     cached_pairs += 1
-                    comparison_results.append(self._clone_cached_result(cached_result, folder1.path, folder2.path))
+                    comparison_result = self._clone_cached_result(cached_result, folder1.path, folder2.path)
                 else:
                     computed_pairs += 1
                     comparison_result = self.compare_two_folders(folder1, folder2)
 
-                    if comparison_result:
-                        comparison_results.append(comparison_result)
-
                 if progress_callback:
                     progress_callback(current_index, total_pairs)
+
+                if comparison_result:
+                    result_count += 1
+                    yield comparison_result
 
         self.last_run_stats = ComparisonRunStats(
             total_pairs=total_pairs,
             cached_pairs=cached_pairs,
             computed_pairs=computed_pairs,
         )
-        logger.info(f"Comparison complete. Returning {len(comparison_results)} total processed pairs for caching and further analysis.")
-        return comparison_results
+        logger.info(f"Comparison complete. Returning {result_count} total processed pairs for caching and further analysis.")
 
     def compare_two_folders(self, folder1: FolderInfo, folder2: FolderInfo) -> Optional[FolderComparisonResult]:
         prepared_folder1 = self._prepare_folder(folder1)
@@ -264,14 +276,8 @@ class ComparisonEngine:
             logger.debug(f"Hashing enabled, but not all music files have hashes for pair: {folder1.path.name}, {folder2.path.name}, or hash comparison not possible.")
         # If hashing is disabled entirely, 'file_hash' won't be in self.weights due to _get_adjusted_weights
         size_similarity_sum = 0.0
-        for prepared_file1, prepared_file2 in zip(files1, files2):
-            file1 = prepared_file1.file_info
-            file2 = prepared_file2.file_info
-            s1, s2 = file1.size_mb, file2.size_mb
-            if s1 > 0 and s2 > 0:
-                ratio = min(s1, s2) / max(s1, s2)
-                size_similarity_sum += 1.0 if ratio >= 0.95 else ratio * ratio
-        similarity_scores['file_size'] = size_similarity_sum / num_files if num_files > 0 else 0.0
+        # Retain score presentation order while accumulating size in the track loop below.
+        similarity_scores['file_size'] = 0.0
         folder_name_sim = cached_string_similarity(folder1.folder_name, folder2.folder_name)
         similarity_scores['folder_name'] = folder_name_sim
         similarity_scores['album_art_hash'] = 1.0 if folder1.album_art_hash and folder1.album_art_hash == folder2.album_art_hash else 0.0
@@ -291,6 +297,10 @@ class ComparisonEngine:
         for prepared_file1, prepared_file2 in zip(files1, files2):
             file1 = prepared_file1.file_info
             file2 = prepared_file2.file_info
+            s1, s2 = file1.size_mb, file2.size_mb
+            if s1 > 0 and s2 > 0:
+                ratio = min(s1, s2) / max(s1, s2)
+                size_similarity_sum += 1.0 if ratio >= 0.95 else ratio * ratio
             fn_sim = cached_string_similarity(file1.filename, file2.filename)
             filename_sim_sum += (fn_sim * filename_adjustment)
             if file1.title and file2.title:
@@ -323,6 +333,7 @@ class ComparisonEngine:
                 value2 = prepared_file2.comparable_tags.get(key)
                 if value2 is not None and value1 == value2:
                     additional_metadata_matches[key] += 1
+        similarity_scores['file_size'] = size_similarity_sum / num_files if num_files > 0 else 0.0
         similarity_scores['filename'] = filename_sim_sum / num_files if num_files > 0 else 0.0
         similarity_scores['title'] = title_sim_sum / num_files if num_files > 0 else 0.0
         similarity_scores['artist'] = artist_sim_sum / num_files if num_files > 0 else 0.0

@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import json
 import logging
 import os
@@ -17,6 +18,30 @@ class DataStore:
                  comparison_cache_file: Path = config.COMPARISON_RESULTS_CACHE_FILE):
         self.music_cache_file = music_cache_file
         self.comparison_cache_file = comparison_cache_file
+    @staticmethod
+    def _comparison_context(scoring_profile: str = "128") -> str:
+        # Increment when comparison or ML feature semantics change.
+        context = {"version": 1, "bitrate_mode": scoring_profile}
+        for name in (
+            "SIMILARITY_WEIGHTS", "GENERIC_NAME_REDUCTION_FACTOR", "GENERIC_NAME_SIMILARITY_THRESHOLD",
+            "BASE_SCORE_ALGORITHMIC_WEIGHT", "BASE_SCORE_ML_WEIGHT", "GEMINI_MODEL_NAME", "GEMINI_THINKING_LEVEL",
+            "QUALITY_WEIGHTS", "HIGH_BITRATE_TARGET", "MID_BITRATE_TARGET", "BITRATE_SCORE_TOLERANCE",
+            "BASE_STRING_SIMILARITY_THRESHOLD",
+        ):
+            context[name] = getattr(config, name)
+        context["model"] = None
+        for path in (config.ML_MODEL_FILE, config.SIMILARITY_MODEL_FALLBACK_FILE):
+            try:
+                file_stat = path.stat()
+            except OSError:
+                continue
+            context["model"] = (str(path), file_stat.st_size, file_stat.st_mtime_ns)
+            break
+        try:
+            context["prompt"] = hashlib.sha256(config.GEMINI_SYSTEM_INST_FILE.read_bytes()).hexdigest()
+        except OSError:
+            context["prompt"] = None
+        return hashlib.sha256(json.dumps(context, sort_keys=True).encode("utf-8")).hexdigest()
     @staticmethod
     @contextmanager
     def _atomic_cache_writer(path: Path, mode: str, **kwargs):
@@ -92,7 +117,8 @@ class DataStore:
         else:
             logger.debug(f"File {file_path} is empty, no backup needed. It will be overwritten or created.")
     def load_comparison_results(
-        self, cache_profile: str = "partial", folder_signatures: Optional[Dict[str, str]] = None
+        self, cache_profile: str = "partial", folder_signatures: Optional[Dict[str, str]] = None,
+        scoring_profile: str = "128",
     ) -> Dict[FrozenSet[str], FolderComparisonResult]:
         if not self.comparison_cache_file.exists():
             logger.info("Comparison results cache file (.pkl) not found. Returning empty map.")
@@ -119,6 +145,9 @@ class DataStore:
                 )
                 return {}
             if folder_signatures is not None:
+                if metadata.get("comparison_context") != self._comparison_context(scoring_profile):
+                    logger.info("Ignoring comparison cache because scoring inputs changed or are unversioned")
+                    return {}
                 stored_signatures = metadata.get("folder_signatures", {})
                 if not isinstance(stored_signatures, dict):
                     return {}
@@ -145,11 +174,12 @@ class DataStore:
                                 results_to_update: Union[List[FolderComparisonResult], Dict[FrozenSet[Path], FolderComparisonResult], Dict[FrozenSet[str], FolderComparisonResult]],
                                 cache_profile: str = "partial",
                                 existing_results_map: Union[Dict[FrozenSet[str], FolderComparisonResult], None] = None,
-                                folder_signatures: Optional[Dict[str, str]] = None):
+                                folder_signatures: Optional[Dict[str, str]] = None,
+                                scoring_profile: str = "128"):
         logger.info(f"Attempting to save/update comparison results to Pickle file: {self.comparison_cache_file}")
         if existing_results_map is None:
             existing_results_map = self.load_comparison_results(
-                cache_profile=cache_profile, folder_signatures=folder_signatures
+                cache_profile=cache_profile, folder_signatures=folder_signatures, scoring_profile=scoring_profile
             )
             logger.info(f"Loaded {len(existing_results_map)} existing comparison results. Merging with {len(results_to_update) if isinstance(results_to_update, (list, dict)) else 'N/A'} new/updated results.")
         else:
@@ -183,6 +213,7 @@ class DataStore:
                         "metadata": {
                             "cache_profile": cache_profile,
                             "folder_signatures": folder_signatures or {},
+                            "comparison_context": self._comparison_context(scoring_profile) if folder_signatures is not None else None,
                         },
                         "results": existing_results_map,
                     },

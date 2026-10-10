@@ -4,6 +4,7 @@ import cProfile
 import io
 import pstats
 import time
+from collections import deque
 from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,7 +50,7 @@ class BenchmarkRecorder:
         self._stage_totals: Dict[str, float] = {}
         self._stage_calls: Dict[str, int] = {}
         self._run_start = time.perf_counter()
-        self.progress_metrics: List[ProgressMetric] = []
+        self.progress_metrics: deque[ProgressMetric] = deque(maxlen=256)
 
     def record_stage_duration(self, label: str, duration_seconds: float) -> None:
         self._stage_totals[label] = self._stage_totals.get(label, 0.0) + duration_seconds
@@ -117,6 +118,30 @@ def _make_timed_method(
             return original(*args, **kwargs)
         finally:
             recorder.record_stage_duration(label, time.perf_counter() - started)
+
+    return wrapped
+
+
+def _make_timed_iterator(
+    label: str,
+    recorder: BenchmarkRecorder,
+    original: Callable[..., Iterable[object]],
+) -> Callable[..., Iterable[object]]:
+    def wrapped(*args, **kwargs):
+        iterator = iter(original(*args, **kwargs))
+        duration = 0.0
+        try:
+            while True:
+                started = time.perf_counter()
+                try:
+                    item = next(iterator)
+                except StopIteration:
+                    return
+                finally:
+                    duration += time.perf_counter() - started
+                yield item
+        finally:
+            recorder.record_stage_duration(label, duration)
 
     return wrapped
 
@@ -189,11 +214,11 @@ def run_benchmark(
         stack.enter_context(
             patch.object(
                 ComparisonEngine,
-                "find_similar_folders",
-                new=_make_timed_method(
+                "iter_similar_folders",
+                new=_make_timed_iterator(
                     "comparison.find_similar_folders",
                     recorder,
-                    ComparisonEngine.find_similar_folders,
+                    ComparisonEngine.iter_similar_folders,
                 ),
             )
         )
@@ -254,7 +279,7 @@ def run_benchmark(
         snapshot=snapshot,
         wall_time_seconds=wall_time_seconds,
         stage_metrics=recorder.build_stage_metrics(),
-        progress_metrics=recorder.progress_metrics,
+        progress_metrics=list(recorder.progress_metrics),
         cprofile_text=stats_stream.getvalue(),
     )
 
