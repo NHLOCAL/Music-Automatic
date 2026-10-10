@@ -273,7 +273,8 @@ class ComparisonEngine:
                 )
         elif self.enable_hashing:
             similarity_scores['file_hash'] = 0.0
-            logger.debug(f"Hashing enabled, but not all music files have hashes for pair: {folder1.path.name}, {folder2.path.name}, or hash comparison not possible.")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Hashing enabled, but not all music files have hashes for pair: {folder1.path.name}, {folder2.path.name}, or hash comparison not possible.")
         # If hashing is disabled entirely, 'file_hash' won't be in self.weights due to _get_adjusted_weights
         size_similarity_sum = 0.0
         # Retain score presentation order while accumulating size in the track loop below.
@@ -353,7 +354,7 @@ class ComparisonEngine:
                  current_total_weight += weight
              elif param == 'file_hash' and not self.enable_hashing:
                  pass
-             elif param != 'additional_metadata_details' and score_value is None: # Log only if not the special details dict
+             elif param != 'additional_metadata_details' and score_value is None and logger.isEnabledFor(logging.DEBUG):
                  logger.debug(f"Weight defined for '{param}' but score not found in similarity_scores for pair {folder1.path.name} vs {folder2.path.name}. Skipping this weight.")
         # Handle 'additional_metadata_details' separately as its value in similarity_scores is a dict
         add_meta_details_dict = similarity_scores.get('additional_metadata_details')
@@ -392,9 +393,10 @@ class ComparisonEngine:
                     boost_amount = (target_score_based_on_metadata - final_weighted_score) * 0.6
                     new_score_before_cap = final_weighted_score + boost_amount
                     final_weighted_score = min(new_score_before_cap, 96.0)
-                    logger.debug(f"Boosting score for '{folder1.path.name}' vs '{folder2.path.name}' due to strong metadata "
-                                 f"(avg_meta_strength: {avg_metadata_strength:.2f}, initial_score: {final_weighted_score - boost_amount:.2f}). "
-                                 f"New score: {final_weighted_score:.2f}")
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(f"Boosting score for '{folder1.path.name}' vs '{folder2.path.name}' due to strong metadata "
+                                     f"(avg_meta_strength: {avg_metadata_strength:.2f}, initial_score: {final_weighted_score - boost_amount:.2f}). "
+                                     f"New score: {final_weighted_score:.2f}")
         if logger.isEnabledFor(logging.DEBUG):
              score_details_list = []
              for k, v_score in sorted(similarity_scores.items()):
