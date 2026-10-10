@@ -60,7 +60,10 @@ function AppContent() {
   const selectedCluster = d.clusters.find((cluster) => cluster.cluster_id === d.selectedClusterId) || null;
   const currentKeeperId = getActiveKeeperId(selectedCluster, d.decisions);
   const hasExplicitDecision = hasExplicitKeeperDecision(selectedCluster, d.decisions);
-  const deletionWorkflow = buildDeletionWorkflowModel(d.allClusters, d.preview, d.decisions, deleteAttemptResults);
+  const deletionWorkflow = useMemo(
+    () => buildDeletionWorkflowModel(d.allClusters, d.preview, d.decisions, deleteAttemptResults),
+    [d.allClusters, d.preview, d.decisions, deleteAttemptResults],
+  );
   const workflowSteps = useMemo(
     () => getWorkflowStepState({
       appView,

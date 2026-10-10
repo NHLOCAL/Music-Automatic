@@ -105,9 +105,7 @@ describe("useDeduplicator", () => {
     window.localStorage.setItem("albumDeduplicator.activeSessionId", "session-1");
     api.getAnalysisSession.mockResolvedValue({ ...sessionResponse, status: "completed" });
     api.getClusters.mockImplementation(async (_sid, bucket) => ({
-      clusters: bucket === "safe"
-        ? [{ ...baseReviewCluster, cluster_id: "cluster-safe-1", confidence_bucket: "safe" }]
-        : [baseReviewCluster],
+      clusters: [{ ...baseReviewCluster, cluster_id: "cluster-safe-1", confidence_bucket: "safe" }, baseReviewCluster],
     }));
 
     const { result } = renderHook(() => useDeduplicator());
@@ -118,6 +116,79 @@ describe("useDeduplicator", () => {
       expect(result.current.status).toBe("completed");
       expect(result.current.preview.total_count).toBe(1);
       expect(result.current.clusters).toHaveLength(1);
+    });
+  });
+
+  it("fetches full clusters once and switches tabs without refetching or reopening events", async () => {
+    const safeCluster = { ...baseReviewCluster, cluster_id: "safe-1", confidence_bucket: "safe" };
+    api.getClusters.mockResolvedValue({ clusters: [safeCluster, baseReviewCluster, completedCluster] });
+    const { result } = renderHook(() => useDeduplicator());
+    act(() => {
+      result.current.setSessionId("session-1");
+      result.current.setStatus("completed");
+    });
+    await waitFor(() => expect(result.current.allClusters).toHaveLength(3));
+    expect(api.getClusters.mock.calls).toEqual([["session-1", "all"]]);
+    const eventConnectionCount = api.getEventSource.mock.calls.length;
+
+    act(() => result.current.setSelectedTab("review"));
+    await waitFor(() => expect(result.current.clusters).toEqual([baseReviewCluster]));
+    act(() => result.current.setSelectedTab("completed"));
+    await waitFor(() => expect(result.current.clusters).toEqual([completedCluster]));
+    expect(result.current.selectedClusterId).toBe(completedCluster.cluster_id);
+    expect(api.getClusters).toHaveBeenCalledTimes(1);
+    expect(api.getAnalysisSession).toHaveBeenCalledTimes(1);
+    expect(api.getDeletePreview).toHaveBeenCalledTimes(1);
+    expect(api.getEventSource).toHaveBeenCalledTimes(eventConnectionCount);
+  });
+
+  it("refreshes only once after an analysis completion event", async () => {
+    const listeners = {};
+    api.getEventSource.mockImplementation(() => ({
+      addEventListener: (name, callback) => { listeners[name] = callback; },
+      close: vi.fn(),
+    }));
+    const { result } = renderHook(() => useDeduplicator());
+    act(() => {
+      result.current.setSessionId("session-1");
+      result.current.setStatus("running");
+    });
+    await act(async () => listeners.completed());
+    await waitFor(() => expect(result.current.allClusters).toHaveLength(1));
+    expect(api.getAnalysisSession).toHaveBeenCalledTimes(1);
+    expect(api.getClusters.mock.calls).toEqual([["session-1", "all"]]);
+    expect(api.getDeletePreview).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not restore a response from a session reset while refresh is pending", async () => {
+    let resolveClusters;
+    api.getClusters.mockReturnValue(new Promise((resolve) => { resolveClusters = resolve; }));
+    const { result } = renderHook(() => useDeduplicator());
+    act(() => {
+      result.current.setSessionId("old-session");
+      result.current.setStatus("completed");
+    });
+    act(() => result.current.resetSession());
+    await act(async () => resolveClusters({ clusters: [baseReviewCluster] }));
+    expect(result.current.sessionId).toBeNull();
+    expect(result.current.summary).toBeNull();
+    expect(result.current.clusters).toEqual([]);
+    expect(result.current.allClusters).toEqual([]);
+    expect(result.current.preview.total_count).toBe(0);
+  });
+
+  it("sends only the changed decision without rewriting previous decisions", async () => {
+    const { result } = renderHook(() => useDeduplicator());
+    act(() => {
+      result.current.setSessionId("session-1");
+      result.current.setStatus("running");
+      result.current.setClusters([baseReviewCluster]);
+      result.current.setDecisions({ previous: "old-keeper" });
+      result.current.setDeleteSelections({ previous: ["old-copy"] });
+    });
+    await act(async () => result.current.handleDecision(baseReviewCluster.cluster_id, "folder-1"));
+    expect(api.updateDecisions).toHaveBeenCalledWith("session-1", {
+      decisions: [{ cluster_id: baseReviewCluster.cluster_id, keeper_id: "folder-1", delete_folder_ids: ["folder-2"] }],
     });
   });
 

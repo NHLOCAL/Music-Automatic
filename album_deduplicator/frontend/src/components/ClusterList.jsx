@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import { Button, Segmented, Tooltip } from "antd";
 import { Icon, StatusTag } from "./UI";
 import { ScoreInfoButton } from "./ScoreTransparencyPanel";
@@ -35,6 +35,30 @@ function getReadinessRank(cluster, decisions) {
 function formatClusterListCount(count) {
   return count === 1 ? "פריט אחד" : `${count} פריטים`;
 }
+
+const ClusterListItem = memo(function ClusterListItem({ cluster, isActive, isResolved, onSelect }) {
+  const statusMeta = getClusterStatusMeta(cluster, isResolved);
+  const score = cluster.pairs?.[0] ? formatPercent(cluster.pairs[0].final_score) : "N/A";
+  const title = getClusterDisplayTitle(cluster);
+  return (
+    <div
+      className={`ide-cluster-item ${isActive ? "active" : ""}`}
+      onClick={() => onSelect(cluster.cluster_id)}
+    >
+      <div className="ide-cluster-title-row">
+        <div className="ide-cluster-title">{isResolved ? "✓ " : ""}{title}</div>
+        <ScoreInfoButton cluster={cluster} label={`הצג ציונים ונימוק עבור ${title}`} placement="leftTop" />
+      </div>
+      <div className="ide-cluster-meta">
+        <span>{getVisibleAlbumCount(cluster)} עותקים</span>
+        <span>התאמה: {score}</span>
+      </div>
+      <div className="ide-cluster-status">
+        <StatusTag tone={statusMeta.tone}>{statusMeta.label}</StatusTag>
+      </div>
+    </div>
+  );
+});
 
 export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId, decisions, selectedTab, setSelectedTab }) {
   const [manualOrderIds, setManualOrderIds] = useState([]);
@@ -103,38 +127,15 @@ export function ClusterList({ clusters, selectedClusterId, setSelectedClusterId,
         </div>
       </div>
       <div className="ide-sidebar-list" data-testid="cluster-scroll">
-        {displayedClusters.map((cluster) => {
-          const isActive = cluster.cluster_id === selectedClusterId;
-          const isResolved = hasExplicitKeeperDecision(cluster, decisions);
-          const statusMeta = getClusterStatusMeta(cluster, isResolved);
-          const score = cluster.pairs?.[0] ? formatPercent(cluster.pairs[0].final_score) : "N/A";
-          
-          return (
-            <div 
-              key={cluster.cluster_id} 
-              className={`ide-cluster-item ${isActive ? 'active' : ''}`}
-              onClick={() => setSelectedClusterId(cluster.cluster_id)}
-            >
-              <div className="ide-cluster-title-row">
-                <div className="ide-cluster-title">
-                  {isResolved ? "✓ " : ""}{getClusterDisplayTitle(cluster)}
-                </div>
-                <ScoreInfoButton
-                  cluster={cluster}
-                  label={`הצג ציונים ונימוק עבור ${getClusterDisplayTitle(cluster)}`}
-                  placement="leftTop"
-                />
-              </div>
-              <div className="ide-cluster-meta">
-                <span>{getVisibleAlbumCount(cluster)} עותקים</span>
-                <span>התאמה: {score}</span>
-              </div>
-              <div className="ide-cluster-status">
-                <StatusTag tone={statusMeta.tone}>{statusMeta.label}</StatusTag>
-              </div>
-            </div>
-          );
-        })}
+        {displayedClusters.map((cluster) => (
+          <ClusterListItem
+            key={cluster.cluster_id}
+            cluster={cluster}
+            isActive={cluster.cluster_id === selectedClusterId}
+            isResolved={hasExplicitKeeperDecision(cluster, decisions)}
+            onSelect={setSelectedClusterId}
+          />
+        ))}
       </div>
     </div>
   );

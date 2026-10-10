@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, startTransition } from "react";
+import { useState, useEffect, useCallback, useRef, startTransition } from "react";
 import * as api from "../api";
 import { clusterMatchesReviewTab, getActiveKeeperId, hasExplicitKeeperDecision } from "../utils";
 
@@ -78,28 +78,27 @@ export function useDeduplicator() {
   const [successSummary, setSuccessSummary] = useState(null);
   const [selectedTab, setSelectedTab] = useState("safe");
   const sessionId = sessionIdState;
+  const sessionIdRef = useRef(sessionId);
+  const refreshGeneration = useRef(0);
   const setSessionId = useCallback((nextSessionId) => {
+    sessionIdRef.current = nextSessionId;
+    refreshGeneration.current += 1;
     setSessionIdState(nextSessionId);
     writeStoredSessionId(nextSessionId);
   }, []);
-  const refreshData = useCallback(async (sid, tab) => {
+  const refreshData = useCallback(async (sid) => {
+    const generation = ++refreshGeneration.current;
     try {
-      const apiBucket = tab === "completed" ? "all" : tab;
-      const clusterRequests = apiBucket === "all"
-        ? [api.getClusters(sid, "all"), Promise.resolve(null)]
-        : [api.getClusters(sid, apiBucket), api.getClusters(sid, "all")];
-      const [sessionData, clustersData, previewData, allClustersData] = await Promise.all([
+      const [sessionData, clustersData, previewData] = await Promise.all([
         api.getAnalysisSession(sid),
-        clusterRequests[0],
+        api.getClusters(sid, "all"),
         api.getDeletePreview(sid),
-        clusterRequests[1],
       ]);
-      const fullClusters = apiBucket === "all" ? clustersData.clusters : (allClustersData?.clusters ?? []);
-      const visibleClusters = (clustersData.clusters ?? []).filter((cluster) => clusterMatchesReviewTab(cluster, tab));
+      if (sessionIdRef.current !== sid || refreshGeneration.current !== generation) return;
+      const fullClusters = clustersData.clusters ?? [];
       startTransition(() => {
         setSummary(sessionData);
         setProgress(sessionData.progress);
-        setClusters(visibleClusters);
         setAllClusters(fullClusters);
         setPreview(previewData);
         setDecisions(() => {
@@ -111,19 +110,23 @@ export function useDeduplicator() {
           });
           return next;
         });
-        setDeleteSelections((prev) => {
-          const next = { ...prev };
+        setDeleteSelections(() => {
+          const next = {};
           fullClusters.forEach((cluster) => {
             next[cluster.cluster_id] = cluster.selected_delete_folder_ids ?? [];
           });
           return next;
         });
-        setSelectedClusterId(prev => visibleClusters.some(c => c.cluster_id === prev) ? prev : visibleClusters[0]?.cluster_id ?? null);
       });
     } catch (err) {
-      setError(err.message);
+      if (sessionIdRef.current === sid && refreshGeneration.current === generation) setError(err.message);
     }
   }, []);
+  useEffect(() => {
+    const visibleClusters = allClusters.filter((cluster) => clusterMatchesReviewTab(cluster, selectedTab));
+    setClusters(visibleClusters);
+    setSelectedClusterId(prev => visibleClusters.some(c => c.cluster_id === prev) ? prev : visibleClusters[0]?.cluster_id ?? null);
+  }, [allClusters, selectedTab]);
   useEffect(() => {
     if (!sessionId || status !== "idle") return;
     let active = true;
@@ -135,9 +138,6 @@ export function useDeduplicator() {
         setStatus(sessionData.status);
         setSummary(sessionData);
         setProgress(sessionData.progress);
-        if (sessionData.status === "completed") {
-          await refreshData(sessionId, selectedTab);
-        }
       } catch {
         if (!active) return;
         setSessionId(null);
@@ -148,35 +148,40 @@ export function useDeduplicator() {
     return () => {
       active = false;
     };
-  }, [sessionId, selectedTab, setSessionId, status, refreshData]);
+  }, [sessionId, setSessionId, status]);
+  const listenForEvents = status !== "completed" && status !== "failed";
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !listenForEvents) return;
+    let active = true;
     const events = api.getEventSource(sessionId);
     events.addEventListener("progress", (e) => {
+      if (!active) return;
       setProgress(JSON.parse(e.data));
       setStatus("running");
     });
-    events.addEventListener("completed", async () => {
+    events.addEventListener("completed", () => {
+      if (!active) return;
       setStatus("completed");
-      await refreshData(sessionId, selectedTab);
     });
     events.addEventListener("failed", (e) => {
+      if (!active) return;
       setStatus("failed");
       setError(JSON.parse(e.data).error ?? "הניתוח נכשל.");
     });
     events.addEventListener("delete_execution", async (e) => {
+      if (!active) return;
       const data = JSON.parse(e.data);
       setSuccessSummary({ moved_count: data.moved_count, total_size_mb: data.total_size_mb ?? 0 });
-      await refreshData(sessionId, selectedTab);
+      await refreshData(sessionId);
     });
     events.addEventListener("end", () => events.close());
-    return () => events.close();
-  }, [sessionId, selectedTab, refreshData]);
+    return () => { active = false; events.close(); };
+  }, [sessionId, listenForEvents, refreshData]);
   useEffect(() => {
     if (sessionId && status === "completed") {
-      refreshData(sessionId, selectedTab);
+      refreshData(sessionId);
     }
-  }, [selectedTab, sessionId, status, refreshData]);
+  }, [sessionId, status, refreshData]);
   const resetSession = useCallback(() => {
     startTransition(() => {
       setSessionId(null);
@@ -197,7 +202,8 @@ export function useDeduplicator() {
   }, []);
   const handleDecision = async (clusterId, keeperId, deleteFolderIds = null) => {
     if (!sessionId) return;
-    const cluster = clusters.find((item) => item.cluster_id === clusterId);
+    const cluster = allClusters.find((item) => item.cluster_id === clusterId)
+      ?? clusters.find((item) => item.cluster_id === clusterId);
     const currentKeeperId = getActiveKeeperId(cluster, decisions);
     const hadExplicitDecision = hasExplicitKeeperDecision(cluster, decisions);
     const visibleFolderIds = cluster
@@ -226,17 +232,18 @@ export function useDeduplicator() {
     }
     try {
       const payload = {
-        decisions: Object.entries(nextDecisions).map(([cid, kid]) => ({
-          cluster_id: cid,
-          keeper_id: kid,
-          delete_folder_ids: kid ? (nextDeleteSelections[cid] ?? []) : [],
-        })),
+        decisions: [{
+          cluster_id: clusterId,
+          keeper_id: keeperId,
+          delete_folder_ids: keeperId ? nextDeleteFolderIds : [],
+        }],
       };
       const nextPreview = await api.updateDecisions(sessionId, payload);
+      if (sessionIdRef.current !== sessionId) return;
       setPreview(nextPreview);
-      await refreshData(sessionId, selectedTab);
+      await refreshData(sessionId);
     } catch (err) {
-      setError(err.message);
+      if (sessionIdRef.current === sessionId) setError(err.message);
     }
   };
   return {
