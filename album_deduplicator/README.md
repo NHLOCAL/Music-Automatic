@@ -115,10 +115,16 @@ npm run dist:desktop
 
 ## תיעוד נוסף
 
+פתח רק את המסמך המתאים לצורך הנוכחי. כללי תרומה ותחזוקת תיעוד נמצאים ב-[CONTRIBUTING.md](../CONTRIBUTING.md); התקנה והרצה נשמרות כאן ולא משוכפלות במסמכי עומק.
+
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - מבנה המערכת, שכבות אחריות וזרימת נתונים.
 - [docs/ML_VALIDATION.md](docs/ML_VALIDATION.md) - ולידציית מודל ה־`ML` וספי `safe delete`.
 - [docs/USER_FEEDBACK_DATASET.md](docs/USER_FEEDBACK_DATASET.md) - איסוף החלטות משתמשים לשיפור המודל.
-- [CHANGELOG.md](CHANGELOG.md) - תיעוד שינויי קוד ועדכוני מוצר.
+- [docs/WINDOWS_RELEASES.md](docs/WINDOWS_RELEASES.md) - אריזה ופרסום ל-Windows.
+- [docs/ISSUES.md](docs/ISSUES.md) - דרישות ובעיות פתוחות, לא תיאור מחייב של המימוש.
+- [CHANGELOG.md](CHANGELOG.md) - שינויים משמעותיים למשתמשים ולמפעילים.
+
+חוזי API זמינים ב-OpenAPI של השרת המקומי דרך `/docs`, לצד הסכמות בקוד. תוכניות UX ו-backlog ישנות הן רקע בלבד ואינן נדרשות לקריאה שגרתית.
 
 ## הערות תפעול
 
