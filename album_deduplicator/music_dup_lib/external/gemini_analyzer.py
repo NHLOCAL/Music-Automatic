@@ -3,7 +3,6 @@ import os
 import json
 import re
 import logging
-import requests
 from io import BytesIO
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
@@ -21,9 +20,6 @@ except ImportError:
     UnidentifiedImageError = _DummyPillowError
     logging.warning("Pillow library not found. Gemini album art analysis will be limited/skipped.")
 
-from google import genai
-from google.genai import types
-from google.genai.types import UploadFileConfig
 from .. import config
 from ..models import FolderInfo, FileInfo, FolderComparisonResult
 from ..utils import AnsiColors
@@ -58,6 +54,11 @@ class GeminiAnalyzer:
         effective_api_key = (api_key or API_KEY or "").strip()
         if not effective_api_key:
             raise ValueError(f"Gemini API Key not found in environment variables: {config.GEMINI_API_KEY_ENV_VAR}")
+        # The optional SDK is expensive to import and is only needed for Gemini.
+        from google import genai
+        from google.genai import types
+
+        self._types = types
         self.client = genai.Client(api_key=effective_api_key)
         self.model = MODEL_NAME
         self.conversation = []
@@ -147,17 +148,20 @@ class GeminiAnalyzer:
 
     def _add_user_text(self, message: str):
         self.conversation.append(
-            types.UserContent(parts=[types.Part.from_text(text=message)])
+            self._types.UserContent(parts=[self._types.Part.from_text(text=message)])
         )
 
     def _add_user_image(self, base64_str: str, mime_type: str = "image/jpeg"):
         if base64_str:
             data = base64.b64decode(base64_str)
             self.conversation.append(
-                types.UserContent(parts=[types.Part.from_bytes(data=data, mime_type=mime_type)])
+                self._types.UserContent(parts=[self._types.Part.from_bytes(data=data, mime_type=mime_type)])
             )
 
     def _send_and_receive(self) -> str:
+        import requests
+
+        types = self._types
         config_obj = types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema={
@@ -206,6 +210,7 @@ class GeminiAnalyzer:
 
     def analyze_pair(self, folder_info1: FolderInfo, folder_info2: FolderInfo, ml_similarity_score: Optional[float]
                     ) -> Tuple[Optional[str], Optional[float], str]:
+        types = self._types
         self.conversation.clear()
 
         album1 = self._prepare_album_data(folder_info1)
@@ -240,7 +245,7 @@ class GeminiAnalyzer:
             art_bytes = base64.b64decode(album1["album_art_base64"])
             file1 = self.client.files.upload(
                 file=BytesIO(art_bytes),
-                config=UploadFileConfig(mime_type="image/jpeg")
+                config=types.UploadFileConfig(mime_type="image/jpeg")
             )
             if file1 and file1.uri:
                 self.conversation.append(types.UserContent(parts=[
@@ -254,7 +259,7 @@ class GeminiAnalyzer:
             art_bytes = base64.b64decode(album2["album_art_base64"])
             file2 = self.client.files.upload(
                 file=BytesIO(art_bytes),
-                config=UploadFileConfig(mime_type="image/jpeg")
+                config=types.UploadFileConfig(mime_type="image/jpeg")
             )
             if file2 and file2.uri:
                 self.conversation.append(types.UserContent(parts=[
