@@ -201,5 +201,13 @@ class ClientTests(unittest.TestCase):
                 self.assertNotIn('TLS',str(ctx.exception))
                 self.assertNotIn('SUPERSECRET',str(ctx.exception))
 
+    def test_missing_provider_confidence_is_not_replaced_with_top_probability(self):
+        response = {'answers': {'verdict': {'choice': 'duplicate', 'probabilities':
+            {'duplicate': .99, 'different': .005, 'uncertain': .005}}},
+            'usage': {'cost': .001}}
+        parsed = parse_response(response, decisions=True)
+        self.assertIsNone(parsed['confidence'])
+        self.assertEqual(parsed['probabilities']['duplicate'], .99)
+
 
 if __name__ == '__main__': unittest.main()

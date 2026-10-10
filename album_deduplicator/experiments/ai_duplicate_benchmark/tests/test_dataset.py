@@ -68,6 +68,14 @@ class DatasetTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_dataset(self.cache, self.music, reviews_path=self.reviews)
 
+    def test_snapshot_bound_external_reviews_cannot_label_a_different_corpus(self):
+        rows = json.loads(self.reviews.read_text(encoding='utf-8'))
+        self.reviews.write_text(json.dumps({'snapshot': {
+            'cache_sha256': 'different-cache', 'music_sha256': 'different-music'},
+            'reviews': rows}), encoding='utf-8')
+        with self.assertRaisesRegex(ValueError, 'snapshot'):
+            build_dataset(self.cache, self.music, reviews_path=self.reviews)
+
     def test_compact_evidence_preserves_tracks_and_exceptional_edition_tags(self):
         track = {"filename": "Song.mp3", "title": "Song", "duration": 10.123,
                  "artist": "A", "album": "Live", "albumartist": "A", "tags": {"discnumber": "2"}}

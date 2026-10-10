@@ -84,7 +84,8 @@ def parse_response(response, decisions=False):
                 if not isinstance(probabilities, dict) or set(probabilities) != set(VERDICTS): raise ValueError()
                 if any(isinstance(p,bool) or not isinstance(p,(int,float)) or not math.isfinite(p) or not 0 <= p <= 1 for p in probabilities.values()): raise ValueError()
                 if abs(sum(probabilities.values()) - 1) > .02: raise ValueError()
-                if confidence is None: confidence = probabilities[verdict]
+                # Native confidence summarizes distribution concentration and
+                # is not the selected option's probability. Preserve missingness.
             parsed = answer
         else:
             parsed = json.loads(response['choices'][0]['message']['content'])

@@ -132,6 +132,47 @@ TLS validation stays enabled. HTTP 418 or certificate errors can indicate
 Netfree filtering but do not establish its cause. Sandbox DNS restrictions and
 browser connection failures are reported separately from confirmed filtering.
 
+## Confidence and question research
+
+`confidence.py` evaluates probability and native-confidence thresholds as
+separate policies. It fits a finite grid on calibration families only, freezes
+the policy and then measures review coverage, dangerous positives and missed
+duplicates on test families. A review action does not earn an accuracy point.
+Cross-model agreement reports shared errors and the cost of both models;
+agreement does not establish statistical independence.
+
+```powershell
+python -m album_deduplicator.experiments.ai_duplicate_benchmark.confidence --dataset album_deduplicator/logs/ai-duplicate-benchmark/comparison/cases.jsonl --records album_deduplicator/logs/ai-duplicate-benchmark/comparison/records.jsonl --output album_deduplicator/logs/ai-duplicate-benchmark/confidence-research
+```
+
+Native `confidence` measures distribution concentration and is preserved
+separately from the full probability vector. Missing native confidence stays
+missing and causes confidence-based deferral. TypeSafe defines Choice
+confidence as `(p_max - 1/n) / (1 - 1/n)`, so for three choices a confidence of
+0.95 is not the same threshold as a chosen-option probability of 0.95.
+See [the official definition](https://docs.typesafe.ai/confidence) and
+[atomic questions](https://docs.typesafe.ai/primitives).
+
+`question_probe.py` compares the existing question, explicit identity criteria,
+and independent release/content/evidence questions. Its versioned questions
+and routing policy are hashed before requests. Labels never enter requests.
+Raw model classification and the policy's duplicate/different/review action are
+recorded separately. Question answers are combined in code; contradictory or
+invalid answers defer. The default current models are Microsoft Decision 1 and
+Jev 1.13, with two repetitions and a $0.50 local cap under the $2 provider cap.
+
+```powershell
+python -m album_deduplicator.experiments.ai_duplicate_benchmark.dataset build --cache album_deduplicator/data/comparison_results_cache.json.bak --music album_deduplicator/data/music_data.json --reviews album_deduplicator/experiments/ai_duplicate_benchmark/reviews/confidence_holdout.json --output album_deduplicator/logs/ai-duplicate-benchmark/confidence-research/fresh-cases.jsonl --limit 20
+python -m album_deduplicator.experiments.ai_duplicate_benchmark.question_probe --dataset album_deduplicator/logs/ai-duplicate-benchmark/confidence-research/fresh-cases.jsonl --output album_deduplicator/logs/ai-duplicate-benchmark/confidence-research/new-probe --repeats 2 --budget 0.5
+```
+
+The fresh review envelope binds both source snapshot hashes; mismatches block
+dataset construction. Its 20 album families exclude the previous reviewed
+families and their transitive aliases. This is metadata-only evidence. More
+questions and higher cutoffs can remove all positive approvals, producing zero
+dangerous positives while making automation unhelpful. Always inspect positive
+approval counts, reference uncertainty, stable family coverage and intervals.
+
 API contracts: [Decisions guide](https://openrouter.ai/blog/insights/what-is-jev/),
 [key creation](https://openrouter.ai/docs/api/api-reference/api-keys/create-keys),
 [Clef models and input limit](https://openrouter.ai/cloudflare).

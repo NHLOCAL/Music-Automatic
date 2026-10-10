@@ -96,12 +96,17 @@ def compact_input(album1, album2):
     return {"album1": results[0], "album2": results[1]}
 
 
-def _read_reviews(path):
+def _read_reviews(path, *, cache_hash=None, music_hash=None):
     if path is None:
         return {index: {"verdict": verdict, "reason": reason,
                         "provenance": "independent_metadata_review", "reviewer": "audit_data"}
                 for index, (verdict, reason) in INITIAL_REVIEWS.items()}
     payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    if isinstance(payload, dict) and "snapshot" in payload:
+        snapshot = payload["snapshot"]
+        if (not isinstance(snapshot, dict) or snapshot.get("cache_sha256") != cache_hash
+                or snapshot.get("music_sha256") != music_hash):
+            raise ValueError("Review snapshot does not match the source cache and music data")
     rows = payload.get("reviews", []) if isinstance(payload, dict) else payload
     result = {}
     for row in rows:
@@ -126,7 +131,7 @@ def build_dataset(cache_path, music_path, *, limit=100, reviews_path=None):
     bundled_reviews = Path(__file__).with_name("reviews") / "independent_metadata.json"
     if reviews_path is None and known_snapshot and bundled_reviews.exists():
         reviews_path = bundled_reviews
-    reviews = _read_reviews(reviews_path) if reviews_path or known_snapshot else {}
+    reviews = _read_reviews(reviews_path, cache_hash=cache_hash, music_hash=music_hash) if reviews_path or known_snapshot else {}
     parent = {}
 
     def find(key):

@@ -1,0 +1,390 @@
+{
+  "provenance": "independent_metadata_review",
+  "purpose": "Fresh metadata-only confidence holdout, separate from prior reviewed gold",
+  "snapshot": {
+    "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+    "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47",
+    "cache_file_sha256": "6fab3d42ea5caa8be1afebdc548cc81eca41d1d2b75634ee1c9458be4e3728f1",
+    "music_file_sha256": "02c0f483bc3b805dc219a69c554cac231fd278958c22bc69f7abca2bcbe5017c"
+  },
+  "exclusions": {
+    "old_reviewed_pairs": 36,
+    "direct_old_album_paths": 70,
+    "excluded_transitive_album_paths": 192,
+    "excluded_families": 34,
+    "exact_linked_pairs": 538,
+    "eligible_remaining_pairs": 339,
+    "selected_pairs": 20,
+    "selected_families": 20,
+    "family_rule": "Transitive closure of every exact-linked cache pair plus identical allowlisted album-payload aliases; no private paths exported"
+  },
+  "reviews": [
+    {
+      "cache_index": 2,
+      "index": 2,
+      "label": "duplicate",
+      "verdict": "duplicate",
+      "reason": "Same Avi Piamenta Pedutenu artist/album; all nine descriptive filenames and numeric title tags have equal durations",
+      "evidence": "Same Avi Piamenta Pedutenu artist/album; all nine descriptive filenames and numeric title tags have equal durations",
+      "tags": [
+        "matching_tracks",
+        "folder_alias",
+        "numeric_titles"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 6,
+      "index": 6,
+      "label": "duplicate",
+      "verdict": "duplicate",
+      "reason": "Same Chevra artist and album tags; all eleven titled tracks, including the a cappella mix, have equal durations despite English/Hebrew folder naming",
+      "evidence": "Same Chevra artist and album tags; all eleven titled tracks, including the a cappella mix, have equal durations despite English/Hebrew folder naming",
+      "tags": [
+        "translated_folder",
+        "matching_tracks"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 9,
+      "index": 9,
+      "label": "duplicate",
+      "verdict": "duplicate",
+      "reason": "Same Lipa artists and three descriptive filenames/titles have equal distinctive durations 176.95,1783.93,577.61 seconds; unknown album tag differs only in encoding",
+      "evidence": "Same Lipa artists and three descriptive filenames/titles have equal distinctive durations 176.95,1783.93,577.61 seconds; unknown album tag differs only in encoding",
+      "tags": [
+        "corrupt_album",
+        "generic_folder"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 20,
+      "index": 20,
+      "label": "duplicate",
+      "verdict": "duplicate",
+      "reason": "Six identical descriptive filenames and durations identify Rak Lehit-aneg under both folder aliases; two title fields are replaced by generic track numbers but filenames retain their names",
+      "evidence": "Six identical descriptive filenames and durations identify Rak Lehit-aneg under both folder aliases; two title fields are replaced by generic track numbers but filenames retain their names",
+      "tags": [
+        "corrupt_metadata",
+        "generic_titles",
+        "folder_alias"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 21,
+      "index": 21,
+      "label": "uncertain",
+      "verdict": "uncertain",
+      "reason": "Seven of eight filenames and durations agree but one track has null title and duration on one side; unknown corrupt artist/album tags cannot establish complete content for that track",
+      "evidence": "Seven of eight filenames and durations agree but one track has null title and duration on one side; unknown corrupt artist/album tags cannot establish complete content for that track",
+      "tags": [
+        "missing_track_metadata",
+        "corrupt_identity"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 28,
+      "index": 28,
+      "label": "different",
+      "verdict": "different",
+      "reason": "Lechaim Idan versus Lechaim Bruder by Yosef Moshe Kahana; ten entirely different titled tracks and durations",
+      "evidence": "Lechaim Idan versus Lechaim Bruder by Yosef Moshe Kahana; ten entirely different titled tracks and durations",
+      "tags": [
+        "same_artist",
+        "distinct_albums"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 29,
+      "index": 29,
+      "label": "different",
+      "verdict": "different",
+      "reason": "Goldman Hagedolim 1 versus 2 explicitly in album tags; ten different descriptive title tags even though filenames are generic AudioTrack numbers",
+      "evidence": "Goldman Hagedolim 1 versus 2 explicitly in album tags; ten different descriptive title tags even though filenames are generic AudioTrack numbers",
+      "tags": [
+        "different_volumes",
+        "generic_filenames"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 33,
+      "index": 33,
+      "label": "duplicate",
+      "verdict": "duplicate",
+      "reason": "No artist/album tags, but both Chevra folder aliases and all eleven descriptive song filenames/titles/durations agree exactly",
+      "evidence": "No artist/album tags, but both Chevra folder aliases and all eleven descriptive song filenames/titles/durations agree exactly",
+      "tags": [
+        "missing_artist_album",
+        "folder_alias"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 40,
+      "index": 40,
+      "label": "different",
+      "verdict": "different",
+      "reason": "Dveykus 5 versus 6 explicitly identified; distinct eleven-song repertoire including different durations for shared Rachem title",
+      "evidence": "Dveykus 5 versus 6 explicitly identified; distinct eleven-song repertoire including different durations for shared Rachem title",
+      "tags": [
+        "different_volumes",
+        "artist_tag_pollution"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 45,
+      "index": 45,
+      "label": "duplicate",
+      "verdict": "duplicate",
+      "reason": "Meir Adler Chatuna same album identified by tags and filenames; all nine numbered recordings match exactly, including distinctive 2952.42s and 1764.39s recordings",
+      "evidence": "Meir Adler Chatuna same album identified by tags and filenames; all nine numbered recordings match exactly, including distinctive 2952.42s and 1764.39s recordings",
+      "tags": [
+        "generic_titles",
+        "translated_artist",
+        "generic_folder"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 48,
+      "index": 48,
+      "label": "uncertain",
+      "verdict": "uncertain",
+      "reason": "Nine same numbered filenames, six matching durations but three tracks have null titles/durations on one side; corrupt unknown identities do not prove the three recordings",
+      "evidence": "Nine same numbered filenames, six matching durations but three tracks have null titles/durations on one side; corrupt unknown identities do not prove the three recordings",
+      "tags": [
+        "missing_track_metadata",
+        "corrupt_identity"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 55,
+      "index": 55,
+      "label": "different",
+      "verdict": "different",
+      "reason": "Same wedding album tag but folder labels identify chuppa-meal versus meal-dancing; all seven numbered durations differ greatly, establishing distinct parts of event",
+      "evidence": "Same wedding album tag but folder labels identify chuppa-meal versus meal-dancing; all seven numbered durations differ greatly, establishing distinct parts of event",
+      "tags": [
+        "same_named_set",
+        "different_parts",
+        "generic_titles"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 119,
+      "index": 119,
+      "label": "duplicate",
+      "verdict": "duplicate",
+      "reason": "Miami performance 3 under Hebrew/English artist aliases; all eight descriptive filenames/titles/durations equal",
+      "evidence": "Miami performance 3 under Hebrew/English artist aliases; all eight descriptive filenames/titles/durations equal",
+      "tags": [
+        "translated_artist",
+        "folder_alias"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 124,
+      "index": 124,
+      "label": "uncertain",
+      "verdict": "uncertain",
+      "reason": "Miami We Will Prevail album and first eight numbered tracks align exactly; final track title and duration are null on one side, preventing confirmation of complete content",
+      "evidence": "Miami We Will Prevail album and first eight numbered tracks align exactly; final track title and duration are null on one side, preventing confirmation of complete content",
+      "tags": [
+        "missing_track_metadata",
+        "generic_titles",
+        "artist_spelling"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 130,
+      "index": 130,
+      "label": "different",
+      "verdict": "different",
+      "reason": "Yeshiva Boys 3 versus 2 explicitly in album tags; different ten-song title/filename repertoires despite same Eli Gerstner artist",
+      "evidence": "Yeshiva Boys 3 versus 2 explicitly in album tags; different ten-song title/filename repertoires despite same Eli Gerstner artist",
+      "tags": [
+        "different_volumes",
+        "mixed_languages",
+        "generic_titles"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 149,
+      "index": 149,
+      "label": "different",
+      "verdict": "different",
+      "reason": "Yair Kalev Etzem Haneshama versus volume3; distinct twelve-track repertoires and durations, despite shared composer/name motifs",
+      "evidence": "Yair Kalev Etzem Haneshama versus volume3; distinct twelve-track repertoires and durations, despite shared composer/name motifs",
+      "tags": [
+        "different_volumes",
+        "shared_composer_titles"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 150,
+      "index": 150,
+      "label": "different",
+      "verdict": "different",
+      "reason": "Kol Achai Hallelu versus Hashkifa; album name appended to artist tags but ten different song repertoires identify distinct releases",
+      "evidence": "Kol Achai Hallelu versus Hashkifa; album name appended to artist tags but ten different song repertoires identify distinct releases",
+      "tags": [
+        "distinct_albums",
+        "artist_album_pollution"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 237,
+      "index": 237,
+      "label": "different",
+      "verdict": "different",
+      "reason": "Israel Lamm Eizo Chatuna 4 versus3; distinct six-track collections, including different duration chuppa and opening medleys",
+      "evidence": "Israel Lamm Eizo Chatuna 4 versus3; distinct six-track collections, including different duration chuppa and opening medleys",
+      "tags": [
+        "different_volumes",
+        "shared_generic_medley_names"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 248,
+      "index": 248,
+      "label": "duplicate",
+      "verdict": "duplicate",
+      "reason": "Josef Rosenblatt Synagogue Service tags identical; all seven descriptive English filenames/titles/durations equal despite Yom Kippur folder alias",
+      "evidence": "Josef Rosenblatt Synagogue Service tags identical; all seven descriptive English filenames/titles/durations equal despite Yom Kippur folder alias",
+      "tags": [
+        "translated_folder",
+        "matching_tracks"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    },
+    {
+      "cache_index": 402,
+      "index": 402,
+      "label": "uncertain",
+      "verdict": "uncertain",
+      "reason": "Rogea versus Rogea3: nine ordered durations agree within0.03s but titles are generic/repeated and artist tags conflict; cannot settle whether first album tag omits volume3 or references a distinct release",
+      "evidence": "Rogea versus Rogea3: nine ordered durations agree within0.03s but titles are generic/repeated and artist tags conflict; cannot settle whether first album tag omits volume3 or references a distinct release",
+      "tags": [
+        "album_volume_conflict",
+        "generic_titles",
+        "near_duration_match"
+      ],
+      "confidence": "metadata_review",
+      "reviewer": "independent_labels_holdout",
+      "provenance": "independent_metadata_review",
+      "review_scope": "Metadata only; not user verified; historical model outcomes excluded",
+      "cache_sha256": "4831ef36978ccf6f1930de54b93000725543726cc7d2ae5252471e2f11295233",
+      "music_sha256": "675774c55ba78bf8d9d3b504f74be521e7f3f4c55e4f38bffb8363b73fee1a47"
+    }
+  ]
+}
