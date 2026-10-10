@@ -54,3 +54,22 @@ def test_track_ratio_calculation_avoids_repeated_min_max_calls(monkeypatch):
     assert result.similarity_scores["file_size"] == 1.0
     assert result.similarity_scores["duration"] == 1.0
     assert len(calls) <= 3
+
+
+def test_repeated_track_fields_are_not_compared_again_per_album_pair(monkeypatch):
+    from music_dup_lib.core import comparison_engine as module
+
+    original = module.cached_string_similarity
+    calls = []
+
+    def counted_similarity(first, second):
+        calls.append((first, second))
+        return original(first, second)
+
+    monkeypatch.setattr(module, "cached_string_similarity", counted_similarity)
+    folders = [make_folder(str(index), 12) for index in range(4)]
+    results = ComparisonEngine().find_similar_folders({folder.path: folder for folder in folders})
+    assert len(results) == 6
+    assert all(result.similarity_scores["title"] == 1.0 for result in results)
+    assert all(result.similarity_scores["artist"] == 1.0 for result in results)
+    assert len(calls) <= 6

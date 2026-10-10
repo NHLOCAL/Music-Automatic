@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, FrozenSet, Iterator, List, Optional, Tup
 from .. import config
 from ..models import FileInfo, FolderComparisonResult, FolderInfo
 from ..utils import cached_string_similarity, normalize_filename_for_sort
+from .track_similarity import StringSequenceComparer
 logger = logging.getLogger(__name__)
 
 ComparisonProgressCallback = Callable[[int, int], None]
@@ -29,6 +30,7 @@ class PreparedFolderComparisonData:
     other_files_map: Dict[str, Dict[str, Any]]
     other_file_names: FrozenSet[str]
     num_files: int
+    string_sequence_ids: Tuple[int, ...]
 
 
 @dataclass(slots=True, frozen=True)
@@ -44,6 +46,7 @@ class ComparisonEngine:
         self.weights = self._get_adjusted_weights(config.SIMILARITY_WEIGHTS, enable_hashing)
         self.total_base_weight = sum(self.weights.values())
         self._prepared_folder_cache: Dict[Path, PreparedFolderComparisonData] = {}
+        self._string_sequences = StringSequenceComparer(cache_size=config.LRU_CACHE_SIZE)
         self.last_run_stats = ComparisonRunStats()
         logger.info(f"Comparison Engine initialized. Hashing enabled: {self.enable_hashing}")
         logger.debug(f"Using similarity weights: {self.weights}")
@@ -72,6 +75,10 @@ class ComparisonEngine:
             other_files_map=other_files_map,
             other_file_names=frozenset(other_files_map.keys()),
             num_files=len(prepared_files),
+            string_sequence_ids=tuple(
+                self._string_sequences.prepare(getattr(item.file_info, field) for item in prepared_files)
+                for field in ("filename", "title", "artist", "albumartist", "album")
+            ),
         )
         self._prepared_folder_cache[folder.path] = prepared
         return prepared
@@ -282,11 +289,6 @@ class ComparisonEngine:
         folder_name_sim = cached_string_similarity(folder1.folder_name, folder2.folder_name)
         similarity_scores['folder_name'] = folder_name_sim
         similarity_scores['album_art_hash'] = 1.0 if folder1.album_art_hash and folder1.album_art_hash == folder2.album_art_hash else 0.0
-        filename_sim_sum = 0.0
-        title_sim_sum = 0.0
-        artist_sim_sum = 0.0
-        album_sim_sum = 0.0
-        albumartist_sim_sum = 0.0
         duration_sim_sum = 0.0
         additional_metadata_matches: Dict[str, int] = defaultdict(int)
         max_generic_filename = max(folder1.generic_filename_score, folder2.generic_filename_score)
@@ -295,6 +297,12 @@ class ComparisonEngine:
                                if max_generic_filename > config.GENERIC_NAME_SIMILARITY_THRESHOLD else 1.0
         title_adjustment = (1.0 - (max_generic_title * config.GENERIC_NAME_REDUCTION_FACTOR)) \
                            if max_generic_title > config.GENERIC_NAME_SIMILARITY_THRESHOLD else 1.0
+        sequences1, sequences2 = prepared_folder1.string_sequence_ids, prepared_folder2.string_sequence_ids
+        filename_sim_sum = self._string_sequences.sum(sequences1[0], sequences2[0], filename_adjustment, include_missing=True)
+        title_sim_sum = self._string_sequences.sum(sequences1[1], sequences2[1], title_adjustment)
+        artist_sim_sum = self._string_sequences.sum(sequences1[2], sequences2[2])
+        albumartist_sim_sum = self._string_sequences.sum(sequences1[3], sequences2[3])
+        album_sim_sum = self._string_sequences.sum(sequences1[4], sequences2[4])
         for prepared_file1, prepared_file2 in zip(files1, files2):
             file1 = prepared_file1.file_info
             file2 = prepared_file2.file_info
@@ -302,28 +310,6 @@ class ComparisonEngine:
             if s1 > 0 and s2 > 0:
                 ratio = s1 / s2 if s1 < s2 else s2 / s1
                 size_similarity_sum += 1.0 if ratio >= 0.95 else ratio * ratio
-            fn_sim = cached_string_similarity(file1.filename, file2.filename)
-            filename_sim_sum += (fn_sim * filename_adjustment)
-            if file1.title and file2.title:
-                 t_sim = cached_string_similarity(file1.title, file2.title)
-                 title_sim_sum += (t_sim * title_adjustment)
-            elif file1.title or file2.title:
-                 title_sim_sum += 0.0
-            if file1.artist and file2.artist:
-                art_sim = cached_string_similarity(file1.artist, file2.artist)
-                artist_sim_sum += art_sim
-            elif file1.artist or file2.artist:
-                artist_sim_sum += 0.0
-            if file1.albumartist and file2.albumartist:
-                aa_sim = cached_string_similarity(file1.albumartist, file2.albumartist)
-                albumartist_sim_sum += aa_sim
-            elif file1.albumartist or file2.albumartist:
-                albumartist_sim_sum += 0.0
-            if file1.album and file2.album:
-                alb_sim = cached_string_similarity(file1.album, file2.album)
-                album_sim_sum += alb_sim
-            elif file1.album or file2.album:
-                album_sim_sum += 0.0
             d1, d2 = file1.duration, file2.duration
             if d1 is not None and d2 is not None and d1 > 0 and d2 > 0:
                  ratio = d1 / d2 if d1 < d2 else d2 / d1
