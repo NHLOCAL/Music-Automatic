@@ -1,0 +1,622 @@
+[
+  {
+    "cache_index": 25,
+    "index": 25,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Dveykus 1 versus 4 explicitly marked in album tags; different complete ten-track title and duration lists",
+    "evidence": "Dveykus 1 versus 4 explicitly marked in album tags; different complete ten-track title and duration lists",
+    "tags": [
+      "different_volumes"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 27,
+    "index": 27,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Journeys 2 versus 3; same artist under spelling variants but different ten-song contents",
+    "evidence": "Journeys 2 versus 3; same artist under spelling variants but different ten-song contents",
+    "tags": [
+      "different_volumes",
+      "artist_spelling"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 37,
+    "index": 37,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "All 32 numbered tracks have equal durations; Project X / Project 1 and Lipa spelling differ only in naming",
+    "evidence": "All 32 numbered tracks have equal durations; Project X / Project 1 and Lipa spelling differ only in naming",
+    "tags": [
+      "generic_tracks",
+      "artist_spelling",
+      "album_alias"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 38,
+    "index": 38,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Shalhevet Shabbat parts C versus D; generic numbered titles overlap but descriptive filenames and durations show different contents",
+    "evidence": "Shalhevet Shabbat parts C versus D; generic numbered titles overlap but descriptive filenames and durations show different contents",
+    "tags": [
+      "different_volumes",
+      "generic_titles"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 42,
+    "index": 42,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Same Gershon Veroba Variations 2 album; all 10 English/Hebrew translated song names align in order with equal durations",
+    "evidence": "Same Gershon Veroba Variations 2 album; all 10 English/Hebrew translated song names align in order with equal durations",
+    "tags": [
+      "translated_titles"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 43,
+    "index": 43,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Lehava Double Project disc 2 versus disc 1; eighteen tracks each but different titles and durations, including different recordings for shared Lev Tahor/Iri titles",
+    "evidence": "Lehava Double Project disc 2 versus disc 1; eighteen tracks each but different titles and durations, including different recordings for shared Lev Tahor/Iri titles",
+    "tags": [
+      "same_named_set",
+      "different_discs"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 44,
+    "index": 44,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Explicit part A versus C and all seven numbered durations differ greatly; corrupted artist names are not identity evidence",
+    "evidence": "Explicit part A versus C and all seven numbered durations differ greatly; corrupted artist names are not identity evidence",
+    "tags": [
+      "different_volumes",
+      "corrupt_artist",
+      "generic_tracks"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 49,
+    "index": 49,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Same Moshe Goldman album; all 11 tracks map by song aliases and unique durations within 0.03 seconds despite reordered files",
+    "evidence": "Same Moshe Goldman album; all 11 tracks map by song aliases and unique durations within 0.03 seconds despite reordered files",
+    "tags": [
+      "title_variation",
+      "reordered_tracks"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 50,
+    "index": 50,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Same artist and Hadaran orchestra album; all four titled medleys match with equal durations despite order changes",
+    "evidence": "Same artist and Hadaran orchestra album; all four titled medleys match with equal durations despite order changes",
+    "tags": [
+      "reordered_tracks"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 54,
+    "index": 54,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Neginah Favorite Chuppa Songs versus Vol II; different medley repertoire and durations despite several shared generic titles",
+    "evidence": "Neginah Favorite Chuppa Songs versus Vol II; different medley repertoire and durations despite several shared generic titles",
+    "tags": [
+      "different_volumes",
+      "shared_generic_song_names"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 117,
+    "index": 117,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Atika Kadisha 1 versus 2 by same artist; entirely different ten-song lists",
+    "evidence": "Atika Kadisha 1 versus 2 by same artist; entirely different ten-song lists",
+    "tags": [
+      "different_volumes"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 126,
+    "index": 126,
+    "label": "uncertain",
+    "verdict": "uncertain",
+    "reason": "One folder claims live performance 2 and other Shira Chadasha; both artist/album tags are corrupt unknowns and track titles are generic, with differing durations; insufficient trustworthy release metadata",
+    "evidence": "One folder claims live performance 2 and other Shira Chadasha; both artist/album tags are corrupt unknowns and track titles are generic, with differing durations; insufficient trustworthy release metadata",
+    "tags": [
+      "corrupt_metadata",
+      "unknown_artist",
+      "generic_tracks",
+      "possible_live_studio"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 128,
+    "index": 128,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Miami Boys Choir Greats quiet versus rhythmic collections; explicit album distinction and different ten-song lists",
+    "evidence": "Miami Boys Choir Greats quiet versus rhythmic collections; explicit album distinction and different ten-song lists",
+    "tags": [
+      "same_named_set",
+      "different_editions"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 132,
+    "index": 132,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Clearly separate numbered lecture releases 066 money versus 068 believe in oneself; corresponding filenames retain distinct release identifiers",
+    "evidence": "Clearly separate numbered lecture releases 066 money versus 068 believe in oneself; corresponding filenames retain distinct release identifiers",
+    "tags": [
+      "missing_artist_album",
+      "different_volumes",
+      "generic_tracks"
+    ],
+    "confidence": "medium",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 169,
+    "index": 169,
+    "label": "uncertain",
+    "verdict": "uncertain",
+    "reason": "Nine-track Mosaic versus Mosaic-2; most durations differ systematically by about 2s but several titles conflict and track numbers are 1-9 versus 10-18; cannot prove whether tagging error or different content",
+    "evidence": "Nine-track Mosaic versus Mosaic-2; most durations differ systematically by about 2s but several titles conflict and track numbers are 1-9 versus 10-18; cannot prove whether tagging error or different content",
+    "tags": [
+      "missing_artist",
+      "album_conflict",
+      "title_conflict",
+      "near_duration_match"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 233,
+    "index": 233,
+    "label": "uncertain",
+    "verdict": "uncertain",
+    "reason": "Same artist and Kol Hamitpalel album; nine numbered tracks differ about 0.1s but final track differs 2.07s; absent/corrupt song titles prevent confirming complete same content",
+    "evidence": "Same artist and Kol Hamitpalel album; nine numbered tracks differ about 0.1s but final track differs 2.07s; absent/corrupt song titles prevent confirming complete same content",
+    "tags": [
+      "missing_titles",
+      "near_duration_match"
+    ],
+    "confidence": "medium",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 255,
+    "index": 255,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Unknown folder resolved by tags: Leib Glantz Selichot; all twenty prayers match in order and duration within 0.03s",
+    "evidence": "Unknown folder resolved by tags: Leib Glantz Selichot; all twenty prayers match in order and duration within 0.03s",
+    "tags": [
+      "generic_folder",
+      "artist_spelling"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 256,
+    "index": 256,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "New folder resolved by tags: Israel Rand Kedat Moshe; all eight titled tracks have equal durations despite one album typo",
+    "evidence": "New folder resolved by tags: Israel Rand Kedat Moshe; all eight titled tracks have equal durations despite one album typo",
+    "tags": [
+      "generic_folder",
+      "album_typo",
+      "artist_spelling"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 260,
+    "index": 260,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Mordechai Sobol Bayamim Hahem parts B versus C; all ten song lists differ",
+    "evidence": "Mordechai Sobol Bayamim Hahem parts B versus C; all ten song lists differ",
+    "tags": [
+      "different_volumes"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 267,
+    "index": 267,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Ashira Na Leyadid volumes 1 versus 2; compilation artist tag is generic but performer-song titles identify different selections",
+    "evidence": "Ashira Na Leyadid volumes 1 versus 2; compilation artist tag is generic but performer-song titles identify different selections",
+    "tags": [
+      "different_volumes",
+      "compilation"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 275,
+    "index": 275,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Modzitz Chai 4 versus 3 explicitly in album/folder tags; same numbered track placeholders but sixteen distinct durations",
+    "evidence": "Modzitz Chai 4 versus 3 explicitly in album/folder tags; same numbered track placeholders but sixteen distinct durations",
+    "tags": [
+      "different_volumes",
+      "generic_tracks"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 304,
+    "index": 304,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Project X new versus Project 1; all 32 ordered durations match within 0.06s and sequence includes distinct 23.8s/48.7s tracks; artist tag on first is a project placeholder",
+    "evidence": "Project X new versus Project 1; all 32 ordered durations match within 0.06s and sequence includes distinct 23.8s/48.7s tracks; artist tag on first is a project placeholder",
+    "tags": [
+      "album_alias",
+      "generic_tracks",
+      "artist_conflict"
+    ],
+    "confidence": "medium",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 377,
+    "index": 377,
+    "label": "uncertain",
+    "verdict": "uncertain",
+    "reason": "Both tags are artist/title placeholders; ten generic numbered tracks have different durations and first folder name TITLE gives no release identity",
+    "evidence": "Both tags are artist/title placeholders; ten generic numbered tracks have different durations and first folder name TITLE gives no release identity",
+    "tags": [
+      "generic_artist_album",
+      "generic_tracks",
+      "duration_conflict"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 408,
+    "index": 408,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Avraham Fried Ah Mechayeh in Hebrew/English; all thirteen descriptive filenames and durations exactly match even though title fields are null",
+    "evidence": "Avraham Fried Ah Mechayeh in Hebrew/English; all thirteen descriptive filenames and durations exactly match even though title fields are null",
+    "tags": [
+      "translated_artist_album",
+      "missing_titles"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 417,
+    "index": 417,
+    "label": "different",
+    "verdict": "different",
+    "reason": "James Taylor self-titled versus JT; explicit different album names and twelve different songs",
+    "evidence": "James Taylor self-titled versus JT; explicit different album names and twelve different songs",
+    "tags": [
+      "same_artist",
+      "distinct_albums"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 421,
+    "index": 421,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Relax With The Stars CD1 versus CD2 explicitly tagged; all eleven track selections differ",
+    "evidence": "Relax With The Stars CD1 versus CD2 explicitly tagged; all eleven track selections differ",
+    "tags": [
+      "same_named_set",
+      "different_discs"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 426,
+    "index": 426,
+    "label": "uncertain",
+    "verdict": "uncertain",
+    "reason": "Chilik Frank Sukkot Jerusalem bilingual titles align across all 33 tracks but durations vary by up to roughly 5.7s and album tag missing on one side; possible cuts or pauses cannot be resolved without audio",
+    "evidence": "Chilik Frank Sukkot Jerusalem bilingual titles align across all 33 tracks but durations vary by up to roughly 5.7s and album tag missing on one side; possible cuts or pauses cannot be resolved without audio",
+    "tags": [
+      "album_translation",
+      "missing_album",
+      "near_duration_match"
+    ],
+    "confidence": "medium",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 431,
+    "index": 431,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Five matching recordings do not cover the whole album: second folder includes Rachem 326.64s and medleys 548.87s/394.20s from other albums instead of Schindler 204.57s, Kibbutz 202.22s and Freilech 165.86s",
+    "evidence": "Five matching recordings do not cover the whole album: second folder includes Rachem 326.64s and medleys 548.87s/394.20s from other albums instead of Schindler 204.57s, Kibbutz 202.22s and Freilech 165.86s",
+    "tags": [
+      "mixed_compilation",
+      "partial_overlap"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 437,
+    "index": 437,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Meni Gorman golden trumpet folders align; all nine numbered durations within 0.03s, with first artist tag identifying Gorman and second artist/title placeholders",
+    "evidence": "Meni Gorman golden trumpet folders align; all nine numbered durations within 0.03s, with first artist tag identifying Gorman and second artist/title placeholders",
+    "tags": [
+      "generic_artist_album",
+      "generic_tracks",
+      "artist_alias"
+    ],
+    "confidence": "medium",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 438,
+    "index": 438,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Israel Lamm symphonic album; all six medleys align by title aliases and duration within 0.01 seconds",
+    "evidence": "Israel Lamm symphonic album; all six medleys align by title aliases and duration within 0.01 seconds",
+    "tags": [
+      "title_variation",
+      "artist_whitespace"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 440,
+    "index": 440,
+    "label": "uncertain",
+    "verdict": "uncertain",
+    "reason": "Same album and nearly same ten song names, but every duration materially differs and artist tags conflict; cannot establish same recordings or a distinct edition from metadata alone",
+    "evidence": "Same album and nearly same ten song names, but every duration materially differs and artist tags conflict; cannot establish same recordings or a distinct edition from metadata alone",
+    "tags": [
+      "same_album_name",
+      "duration_conflict"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 848,
+    "index": 848,
+    "label": "different",
+    "verdict": "different",
+    "reason": "Lanzbaum Chabad Sessions versus Strings Of The Soul; eleven distinct song selections and durations",
+    "evidence": "Lanzbaum Chabad Sessions versus Strings Of The Soul; eleven distinct song selections and durations",
+    "tags": [
+      "same_artist",
+      "distinct_albums"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 1072,
+    "index": 1072,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Yossele Rosenblatt Early Recordings versus Selected Recordings; sixteen prayer titles map by spelling variants and all ordered durations within 0.03s",
+    "evidence": "Yossele Rosenblatt Early Recordings versus Selected Recordings; sixteen prayer titles map by spelling variants and all ordered durations within 0.03s",
+    "tags": [
+      "album_alias",
+      "generic_artist",
+      "title_variation"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 1277,
+    "index": 1277,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Same Moshe Goldman Gadol Yihyeh artist/album with all 26 titles, filenames and durations equal",
+    "evidence": "Same Moshe Goldman Gadol Yihyeh artist/album with all 26 titles, filenames and durations equal",
+    "tags": [
+      "same_album_name",
+      "matching_tracks"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 1690,
+    "index": 1690,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Hentelech album versus full-album folder; all seventeen song titles and durations equal while second artist/album is download-site text",
+    "evidence": "Hentelech album versus full-album folder; all seventeen song titles and durations equal while second artist/album is download-site text",
+    "tags": [
+      "artist_album_pollution",
+      "filename_variation"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  },
+  {
+    "cache_index": 3652,
+    "index": 3652,
+    "label": "duplicate",
+    "verdict": "duplicate",
+    "reason": "Same Moshe Goldman Zachor Mi Haish; all eleven titles/durations equal and only filename track-number suffix differs",
+    "evidence": "Same Moshe Goldman Zachor Mi Haish; all eleven titles/durations equal and only filename track-number suffix differs",
+    "tags": [
+      "filename_variation",
+      "matching_tracks"
+    ],
+    "confidence": "high",
+    "reviewer": "independent_labels",
+    "provenance": "independent_metadata_review",
+    "source": "music_data.json linked exactly to comparison_results_cache.json.bak",
+    "review_scope": "Metadata only; not user verified; historical model outputs and scores excluded"
+  }
+]

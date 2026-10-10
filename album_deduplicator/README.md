@@ -98,6 +98,8 @@ npm run build
 
 ### Benchmark / Profiling
 
+POC מבודד להשוואת מודלי AI, עם נתוני ייחוס, חיוב בפועל ומדדי בטיחות: [הוראות הרצה](experiments/ai_duplicate_benchmark/README.md)
+
 ```bash
 cd album_deduplicator
 python tools/benchmark_analysis.py "D:/שמע/כל המוזיקה" --report-path logs/benchmarks/latest.md
