@@ -4,16 +4,18 @@ import json
 import logging
 import os
 import threading
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import Dict, Optional, Set
 
+from .. import config
 from .dto import AnalysisSnapshot
 
 
 logger = logging.getLogger(__name__)
-USER_DECISIONS_SCHEMA_VERSION = "1.0"
+USER_DECISIONS_SCHEMA_VERSION = "1.1"
 USER_DECISIONS_FILENAME = "album_decisions.json"
 
 
@@ -75,6 +77,7 @@ class UserDecisionStore:
             "delete_folder_ids": normalized_delete_folder_ids,
             "resolution_state": "user_selected" if keeper_id else "skipped",
             "album_paths": album_paths,
+            "evidence_fingerprint": self._evidence_fingerprint(snapshot, cluster_id),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -112,6 +115,10 @@ class UserDecisionStore:
                 continue
             if set(record.get("folder_ids") or []) != set(cluster.folder_ids):
                 continue
+            # Paths alone identify locations, not the content previously reviewed.
+            # Legacy records without evidence require a fresh user decision.
+            if record.get("evidence_fingerprint") != self._evidence_fingerprint(snapshot, cluster_id):
+                continue
 
             keeper_id = record.get("keeper_id")
             if keeper_id is None:
@@ -135,6 +142,84 @@ class UserDecisionStore:
                 resolution_state="user_selected" if keeper_id else "skipped",
             )
         return restored
+
+    @staticmethod
+    def _path_signature(path: Path) -> Optional[tuple[int, int]]:
+        try:
+            stat = path.stat()
+        except OSError:
+            return None
+        return stat.st_size, stat.st_mtime_ns
+
+    def _evidence_fingerprint(self, snapshot: AnalysisSnapshot, cluster_id: str) -> str:
+        cluster = snapshot.clusters[cluster_id]
+        albums = []
+        for folder_id in sorted(cluster.folder_ids):
+            album = snapshot.albums.get(folder_id)
+            if album is None:
+                albums.append({"folder_id": folder_id, "missing": True})
+                continue
+            folder = snapshot.folders.get(album.path)
+            files = sorted(folder.files, key=lambda item: str(item.filepath)) if folder else []
+            folder_data = asdict(folder) if folder else None
+            if folder_data is not None:
+                folder_data["files"].sort(key=lambda item: str(item["filepath"]))
+                folder_data["other_files"] = sorted(folder_data["other_files"], key=lambda item: str(item.get("name", "")))
+            albums.append({
+                "album": asdict(album),
+                "folder": folder_data,
+                "directory_signature": self._path_signature(album.path),
+                "file_signatures": [
+                    (str(item.filepath), self._path_signature(item.filepath)) for item in files
+                ],
+            })
+
+        pairs = []
+        for pair_id in sorted(cluster.pair_ids):
+            pair = snapshot.pairs.get(pair_id)
+            if pair is None:
+                continue
+            # Cached pairs deliberately omit diagnostic details. Bind decisions
+            # to comparison outcomes rather than their optional explanations.
+            pair_data = {
+                name: getattr(pair, name) for name in (
+                    "pair_id", "folder1_id", "folder2_id", "folder1_path", "folder2_path",
+                    "algorithmic_score", "ml_score", "base_score", "gemini_score",
+                    "final_score", "is_identical_by_hash", "gemini_verdict",
+                )
+            }
+            if pair.folder1_id > pair.folder2_id:
+                for suffix in ("id", "path"):
+                    first, second = f"folder1_{suffix}", f"folder2_{suffix}"
+                    pair_data[first], pair_data[second] = pair_data[second], pair_data[first]
+            pairs.append(pair_data)
+
+        evidence = {
+            "albums": albums,
+            "pairs": pairs,
+            "recommended_keeper_id": cluster.recommended_keeper_id,
+            "confidence_bucket": cluster.confidence_bucket,
+            "policy": {
+                name: getattr(config, name) for name in (
+                    "REVIEW_MIN_SIMILARITY", "SAFE_DELETE_MIN_SIMILARITY",
+                    "BASE_SCORE_ALGORITHMIC_WEIGHT", "BASE_SCORE_ML_WEIGHT",
+                    "FINAL_SCORE_BASE_WEIGHT", "FINAL_SCORE_GEMINI_WEIGHT",
+                    "SIMILARITY_WEIGHTS", "QUALITY_WEIGHTS", "GEMINI_MODEL_NAME",
+                    "HASH_CHUNK_SIZE", "HASH_NUM_RANDOM_CHUNKS",
+                )
+            },
+        }
+
+        def encode_value(value):
+            if isinstance(value, (set, frozenset)):
+                return sorted(value, key=str)
+            return str(value)
+
+        digest = sha256()
+        encoder = json.JSONEncoder(sort_keys=True, ensure_ascii=False, default=encode_value)
+        for chunk in encoder.iterencode(evidence):
+            digest.update(chunk.encode("utf-8"))
+        return digest.hexdigest()
 
     def _read_data_unlocked(self) -> dict:
         try:

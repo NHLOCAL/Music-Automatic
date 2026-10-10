@@ -2,6 +2,8 @@ import importlib
 import json
 from pathlib import Path
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from api.app import app, store
@@ -591,6 +593,41 @@ def test_successful_bulk_delete_writes_ml_feedback_event(monkeypatch, tmp_path):
     assert event["model_policy"]["base_score_ml_weight"] == config.BASE_SCORE_ML_WEIGHT
 
 
+@pytest.mark.parametrize("single", [False, True])
+def test_successful_delete_updates_state_when_feedback_write_fails(monkeypatch, tmp_path, caplog, single):
+    session_store = SessionStore(decision_store=UserDecisionStore(tmp_path / "decisions.json"))
+    session = session_store.create_session(AnalysisOptions(folders=[Path("C:/music")]))
+    session.snapshot = build_snapshot()
+    cluster = next(iter(session.snapshot.clusters.values()))
+    drop_id = cluster.deletable_folder_ids[0]
+    session.decisions = {cluster.cluster_id: cluster.recommended_keeper_id}
+    session.resolution_states = {cluster.cluster_id: "user_selected"}
+    session.delete_selections = {cluster.cluster_id: {drop_id}}
+    session.preview = DeletionService().build_preview(
+        session.snapshot.clusters, session.snapshot.albums, session.decisions,
+        resolution_states=session.resolution_states, delete_selections=session.delete_selections,
+    )
+    monkeypatch.setattr("music_dup_lib.services.deletion_service.send2trash", lambda path: None)
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+
+    def fail_feedback(**kwargs):
+        raise PermissionError("feedback directory is read-only")
+
+    monkeypatch.setattr(session_store.feedback_logger, "log_delete_execution", fail_feedback)
+    if single:
+        execution = session_store.execute_single_delete(session.session_id, cluster.cluster_id, drop_id)
+    else:
+        execution = session_store.execute_delete(session.session_id, [drop_id])
+
+    assert execution.moved_count == 1
+    assert session.deleted_folder_ids == {drop_id}
+    assert session.delete_selections[cluster.cluster_id] == set()
+    assert session.preview.total_count == 0
+    assert cluster.resolution_state == "deleted"
+    assert session.events.get_nowait()["event"] == "delete_execution"
+    assert "feedback" in caplog.text.lower()
+
+
 def test_keep_all_decision_does_not_write_ml_feedback_event(tmp_path):
     feedback_file = tmp_path / "feedback" / "user_feedback_events.jsonl"
     store.feedback_logger.feedback_file = feedback_file
@@ -658,7 +695,7 @@ def test_user_decision_is_saved_to_local_decision_store(tmp_path):
 
     saved = json.loads(decision_store.decision_file.read_text(encoding="utf-8"))
     saved_decision = saved["decisions"][cluster.cluster_id]
-    assert saved["schema_version"] == "1.0"
+    assert saved["schema_version"] == "1.1"
     assert saved_decision["keeper_id"] == keeper_id
     assert saved_decision["delete_folder_ids"] == [drop_id]
     assert saved_decision["folder_ids"] == sorted(cluster.folder_ids)

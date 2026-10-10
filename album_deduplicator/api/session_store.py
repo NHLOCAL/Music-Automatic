@@ -253,7 +253,7 @@ class SessionStore:
         execution = self._deletion_service.execute(session.preview, folder_ids)
         removed_ids = {result.folder_id for result in execution.results if result.success}
         with session.lock:
-            self.feedback_logger.log_delete_execution(
+            self._log_delete_execution(
                 session_id=session.session_id,
                 snapshot=session.snapshot,
                 execution=execution,
@@ -312,7 +312,7 @@ class SessionStore:
         execution = self._deletion_service.execute(DeletePreview(items=preview_items), [folder_id])
         removed_ids = {result.folder_id for result in execution.results if result.success}
         with session.lock:
-            self.feedback_logger.log_delete_execution(
+            self._log_delete_execution(
                 session_id=session.session_id,
                 snapshot=session.snapshot,
                 execution=execution,
@@ -341,6 +341,14 @@ class SessionStore:
             },
         )
         return execution
+
+    def _log_delete_execution(self, **kwargs) -> None:
+        try:
+            self.feedback_logger.log_delete_execution(**kwargs)
+        except OSError:
+            # Recycling already succeeded. Optional training-data persistence must
+            # not leave the session offering those folders for deletion again.
+            logger.exception("Could not persist ML feedback after delete execution")
 
     def _handle_progress(self, session: SessionState, event: AnalysisProgressEvent) -> None:
         total = max(event.total, 1)
