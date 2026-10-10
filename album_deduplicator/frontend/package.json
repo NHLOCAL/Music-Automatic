@@ -12,9 +12,10 @@
     "dev:electron": "npm run sync:icons && concurrently -k \"vite --host 127.0.0.1 --port 5173\" \"wait-on tcp:127.0.0.1:5173 && cross-env ELECTRON_RENDERER_URL=http://127.0.0.1:5173 electron .\"",
     "electron": "npm run sync:icons && electron .",
     "build": "npm run sync:icons && vite build",
-    "build:desktop": "npm run build && electron-builder --config electron-builder.config.cjs --dir --publish never",
-    "dist:desktop": "npm run build && electron-builder --config electron-builder.config.cjs --publish never",
-    "dist:desktop:publish": "npm run build && electron-builder --config electron-builder.config.cjs --publish always",
+    "build:backend": "python ../scripts/build_backend.py",
+    "build:desktop": "npm run build:backend && npm run build && electron-builder --config electron-builder.config.cjs --dir --publish never",
+    "dist:desktop": "npm run build:backend && npm run build && electron-builder --config electron-builder.config.cjs --publish never",
+    "dist:desktop:publish": "npm run dist:desktop && python ../scripts/verify_desktop_bundle.py --installer-dir desktop-dist && electron-builder --config electron-builder.config.cjs --prepackaged desktop-dist/win-unpacked --publish always",
     "preview": "vite preview",
     "test": "vitest run"
   },

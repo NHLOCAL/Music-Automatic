@@ -1,21 +1,29 @@
 import logging
 import os
+import sys
 from pathlib import Path
 MUSIC_DUP_LIB_ROOT = Path(__file__).resolve().parent
 ALBUM_DEDUP_PROJECT_ROOT = MUSIC_DUP_LIB_ROOT.parent
 REPO_ROOT = ALBUM_DEDUP_PROJECT_ROOT.parent
-DATA_DIR = ALBUM_DEDUP_PROJECT_ROOT / "data"
-DATA_DIR.mkdir(exist_ok=True)
-LOGS_DIR = ALBUM_DEDUP_PROJECT_ROOT / "logs"
-LOGS_DIR.mkdir(exist_ok=True)
+RESOURCE_DATA_DIR = ALBUM_DEDUP_PROJECT_ROOT / "data"
+if getattr(sys, "frozen", False):
+    runtime_root = Path(os.getenv("ALBUM_DEDUP_USER_DATA_DIR") or
+                        (Path(os.environ.get("LOCALAPPDATA", Path.home())) /
+                         "Music Automatic" / "Album Deduplicator"))
+else:
+    runtime_root = ALBUM_DEDUP_PROJECT_ROOT
+DATA_DIR = runtime_root / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+LOGS_DIR = runtime_root / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 MUSIC_DATA_CACHE_FILENAME = "music_data.json"
 COMPARISON_RESULTS_CACHE_FILENAME = "comparison_results_cache.pkl" # שונה ל-pkl
 MUSIC_DATA_CACHE_FILE = DATA_DIR / MUSIC_DATA_CACHE_FILENAME
 COMPARISON_RESULTS_CACHE_FILE = DATA_DIR / COMPARISON_RESULTS_CACHE_FILENAME
 ARTIST_CSV_FILENAME = "singer-list.csv"
-ARTIST_CSV_FILE = DATA_DIR / ARTIST_CSV_FILENAME
+ARTIST_CSV_FILE = RESOURCE_DATA_DIR / ARTIST_CSV_FILENAME
 ML_MODEL_FILENAME = "lgbm_regressor_model.joblib"
-ML_MODEL_FILE = DATA_DIR / ML_MODEL_FILENAME
+ML_MODEL_FILE = RESOURCE_DATA_DIR / ML_MODEL_FILENAME
 SIMILARITY_MODEL_FALLBACK_FILE = REPO_ROOT / "similarity_model" / "models" / ML_MODEL_FILENAME
 ML_PREDICTION_BATCH_SIZE = 256
 ML_MAX_THREADS = max(1, min(4, max(1, (os.cpu_count() or 1) // 2)))

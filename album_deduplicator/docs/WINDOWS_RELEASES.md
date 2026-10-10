@@ -38,19 +38,20 @@
 
 ```bash
 cd album_deduplicator
+python -m pip install -r requirements-build.txt
 pytest tests -q
 
 cd frontend
 npm test
-npm run sync:icons
 npm run dist:desktop
+python ../scripts/verify_desktop_bundle.py --installer-dir desktop-dist
 ```
 
 2. צור tag release:
 
 ```bash
-git tag album-deduplicator-v0.1.0
-git push origin album-deduplicator-v0.1.0
+git tag album-deduplicator-v0.2.1
+git push origin album-deduplicator-v0.2.1
 ```
 
 3. ה-workflow ייצור `GitHub Release` ויצרף אליו את מתקין ה-`Windows`
@@ -74,9 +75,6 @@ git push origin album-deduplicator-v0.1.0
 
 ## מגבלות נוכחיות
 
-- המתקין עדיין לא self-contained מבחינת backend:
-  - ה-`Electron shell` אורז את קוד ה-`FastAPI` כ-source resources
-  - בזמן ריצה האפליקציה עדיין מצפה ל-`Python` זמין במכונה של המשתמש
 - ה-release כרגע לא מבצע `code signing`
   - ב-`Windows`, אפליקציה לא חתומה עלולה לקבל אזהרות `SmartScreen`
   - ה-workflow מבטל `CSC_IDENTITY_AUTO_DISCOVERY` כדי למנוע כשלי build בסביבה לא חתומה
@@ -91,9 +89,16 @@ git push origin album-deduplicator-v0.1.0
   - `frontend/electron/assets/icons/app-icon.ico`
 - `npm run build`, `npm run electron`, ו-`npm run dev:electron` מריצים את הסנכרון הזה אוטומטית, כך שכל build או הרצה של מעטפת ה-Desktop משתמשים בגרסה המעודכנת של האייקון
 
-## שלב מומלץ הבא
+## שרת עצמאי ובדיקת התקנה
 
-אם רוצים חוויית התקנה טובה יותר למשתמשי `Windows`, שני השיפורים הטבעיים הבאים הם:
+`requirements-build.txt` מגדיר את PyInstaller ואת גרסאות ספריות החישוב. יש להתקין אותו בסביבת Python 3.12 מבודדת לפני בניית המתקין. `npm run dist:desktop` מקפיא את השרת אל `build/backend/album-deduplicator-api` ואורז אותו במשאבי Electron. כל רכיבי LightGBM ו-scikit-learn, המודל, מיפוי האמנים והנחיות Gemini נכללים בחבילה. לפי [תיעוד PyInstaller](https://pyinstaller.org/en/stable/runtime-information.html), נתיבי המשאבים נקבעים יחסית למודולים הארוזים
 
-1. לארוז את ה-backend כ-executable, כדי להסיר את הדרישה ל-`Python` מותקן מראש
-2. להוסיף `code signing`, רצוי דרך `Azure Trusted Signing` או תהליך signing ארגוני אחר שנתמך על ידי `electron-builder`
+השרת הארוז מקבל פורט מ-Electron ועוצר אם המודל אינו נטען. מטמון ולוגים נשמרים תחת `%LOCALAPPDATA%/Music Automatic/Album Deduplicator`, ומשאבי המודל נשארים בתיקיית ההתקנה
+
+לפני פרסום, ה-workflow מתקין את NSIS לתיקייה זמנית ובודק את השרת המותקן עם PATH שמכיל רק את System32, ללא משתני Python. הבדיקה מאמתת health, חוזה API, סריקת שני אלבומים, hash זהה של המודל ו-32 תחזיות זהות להרצה מהמקור. היא פותחת גם את Electron המותקן ומאמתת שקובצי React והממשק נטענים ושגשר preload מחובר לשרת ולגרסה הנכונים, ואז מסירה את התקנת הבדיקה. זו בדיקת ריצה מבודדת במחשב Windows, ולא בדיקת VM ללא Python מותקן
+
+```bash
+python ../scripts/verify_desktop_bundle.py --installer-dir desktop-dist
+```
+
+חתימת קוד היא שיפור עתידי לתהליך הפרסום

@@ -16,24 +16,12 @@ module.exports = {
   ],
   extraResources: [
     {
-      from: "../api",
-      to: "backend-source/api",
+      from: "../build/backend/album-deduplicator-api",
+      to: "backend",
     },
     {
-      from: "../music_dup_lib",
-      to: "backend-source/music_dup_lib",
-    },
-    {
-      from: "../data/lgbm_regressor_model.joblib",
-      to: "backend-source/data/lgbm_regressor_model.joblib",
-    },
-    {
-      from: "../data/singer-list.csv",
-      to: "backend-source/data/singer-list.csv",
-    },
-    {
-      from: "../frontend/dist",
-      to: "backend-source/frontend/dist",
+      from: "dist",
+      to: "backend/_internal/frontend/dist",
     },
   ],
   extraMetadata: {

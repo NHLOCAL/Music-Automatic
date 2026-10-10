@@ -5,16 +5,19 @@ const require = createRequire(import.meta.url);
 const builderConfig = require("./electron-builder.config.cjs");
 
 describe("electron builder config", () => {
-  it("packages artist normalization data with the backend", () => {
+  it("packages the complete frozen backend directory", () => {
     expect(builderConfig.extraResources).toContainEqual({
-      from: "../data/singer-list.csv",
-      to: "backend-source/data/singer-list.csv",
+      from: "../build/backend/album-deduplicator-api",
+      to: "backend",
     });
   });
-  it("packages the ML model where the backend config resolves it", () => {
+  it("does not ship a source backend that requires a user Python installation", () => {
+    expect(builderConfig.extraResources.some(({ to }) => to.startsWith("backend-source"))).toBe(false);
+  });
+  it("serves the renderer from the frozen API resource root", () => {
     expect(builderConfig.extraResources).toContainEqual({
-      from: "../data/lgbm_regressor_model.joblib",
-      to: "backend-source/data/lgbm_regressor_model.joblib",
+      from: "dist",
+      to: "backend/_internal/frontend/dist",
     });
   });
 });

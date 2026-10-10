@@ -26,6 +26,10 @@
 
 ## התקנה
 
+### מתקין Windows
+
+מתקין Windows כולל את Python, שרת FastAPI, מודל LightGBM ותלויות הריצה. משתמשי המתקין אינם צריכים להתקין Python או חבילות ידנית. הוראות הפיתוח הבאות מיועדות להרצה מהמקור
+
 ### Backend
 
 ```bash
@@ -109,7 +113,7 @@ python tools/benchmark_analysis.py "D:/שמע/כל המוזיקה" --report-path
 
 ```bash
 cd album_deduplicator/frontend
-npm run sync:icons
+python -m pip install -r ../requirements-build.txt
 npm run dist:desktop
 ```
 

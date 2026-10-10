@@ -61,10 +61,12 @@ function getSpawnCandidates(port) {
   const packagedExecutable = getPackagedBackendExecutable();
   candidates.push({
     command: packagedExecutable,
-    args: [],
+    args: ["--port", String(port)],
     cwd: path.dirname(packagedExecutable),
     mode: "packaged-executable",
   });
+
+  if (app.isPackaged) return candidates;
 
   const rawCommands = process.platform === "win32"
     ? [process.env.ALBUM_DEDUP_PYTHON, process.env.PYTHON, "py", "python"]
@@ -315,7 +317,9 @@ app.whenReady().then(async () => {
     console.error(error);
     dialog.showErrorBox(
       "Album Deduplicator failed to start",
-      `${error.message}\n\nודא ש-Python זמין במערכת ושה-dependencies של ה-backend מותקנות.`,
+      `${error.message}\n\n${app.isPackaged
+        ? "התקנת היישום אינה תקינה. נסה להתקין מחדש את היישום"
+        : "ודא ש-Python זמין במערכת ושהתלויות של השרת מותקנות"}`,
     );
     app.quit();
   }

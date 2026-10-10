@@ -1,0 +1,9 @@
+-r requirements.txt
+pyinstaller==6.20.0
+# Match the validated source model runtime; packaging must not upgrade scoring.
+lightgbm==4.6.0
+scikit-learn==1.8.0
+numpy==2.4.4
+pandas==3.0.2
+scipy==1.17.1
+joblib==1.5.3
