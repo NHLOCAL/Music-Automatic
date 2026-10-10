@@ -130,6 +130,10 @@ def test_folder_scanner_skips_cache_rewrite_when_everything_comes_from_cache(mon
     monkeypatch.setattr(scanner, "_iter_folder_candidates", lambda roots: iter([candidate]))
 
     save_calls = []
+    for path in candidate.music_file_paths:
+        path.write_bytes(b"stub")
+    cached_entry[str(root)]["cache_signature"] = scanner._candidate_signature(candidate, scanner._signature_context())
+    store.save_data(cached_entry)
     monkeypatch.setattr(
         store,
         "save_data",

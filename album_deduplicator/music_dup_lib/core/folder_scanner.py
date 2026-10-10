@@ -1,4 +1,6 @@
 import concurrent.futures
+import hashlib
+import json
 import logging
 import os
 import re
@@ -16,6 +18,7 @@ from .file_processor import FileProcessor
 logger = logging.getLogger(__name__)
 
 RECYCLE_BIN_DIR_NAMES = frozenset({"$recycle.bin", "recycler", "recycled"})
+FOLDER_CACHE_SIGNATURE_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,7 @@ class FolderScanner:
         self.data_store = data_store
         self.force_rescan = force_rescan
         self.artists_map = self._load_artists_from_csv(config.ARTIST_CSV_FILE)
+        self.cache_signatures: Dict[str, str] = {}
 
     def _load_artists_from_csv(self, csv_path: Path) -> Dict[str, str]:
         artists_map = {}
@@ -60,6 +64,10 @@ class FolderScanner:
     def scan_folders(self, root_paths: List[Path]) -> Dict[Path, FolderInfo]:
         logger.info(f"Starting scan of root paths: {root_paths}")
         processed_folders: Dict[Path, FolderInfo] = {}
+        self.cache_signatures.clear()
+        # Art hashes belong to the previous file snapshot when a scanner is reused.
+        self.file_processor._album_art_hash_cache.clear()
+        signature_context = None
         cached_data = self.data_store.load_data()
         # Keep only changed records until persistence, rather than copying the
         # entire loaded cache (including folders outside the selected roots).
@@ -75,7 +83,12 @@ class FolderScanner:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             for candidate in self._iter_folder_candidates(root_paths):
                 candidates_found += 1
-                cached_folder = self._load_cached_folder(candidate.path, cached_data)
+                if signature_context is None:
+                    signature_context = self._signature_context()
+                signature = self._candidate_signature(candidate, signature_context)
+                if signature is not None:
+                    self.cache_signatures[str(candidate.path)] = signature
+                cached_folder = self._load_cached_folder(candidate.path, cached_data, signature)
                 if cached_folder is not None:
                     processed_folders[candidate.path] = cached_folder
                     continue
@@ -191,7 +204,39 @@ class FolderScanner:
             album_art_file_paths=album_art_file_paths,
         )
 
-    def _load_cached_folder(self, folder_path: Path, cached_data: Dict[str, Any]) -> Optional[FolderInfo]:
+    def _signature_context(self) -> bytes:
+        # Bump the version when metadata/generic-name extraction semantics change.
+        payload = {
+            "version": FOLDER_CACHE_SIGNATURE_VERSION,
+            "artists": sorted(self.artists_map.items()),
+            "hashing_strategy": self.file_processor.hashing_strategy,
+            "hash_chunk_size": config.HASH_CHUNK_SIZE,
+            "hash_random_chunks": config.HASH_NUM_RANDOM_CHUNKS,
+            "lossless_extensions": sorted(config.LOSSLESS_EXTENSIONS),
+        }
+        return hashlib.sha256(json.dumps(payload, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).digest()
+
+    @staticmethod
+    def _candidate_signature(candidate: FolderScanCandidate, context: bytes) -> Optional[str]:
+        digest = hashlib.sha256(context)
+        try:
+            for category, paths in (
+                ("music", candidate.music_file_paths),
+                ("other", candidate.other_file_paths),
+                ("art", candidate.album_art_file_paths),
+            ):
+                for path in paths:
+                    file_stat = path.stat()
+                    record = (category, path.name, file_stat.st_size, file_stat.st_mtime_ns, file_stat.st_mode)
+                    digest.update(json.dumps(record, ensure_ascii=False, separators=(',', ':')).encode('utf-8'))
+            return digest.hexdigest()
+        except OSError as exc:
+            logger.warning("Cannot validate folder cache for %s: %s", candidate.path, exc)
+            return None
+
+    def _load_cached_folder(
+        self, folder_path: Path, cached_data: Dict[str, Any], signature: Optional[str] = None
+    ) -> Optional[FolderInfo]:
         folder_path_str = str(folder_path)
         if self.force_rescan or folder_path_str not in cached_data:
             return None
@@ -200,6 +245,9 @@ class FolderScanner:
             cached_folder_dict = cached_data[folder_path_str]
             if not isinstance(cached_folder_dict, dict) or 'path' not in cached_folder_dict:
                 logger.warning(f"Invalid cache format for {folder_path}, rescanning.")
+                return None
+            if signature is None or cached_folder_dict.get("cache_signature") != signature:
+                logger.debug("Rescanning %s because its cache fingerprint changed or is missing.", folder_path)
                 return None
 
             cached_hash_strategy = cached_folder_dict.get("hashing_strategy", "partial")
@@ -392,6 +440,7 @@ class FolderScanner:
             "lossless_ratio": folder_info.lossless_ratio,
             "lyrics_ratio": folder_info.lyrics_ratio,
             "hashing_strategy": self.file_processor.hashing_strategy,
+            "cache_signature": self.cache_signatures.get(str(folder_info.path)),
             "quality_score": folder_info.quality_score,
             "quality_breakdown": folder_info.quality_breakdown,
         }

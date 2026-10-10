@@ -1,10 +1,13 @@
 import datetime
 import json
 import logging
+import os
 import pickle
 from pathlib import Path
 import shutil
-from typing import Dict, Any, List, Union, FrozenSet
+import tempfile
+from contextlib import contextmanager
+from typing import Dict, Any, List, Union, FrozenSet, Optional
 from .. import config
 from ..models import FolderComparisonResult
 logger = logging.getLogger(__name__)
@@ -14,6 +17,21 @@ class DataStore:
                  comparison_cache_file: Path = config.COMPARISON_RESULTS_CACHE_FILE):
         self.music_cache_file = music_cache_file
         self.comparison_cache_file = comparison_cache_file
+    @staticmethod
+    @contextmanager
+    def _atomic_cache_writer(path: Path, mode: str, **kwargs):
+        temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode=mode, dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False, **kwargs
+            ) as stream:
+                temporary_path = Path(stream.name)
+                yield stream
+            # Replace only after serialization and buffered writes both succeed.
+            os.replace(temporary_path, path)
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
     def load_data(self) -> Dict[str, Any]:
         if self.music_cache_file.exists():
             logger.info(f"Loading music data cache from: {self.music_cache_file}")
@@ -50,7 +68,7 @@ class DataStore:
         logger.info(f"Total music data entries after merge: {len(data_to_write)}")
         try:
             self.music_cache_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.music_cache_file, 'w', encoding='utf-8') as f:
+            with self._atomic_cache_writer(self.music_cache_file, 'w', encoding='utf-8') as f:
                 json.dump(data_to_write, f, ensure_ascii=False, separators=(',', ':'))
             logger.info(f"Music data cache successfully updated and saved with {len(data_to_write)} total entries.")
         except TypeError as e:
@@ -73,7 +91,9 @@ class DataStore:
             logger.debug(f"File {file_path} does not exist, no backup needed.")
         else:
             logger.debug(f"File {file_path} is empty, no backup needed. It will be overwritten or created.")
-    def load_comparison_results(self, cache_profile: str = "partial") -> Dict[FrozenSet[str], FolderComparisonResult]:
+    def load_comparison_results(
+        self, cache_profile: str = "partial", folder_signatures: Optional[Dict[str, str]] = None
+    ) -> Dict[FrozenSet[str], FolderComparisonResult]:
         if not self.comparison_cache_file.exists():
             logger.info("Comparison results cache file (.pkl) not found. Returning empty map.")
             return {}
@@ -98,6 +118,20 @@ class DataStore:
                     cache_profile,
                 )
                 return {}
+            if folder_signatures is not None:
+                stored_signatures = metadata.get("folder_signatures", {})
+                if not isinstance(stored_signatures, dict):
+                    return {}
+                # Remove stale pairs in place instead of allocating another full cache.
+                stale_keys = [
+                    key for key in results
+                    if not isinstance(key, frozenset) or len(key) != 2 or any(
+                        path not in folder_signatures or stored_signatures.get(path) != folder_signatures[path]
+                        for path in key
+                    )
+                ]
+                for key in stale_keys:
+                    del results[key]
             logger.info(f"Successfully loaded {len(results)} comparison results into map from Pickle cache.")
             return results
         except pickle.UnpicklingError as e:
@@ -110,10 +144,13 @@ class DataStore:
     def save_comparison_results(self,
                                 results_to_update: Union[List[FolderComparisonResult], Dict[FrozenSet[Path], FolderComparisonResult], Dict[FrozenSet[str], FolderComparisonResult]],
                                 cache_profile: str = "partial",
-                                existing_results_map: Union[Dict[FrozenSet[str], FolderComparisonResult], None] = None):
+                                existing_results_map: Union[Dict[FrozenSet[str], FolderComparisonResult], None] = None,
+                                folder_signatures: Optional[Dict[str, str]] = None):
         logger.info(f"Attempting to save/update comparison results to Pickle file: {self.comparison_cache_file}")
         if existing_results_map is None:
-            existing_results_map = self.load_comparison_results(cache_profile=cache_profile)
+            existing_results_map = self.load_comparison_results(
+                cache_profile=cache_profile, folder_signatures=folder_signatures
+            )
             logger.info(f"Loaded {len(existing_results_map)} existing comparison results. Merging with {len(results_to_update) if isinstance(results_to_update, (list, dict)) else 'N/A'} new/updated results.")
         else:
             existing_results_map = dict(existing_results_map)
@@ -140,10 +177,13 @@ class DataStore:
         logger.info(f"Total comparison results after merge: {len(existing_results_map)}")
         try:
             self.comparison_cache_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.comparison_cache_file, 'wb') as f:
+            with self._atomic_cache_writer(self.comparison_cache_file, 'wb') as f:
                 pickle.dump(
                     {
-                        "metadata": {"cache_profile": cache_profile},
+                        "metadata": {
+                            "cache_profile": cache_profile,
+                            "folder_signatures": folder_signatures or {},
+                        },
                         "results": existing_results_map,
                     },
                     f,
