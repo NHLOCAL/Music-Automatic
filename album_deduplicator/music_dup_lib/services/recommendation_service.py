@@ -61,15 +61,20 @@ class RecommendationService:
     ) -> Dict[str, AlbumCluster]:
         graph: Dict[str, Set[str]] = defaultdict(set)
         pair_lookup_by_folder_ids: Dict[frozenset[str], str] = {}
-        eligible_pairs = [
+        eligible_pairs = (
             pair
             for pair in pairs.values()
             if pair.is_identical_by_hash or config.is_review_candidate(pair.final_score)
-        ]
+        )
         for pair in eligible_pairs:
             graph[pair.folder1_id].add(pair.folder2_id)
             graph[pair.folder2_id].add(pair.folder1_id)
             pair_lookup_by_folder_ids[frozenset({pair.folder1_id, pair.folder2_id})] = pair.pair_id
+
+        pair_ids_by_folder: Dict[str, Set[str]] = defaultdict(set)
+        for folder_ids, pair_id in pair_lookup_by_folder_ids.items():
+            for member_id in folder_ids:
+                pair_ids_by_folder[member_id].add(pair_id)
 
         clusters: Dict[str, AlbumCluster] = {}
         seen: Set[str] = set()
@@ -81,7 +86,7 @@ class RecommendationService:
                 continue
 
             component_list = sorted(component)
-            component_pairs = self._component_pairs(component, pair_lookup_by_folder_ids)
+            component_pairs = self._component_pairs(component, pair_ids_by_folder)
             recommended_keeper_id, keeper_reasons, reason_codes, clear_keeper = self._pick_keeper(component, albums)
             pairwise_complete = self._has_full_pairwise_coverage(component_list, component_pairs)
             all_pairs_safe = pairwise_complete and all(
@@ -176,15 +181,11 @@ class RecommendationService:
     def _component_pairs(
         self,
         component: Iterable[str],
-        pair_lookup_by_folder_ids: Dict[frozenset[str], str],
+        pair_ids_by_folder: Dict[str, Set[str]],
     ) -> Set[str]:
-        component_list = sorted(component)
         pair_ids: Set[str] = set()
-        for index, folder_id in enumerate(component_list):
-            for other_folder_id in component_list[index + 1 :]:
-                pair_id = pair_lookup_by_folder_ids.get(frozenset({folder_id, other_folder_id}))
-                if pair_id:
-                    pair_ids.add(pair_id)
+        for folder_id in component:
+            pair_ids.update(pair_ids_by_folder.get(folder_id, ()))
         return pair_ids
 
     def _has_full_pairwise_coverage(
