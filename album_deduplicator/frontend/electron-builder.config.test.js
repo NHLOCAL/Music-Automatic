@@ -5,6 +5,12 @@ const require = createRequire(import.meta.url);
 const builderConfig = require("./electron-builder.config.cjs");
 
 describe("electron builder config", () => {
+  it("packages artist normalization data with the backend", () => {
+    expect(builderConfig.extraResources).toContainEqual({
+      from: "../data/singer-list.csv",
+      to: "backend-source/data/singer-list.csv",
+    });
+  });
   it("packages the ML model where the backend config resolves it", () => {
     expect(builderConfig.extraResources).toContainEqual({
       from: "../data/lgbm_regressor_model.joblib",

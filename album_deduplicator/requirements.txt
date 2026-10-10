@@ -3,6 +3,7 @@ jibrish_to_hebrew
 rapidfuzz
 joblib
 lightgbm
+scikit-learn
 pandas
 numpy
 Pillow

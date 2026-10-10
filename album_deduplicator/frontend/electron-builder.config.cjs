@@ -28,6 +28,10 @@ module.exports = {
       to: "backend-source/data/lgbm_regressor_model.joblib",
     },
     {
+      from: "../data/singer-list.csv",
+      to: "backend-source/data/singer-list.csv",
+    },
+    {
       from: "../frontend/dist",
       to: "backend-source/frontend/dist",
     },

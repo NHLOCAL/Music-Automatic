@@ -65,6 +65,7 @@ git push origin album-deduplicator-v0.1.0
 
 - `electron-builder` כבר נמצא בפרויקט ומוגדר ל-`NSIS`, כך שאין צורך להוסיף מערכת packaging נוספת
 - ה-tag ב-Git הוא כעת מקור האמת לגרסת release, ולכן לא צריך לעדכן ידנית את `frontend/package.json` לפני כל שחרור
+- מודל ה-ML ומיפוי האמנים תחת `data/` מנוהלים ב-Git ונארזים כמשאבי backend. בדיקת `verify` שולפת היסטוריה מלאה עבור בדיקות ההתאמה לתגים ולקומיטים קודמים
 - האייקון של האפליקציה נגזר אוטומטית מתוך `album_deduplicator/frontend/build/icons/app-icon-source.png`, כך שחלון ה-`Electron`, קובץ ה-`exe`, המתקין וה-uninstaller משתמשים באותו נכס רשמי
 - `GitHub Releases` הוא provider נתמך ישירות על ידי `electron-builder`, ולכן התהליך קצר ויציב יותר מפתרון custom
 - הפלט כולל `latest.yml`, כך שאם בהמשך תתווסף שכבת `electron-updater`, בסיס הפרסום כבר קיים
