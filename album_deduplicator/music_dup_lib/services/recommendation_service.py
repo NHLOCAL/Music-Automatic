@@ -37,6 +37,7 @@ class RecommendationService:
         summaries: Dict[str, AlbumSummary] = {}
         for folder_path, folder_info in folders.items():
             folder_id = stable_id("folder", str(folder_path))
+            preferred_root_rank = self._preferred_root_rank(folder_path)
             summaries[folder_id] = AlbumSummary(
                 folder_id=folder_id,
                 path=folder_path,
@@ -44,12 +45,12 @@ class RecommendationService:
                 quality_score=folder_info.quality_score,
                 avg_bitrate=folder_info.avg_bitrate,
                 file_count=len(folder_info.files),
-                in_preferred_root=self._is_in_preferred_root(folder_path),
+                in_preferred_root=preferred_root_rank is not None,
                 has_album_art=bool(folder_info.album_art_hash),
                 lossless_ratio=folder_info.lossless_ratio,
                 lyrics_ratio=folder_info.lyrics_ratio,
                 total_size_mb=round(sum(file.size_mb for file in folder_info.files), 2),
-                preferred_root_rank=self._preferred_root_rank(folder_path),
+                preferred_root_rank=preferred_root_rank,
             )
         return summaries
 
@@ -267,6 +268,8 @@ class RecommendationService:
         return self._preferred_root_rank(folder_path) is not None
 
     def _preferred_root_rank(self, folder_path: Path) -> Optional[int]:
+        if not self._normalized_preferred_roots:
+            return None
         normalized_folder_path = self._normalize_path(folder_path)
         for rank, normalized_root in enumerate(self._normalized_preferred_roots):
             if normalized_folder_path == normalized_root:
