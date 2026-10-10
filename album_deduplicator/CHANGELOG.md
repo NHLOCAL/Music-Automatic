@@ -6,6 +6,10 @@
 
 ## Unreleased
 
+### Performance
+
+- Reduced redundant file-stat calls, disabled-log formatting and folder-cache copies during scanning; repeated generic track names keep the same score with a direct exact-match path
+
 ### Fixed
 
 - מטאדאטה שמכילה ערכי placeholder כמו `Unknown Artist`, `Unknown Album`, `אמן לא ידוע` או `אלבום לא ידוע` מורידה כעת את ציון איכות האלבום.

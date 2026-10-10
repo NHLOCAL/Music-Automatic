@@ -61,7 +61,9 @@ class FolderScanner:
         logger.info(f"Starting scan of root paths: {root_paths}")
         processed_folders: Dict[Path, FolderInfo] = {}
         cached_data = self.data_store.load_data()
-        cache_to_persist = dict(cached_data)
+        # Keep only changed records until persistence, rather than copying the
+        # entire loaded cache (including folders outside the selected roots).
+        cache_to_persist: Dict[str, Any] = {}
         cache_modified_ref = [False]
         candidates_found = 0
         futures: Dict[concurrent.futures.Future[Optional[FolderInfo]], FolderScanCandidate] = {}
@@ -87,6 +89,7 @@ class FolderScanner:
                         futures=futures,
                         processed_folders=processed_folders,
                         cache_to_persist=cache_to_persist,
+                        cached_data=cached_data,
                         cache_modified_ref=cache_modified_ref,
                         wait_for_all=False,
                     )
@@ -95,6 +98,7 @@ class FolderScanner:
                 futures=futures,
                 processed_folders=processed_folders,
                 cache_to_persist=cache_to_persist,
+                cached_data=cached_data,
                 cache_modified_ref=cache_modified_ref,
                 wait_for_all=True,
             )
@@ -103,7 +107,8 @@ class FolderScanner:
             f"Scan complete. Found {candidates_found} candidate folders and processed {len(processed_folders)} folders."
         )
         if cache_modified_ref[0]:
-            self.data_store.save_data(cache_to_persist, merge=False)
+            cached_data.update(cache_to_persist)
+            self.data_store.save_data(cached_data, merge=False)
         else:
             logger.info("Folder cache did not change during scan; skipping music cache rewrite.")
         return processed_folders
@@ -223,6 +228,7 @@ class FolderScanner:
         futures: Dict[concurrent.futures.Future[Optional[FolderInfo]], FolderScanCandidate],
         processed_folders: Dict[Path, FolderInfo],
         cache_to_persist: Dict[str, Any],
+        cached_data: Dict[str, Any],
         cache_modified_ref: List[bool],
         wait_for_all: bool,
     ) -> None:
@@ -240,7 +246,8 @@ class FolderScanner:
                     processed_folders[result.path] = result
                     serialized = self._folder_info_to_dict(result)
                     cache_key = str(result.path)
-                    if cache_to_persist.get(cache_key) != serialized:
+                    previous = cache_to_persist.get(cache_key, cached_data.get(cache_key))
+                    if previous != serialized:
                         cache_modified_ref[0] = True
                         cache_to_persist[cache_key] = serialized
             except Exception as e:
@@ -350,6 +357,10 @@ class FolderScanner:
             return 1.0
         if len(cleaned_names) < 2:
             return 0.0
+        # Every pair of identical nonempty names scores exactly 1.0. This is
+        # common for numbered tracks and avoids a quadratic loop in that case.
+        if all(name == cleaned_names[0] for name in cleaned_names):
+            return 1.0
 
         total_similarity = 0.0
         pair_count = 0

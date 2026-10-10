@@ -1,6 +1,7 @@
 import hashlib
 import random
 import logging
+import stat
 from pathlib import Path
 from typing import Iterable, Optional, Tuple, Dict, Any
 
@@ -66,7 +67,12 @@ class FileProcessor:
 
     def process_file(self, filepath: Path) -> Optional[FileInfo]:
 
-        if not filepath.is_file():
+        try:
+            file_stat = filepath.stat()
+        except OSError:
+            logger.warning(f"File not found or is not a file: {filepath}")
+            return None
+        if not stat.S_ISREG(file_stat.st_mode):
             logger.warning(f"File not found or is not a file: {filepath}")
             return None
 
@@ -76,11 +82,7 @@ class FileProcessor:
             return None
 
         filename = filepath.name
-        try:
-            file_size_bytes = filepath.stat().st_size
-        except OSError as e:
-            logger.error(f"Error getting file size for {filepath}: {e}")
-            file_size_bytes = 0
+        file_size_bytes = file_stat.st_size
         size_mb = file_size_bytes / (1024 * 1024) if file_size_bytes > 0 else 0.0
         file_hash = self._calculate_hash(filepath, file_size=file_size_bytes) if self.enable_hashing else None
 
@@ -118,7 +120,7 @@ class FileProcessor:
             has_lyrics=has_lyrics,
             is_lossless=is_lossless
         )
-        logger.debug(f"Processed file: {filename} -> {file_info}")
+        logger.debug("Processed file: %s -> %s", filename, file_info)
         return file_info
 
     def _extract_metadata(self, filepath: Path) -> Dict[str, Any]:
@@ -325,11 +327,12 @@ class FileProcessor:
             return None
 
     def process_other_file_info(self, filepath: Path) -> Optional[Dict[str, Any]]:
-        if not filepath.is_file():
-            logger.warning(f"Other file not found or is not a file: {filepath}")
-            return None
         try:
-            file_size = filepath.stat().st_size
+            file_stat = filepath.stat()
+            if not stat.S_ISREG(file_stat.st_mode):
+                logger.warning(f"Other file not found or is not a file: {filepath}")
+                return None
+            file_size = file_stat.st_size
             return {
                 'name': filepath.name,
                 'size_bytes': file_size,
