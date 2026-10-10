@@ -300,7 +300,7 @@ class ComparisonEngine:
             file2 = prepared_file2.file_info
             s1, s2 = file1.size_mb, file2.size_mb
             if s1 > 0 and s2 > 0:
-                ratio = min(s1, s2) / max(s1, s2)
+                ratio = s1 / s2 if s1 < s2 else s2 / s1
                 size_similarity_sum += 1.0 if ratio >= 0.95 else ratio * ratio
             fn_sim = cached_string_similarity(file1.filename, file2.filename)
             filename_sim_sum += (fn_sim * filename_adjustment)
@@ -326,7 +326,7 @@ class ComparisonEngine:
                 album_sim_sum += 0.0
             d1, d2 = file1.duration, file2.duration
             if d1 is not None and d2 is not None and d1 > 0 and d2 > 0:
-                 ratio = min(d1, d2) / max(d1, d2)
+                 ratio = d1 / d2 if d1 < d2 else d2 / d1
                  duration_sim_sum += 1.0 if ratio >= 0.97 else (ratio * ratio if ratio > 0.8 else 0.0)
             elif d1 is not None or d2 is not None :
                 duration_sim_sum += 0.0
