@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+from collections import deque
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
@@ -67,7 +68,6 @@ class FolderScanner:
         self.cache_signatures.clear()
         # Art hashes belong to the previous file snapshot when a scanner is reused.
         self.file_processor._album_art_hash_cache.clear()
-        signature_context = None
         cached_data = self.data_store.load_data()
         # Keep only changed records until persistence, rather than copying the
         # entire loaded cache (including folders outside the selected roots).
@@ -81,11 +81,8 @@ class FolderScanner:
         logger.info(f"Using up to {max_workers} workers for processing.")
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for candidate in self._iter_folder_candidates(root_paths):
+            for candidate, signature in self._iter_validated_candidates(root_paths, executor, min(4, max_workers)):
                 candidates_found += 1
-                if signature_context is None:
-                    signature_context = self._signature_context()
-                signature = self._candidate_signature(candidate, signature_context)
                 if signature is not None:
                     self.cache_signatures[str(candidate.path)] = signature
                 cached_folder = self._load_cached_folder(candidate.path, cached_data, signature)
@@ -125,6 +122,31 @@ class FolderScanner:
         else:
             logger.info("Folder cache did not change during scan; skipping music cache rewrite.")
         return processed_folders
+
+    def _iter_validated_candidates(
+        self,
+        root_paths: List[Path],
+        executor: concurrent.futures.ThreadPoolExecutor,
+        max_pending: int,
+    ) -> Iterable[tuple[FolderScanCandidate, Optional[str]]]:
+        # Keep authoritative Path.stat checks (including hard links and Windows
+        # executable mode bits), but overlap their I/O in the existing worker pool.
+        # Consume in discovery order so warm-cache pair orientation is unchanged.
+        pending = deque()
+        context = None
+        for candidate in self._iter_folder_candidates(root_paths):
+            if context is None:
+                context = self._signature_context()
+            if max_pending <= 1:
+                yield candidate, self._candidate_signature(candidate, context)
+                continue
+            pending.append((candidate, executor.submit(self._candidate_signature, candidate, context)))
+            if len(pending) >= max_pending:
+                oldest, future = pending.popleft()
+                yield oldest, future.result()
+        while pending:
+            oldest, future = pending.popleft()
+            yield oldest, future.result()
 
     def _resolve_max_workers(self) -> int:
         if config.SCAN_MAX_WORKERS:
