@@ -91,6 +91,8 @@ git push origin album-deduplicator-v0.2.1
 
 ## שרת עצמאי ובדיקת התקנה
 
+`electron/installer/hooks.nsh` מחיל את תיקון electron-builder [a356198](https://github.com/electron-userland/electron-builder/commit/a356198ec7c54c7795659342bff36d9a5162cd93) עבור העתקת נתיב ההתקנה למשתמש. יש להסיר את ה-override כאשר תבנית `multiUser.nsh` של גרסת הבנייה תכלול את ההעתקה הבטוחה באמצעות `lstrcpynW`
+
 `requirements-build.txt` מגדיר את PyInstaller ואת גרסאות ספריות החישוב. יש להתקין אותו בסביבת Python 3.12 מבודדת לפני בניית המתקין. `npm run dist:desktop` מקפיא את השרת אל `build/backend/album-deduplicator-api` ואורז אותו במשאבי Electron. כל רכיבי LightGBM ו-scikit-learn, המודל, מיפוי האמנים והנחיות Gemini נכללים בחבילה. לפי [תיעוד PyInstaller](https://pyinstaller.org/en/stable/runtime-information.html), נתיבי המשאבים נקבעים יחסית למודולים הארוזים
 
 השרת הארוז מקבל פורט מ-Electron ועוצר אם המודל אינו נטען. מטמון ולוגים נשמרים תחת `%LOCALAPPDATA%/Music Automatic/Album Deduplicator`, ומשאבי המודל נשארים בתיקיית ההתקנה

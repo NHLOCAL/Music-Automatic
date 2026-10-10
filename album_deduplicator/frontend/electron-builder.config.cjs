@@ -32,6 +32,7 @@ module.exports = {
     icon: "build/icons/app-icon.ico",
   },
   nsis: {
+    include: "electron/installer/hooks.nsh",
     installerIcon: "build/icons/app-icon.ico",
     uninstallerIcon: "build/icons/app-icon.ico",
     installerHeaderIcon: "build/icons/app-icon.ico",

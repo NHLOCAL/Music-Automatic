@@ -5,6 +5,9 @@ const require = createRequire(import.meta.url);
 const builderConfig = require("./electron-builder.config.cjs");
 
 describe("electron builder config", () => {
+  it("applies the safe per-user installation path override", () => {
+    expect(builderConfig.nsis.include).toBe("electron/installer/hooks.nsh");
+  });
   it("packages the complete frozen backend directory", () => {
     expect(builderConfig.extraResources).toContainEqual({
       from: "../build/backend/album-deduplicator-api",
