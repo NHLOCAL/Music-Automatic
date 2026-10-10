@@ -173,6 +173,36 @@ questions and higher cutoffs can remove all positive approvals, producing zero
 dangerous positives while making automation unhelpful. Always inspect positive
 approval counts, reference uncertainty, stable family coverage and intervals.
 
+## User-reviewed reference layer
+
+`reviews/user_review_decisions.json` is the current human export for the 31-case
+common sample. Decisions join by `case_id`, never row position. Duplicate IDs,
+unknown cases, missing cases in a complete overlay, invalid verdicts or invalid
+notes reject the import. `note` is plain review data and never enters model
+inputs. The corrected `07e43d40423e2880f209` decision is `different`.
+
+The previous human export is retained under `reviews/user_review_history/`;
+the original independent metadata reviews remain unchanged. Each overlaid case
+keeps its prior label, provenance, review and source in `reference_history`.
+The current label has `label_provenance=user_review`, plus export timestamp and
+content hash. Reapplying the same export does not duplicate that history.
+
+For the exact original metadata snapshots, default dataset builds apply the
+current user layer. `--metadata-only` reproduces metadata-only references.
+Explicit `--reviews` datasets such as the fresh 20-family holdout do not acquire
+the default user overlay; `--user-decisions` opts into a particular export.
+
+```powershell
+python -m album_deduplicator.experiments.ai_duplicate_benchmark.user_reviews --dataset album_deduplicator/logs/ai-duplicate-benchmark/comparison/cases.jsonl --output album_deduplicator/logs/ai-duplicate-benchmark/comparison-user-reviewed/cases.jsonl
+python -m album_deduplicator.experiments.ai_duplicate_benchmark.report --dataset album_deduplicator/logs/ai-duplicate-benchmark/comparison-user-reviewed/cases.jsonl --records album_deduplicator/logs/ai-duplicate-benchmark/comparison/records.jsonl --output album_deduplicator/logs/ai-duplicate-benchmark/comparison-user-reviewed
+```
+
+Reference updates rescore the existing paid responses; they require no inference
+calls. Original run manifests, prompt/input hashes and response ledgers stay
+unchanged. Preserve old reference reports separately from user-reviewed
+outputs. Do not resume a paid run using its original directory after changing
+dataset references; evaluate the existing records instead.
+
 API contracts: [Decisions guide](https://openrouter.ai/blog/insights/what-is-jev/),
 [key creation](https://openrouter.ai/docs/api/api-reference/api-keys/create-keys),
 [Clef models and input limit](https://openrouter.ai/cloudflare).

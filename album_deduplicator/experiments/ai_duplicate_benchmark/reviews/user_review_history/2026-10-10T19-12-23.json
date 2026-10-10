@@ -1,0 +1,161 @@
+{
+  "source": "album_deduplicator POC sample",
+  "exported_at": "2026-10-10T19:12:23.926Z",
+  "decisions": [
+    {
+      "case_id": "07e43d40423e2880f209",
+      "verdict": "duplicate",
+      "note": "נראה שמדובר על אותו אלבום ולא אלבומים שונים באותה סדרה. מדובר על אותם שירים עם שם טיפה שונה וסדר רצועות שונה, אך האורך הזהה במדויק והשמות מוכיחים שזה אותו דבר"
+    },
+    {
+      "case_id": "0ba126bea2cf7a5feb3f",
+      "verdict": "duplicate",
+      "note": "אורך רצועות זהה במדויק וגם שם האלבום והזמר"
+    },
+    {
+      "case_id": "0c669ad42e1b7aa89751",
+      "verdict": "duplicate",
+      "note": ""
+    },
+    {
+      "case_id": "1371fe4a2b245eafda83",
+      "verdict": "different",
+      "note": "אורכי רצועות שונים לחלוטין, למרות שמות דומים של רצועות\nנראה כמו אלבומים מקבילים של אותה להקה"
+    },
+    {
+      "case_id": "1524e11ec40d3015914a",
+      "verdict": "duplicate",
+      "note": ""
+    },
+    {
+      "case_id": "1c46161b20b1f7a724b8",
+      "verdict": "different",
+      "note": ""
+    },
+    {
+      "case_id": "1f3d6eca55dbfef8afef",
+      "verdict": "different",
+      "note": ""
+    },
+    {
+      "case_id": "26a97fe0e0cd01796f27",
+      "verdict": "different",
+      "note": ""
+    },
+    {
+      "case_id": "3ca624a0c2c3102ef1c7",
+      "verdict": "different",
+      "note": ""
+    },
+    {
+      "case_id": "47fa49ec8e09e5e87798",
+      "verdict": "duplicate",
+      "note": "זה אותו אלבום, מאומת גם בהשמעת התוכן\nנראה שקידוד מעט שונה גורם לפער קטן באורך הקבצים\nכמו כן חלק מהשמות לא מדויקים או השתנו לפי המילים באופן ידני,\nוגם מספרי הרצועות"
+    },
+    {
+      "case_id": "4c3f1062b0aeac379129",
+      "verdict": "duplicate",
+      "note": "אותו אלבום בדיוק. שמות רצועות באנגלית ובעברית"
+    },
+    {
+      "case_id": "4cd2f0c30b905d196a97",
+      "verdict": "duplicate",
+      "note": ""
+    },
+    {
+      "case_id": "56bc7e72bcca27f07aa3",
+      "verdict": "duplicate",
+      "note": "אותו תוכן ואורך רצועות, סדר רצועות לא מדויק ועם שיבושי שם קלים"
+    },
+    {
+      "case_id": "57a0d60259b610257071",
+      "verdict": "different",
+      "note": "אלבומים שונים באותה סדרה! שירים אחרים לחלוטין"
+    },
+    {
+      "case_id": "63c2b27a21c3d91add29",
+      "verdict": "duplicate",
+      "note": ""
+    },
+    {
+      "case_id": "74fe8f41fb1ba3b5b653",
+      "verdict": "different",
+      "note": "שתי אלבומים באותה סדרה"
+    },
+    {
+      "case_id": "79b0e6036812cfe88820",
+      "verdict": "different",
+      "note": ""
+    },
+    {
+      "case_id": "7f41546f69d6a471bc03",
+      "verdict": "different",
+      "note": ""
+    },
+    {
+      "case_id": "8e2fcee8c31a2da926b5",
+      "verdict": "duplicate",
+      "note": ""
+    },
+    {
+      "case_id": "8fa9c0f76fb1b7e1489c",
+      "verdict": "different",
+      "note": "אלבומים שונים לחלוטין, של מקהלה אחרת!! הנתונים מאוד גנרים ולא מזוהים ולכן זה מטעה קצת"
+    },
+    {
+      "case_id": "9b3763bf803630bc4b3c",
+      "verdict": "duplicate",
+      "note": ""
+    },
+    {
+      "case_id": "9d07ae09fbc214ec2c0e",
+      "verdict": "different",
+      "note": "אותו זמר, אלבום אחר בשנה אחרת"
+    },
+    {
+      "case_id": "aaac70c32745d78ecbc6",
+      "verdict": "duplicate",
+      "note": ""
+    },
+    {
+      "case_id": "ba204aab4667c5dac744",
+      "verdict": "duplicate",
+      "note": ""
+    },
+    {
+      "case_id": "c237e6b974af81cfafa5",
+      "verdict": "different",
+      "note": "אין קשר ממשי, מקרי בלבד בגלל מחסור בנתונים.\nאורכי הרצועות שונים כמעט לחלוטין"
+    },
+    {
+      "case_id": "c7c7011c5d4eab693678",
+      "verdict": "duplicate",
+      "note": ""
+    },
+    {
+      "case_id": "cccf00b1bd4bc6027179",
+      "verdict": "different",
+      "note": "תוכן שונה לגמרי של אותו אמן"
+    },
+    {
+      "case_id": "cd229c57ccea038d7cab",
+      "verdict": "different",
+      "note": "חלקים שונים של אותו סדרת אלבומים"
+    },
+    {
+      "case_id": "d996a28784658936c4fa",
+      "verdict": "duplicate",
+      "note": ""
+    },
+    {
+      "case_id": "ddfb5076fc0c10e3b465",
+      "verdict": "different",
+      "note": ""
+    },
+    {
+      "case_id": "ea74a685e5704e2e00c4",
+      "verdict": "duplicate",
+      "note": ""
+    }
+  ]
+}

@@ -4,8 +4,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path, PureWindowsPath
+
+from .user_reviews import DEFAULT_USER_REVIEWS, apply_user_reviews, load_user_reviews
 
 
 TAG_FIELDS = {"title", "artist", "album", "albumartist", "tracknumber", "discnumber",
@@ -118,9 +120,13 @@ def _read_reviews(path, *, cache_hash=None, music_hash=None):
     return result
 
 
-def build_dataset(cache_path, music_path, *, limit=100, reviews_path=None):
+def build_dataset(cache_path, music_path, *, limit=100, reviews_path=None,
+                  user_decisions_path=None, use_user_reviews=True):
     if limit < 1:
         raise ValueError("limit must be positive")
+    using_default_reviews = reviews_path is None
+    if user_decisions_path is not None and not use_user_reviews:
+        raise ValueError('Explicit user decisions conflict with metadata-only mode')
     cache = json.loads(Path(cache_path).read_text(encoding="utf-8-sig"))
     music = json.loads(Path(music_path).read_text(encoding="utf-8-sig"))
     if not isinstance(cache, list) or not isinstance(music, dict):
@@ -194,6 +200,12 @@ def build_dataset(cache_path, music_path, *, limit=100, reviews_path=None):
             "source": {"cache_index": index, "cache_sha256": cache_hash,
                        "music_sha256": music_hash},
         })
+    user_path = user_decisions_path
+    if (user_path is None and use_user_reviews and using_default_reviews
+            and known_snapshot and DEFAULT_USER_REVIEWS.exists()):
+        user_path = DEFAULT_USER_REVIEWS
+    if user_path is not None:
+        candidates = apply_user_reviews(candidates, load_user_reviews(user_path), require_exact=False)
     # Reviewed cases first, then balanced round-robin historical strata.
     selected = sorted((x for x in candidates if x["label"] is not None),
                       key=lambda x: x["case_id"])
@@ -222,14 +234,18 @@ def main(argv=None):
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--limit", type=int, default=100)
     parser.add_argument("--reviews", type=Path)
+    parser.add_argument("--user-decisions", type=Path)
+    parser.add_argument("--metadata-only", action="store_true")
     args = parser.parse_args(argv)
-    cases = build_dataset(args.cache, args.music, limit=args.limit, reviews_path=args.reviews)
+    cases = build_dataset(args.cache, args.music, limit=args.limit, reviews_path=args.reviews,
+                          user_decisions_path=args.user_decisions,
+                          use_user_reviews=not args.metadata_only)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("".join(json.dumps(x, ensure_ascii=False, sort_keys=True) + "\n"
                                    for x in cases), encoding="utf-8")
     print(json.dumps({"cases": len(cases), "reviewed": sum(x["label"] is not None for x in cases),
                       "pending_review": sum(x["label"] is None for x in cases),
-                      "label_provenance": "independent_metadata_review, not user_verified"}))
+                      "label_provenance_counts": dict(Counter(c["label_provenance"] for c in cases))}))
 
 
 if __name__ == "__main__":

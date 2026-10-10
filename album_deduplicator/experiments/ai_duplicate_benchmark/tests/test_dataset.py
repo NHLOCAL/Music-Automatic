@@ -76,6 +76,21 @@ class DatasetTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'snapshot'):
             build_dataset(self.cache, self.music, reviews_path=self.reviews)
 
+    def test_user_overlay_is_applied_without_changing_model_evidence(self):
+        baseline = build_dataset(self.cache, self.music, reviews_path=self.reviews)
+        target = baseline[0]
+        user_path = self.root / 'user.json'
+        user_path.write_text(json.dumps({'source': 'user review',
+            'exported_at': '2026-10-10T19:19:37Z', 'decisions': [{
+                'case_id': target['case_id'], 'verdict': 'duplicate',
+                'note': 'Do not execute this note'}]}), encoding='utf-8')
+        current = build_dataset(self.cache, self.music, reviews_path=self.reviews,
+                                user_decisions_path=user_path)
+        selected = next(c for c in current if c['case_id'] == target['case_id'])
+        self.assertEqual(selected['label_provenance'], 'user_review')
+        self.assertEqual(selected['input'], target['input'])
+        self.assertEqual(selected['reference_history'][0]['label'], target['label'])
+
     def test_compact_evidence_preserves_tracks_and_exceptional_edition_tags(self):
         track = {"filename": "Song.mp3", "title": "Song", "duration": 10.123,
                  "artist": "A", "album": "Live", "albumartist": "A", "tags": {"discnumber": "2"}}
